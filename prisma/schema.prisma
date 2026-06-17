@@ -1,0 +1,565 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  DEACTIVATED
+}
+
+enum PolicyType {
+  DEPOSIT
+  CANCELLATION
+  COMPENSATION
+  ADDITIONAL_FEE
+  WAGE_RULE
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_SURVEY
+  SURVEYED
+  WAITING_FOR_DEPOSIT
+  CONFIRMED
+  PREPARING
+  EXECUTING
+  EVENT_HAPPENING
+  RETURNED_PENDING
+  SETTLED
+  COMPLETED
+  CANCELLED
+}
+
+enum QuotationStatus {
+  DRAFT
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum SurveyStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum FieldProgressStep {
+  TRANSPORTATION
+  INSTALLATION
+  COLLECTION
+  WAREHOUSE_RETURN
+}
+
+enum FieldProgressStatus {
+  PROCESSING
+  COMPLETED
+}
+
+enum PaymentType {
+  DEPOSIT
+  FINAL_SETTLEMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum SettlementStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum AttendanceStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  REJECTED
+  FRAUD_DETECTED
+}
+
+// ============================================================
+// USER & ROLE MANAGEMENT
+// ============================================================
+
+model Role {
+  id          Int       @id @default(autoincrement())
+  roleName    String    @unique @db.VarChar(100)
+  description String?   @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  users           User[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  id         Int    @id @default(autoincrement())
+  roleId     Int
+  permission String @db.VarChar(100)
+
+  // Relations
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([roleId, permission])
+  @@map("role_permissions")
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  username     String     @unique @db.VarChar(100)
+  fullName     String     @db.VarChar(200)
+  email        String     @unique @db.VarChar(200)
+  phone        String?    @db.VarChar(20)
+  passwordHash String     @db.VarChar(255)
+  status       UserStatus @default(ACTIVE)
+  roleId       Int
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  role              Role               @relation(fields: [roleId], references: [id])
+  assignedSurveys   Survey[]           @relation("LeaderSurveys")
+  changeRequests    ChangeRequest[]    @relation("LeaderChangeRequests")
+  attendanceRecords AttendanceRecord[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  paymentEvidences  PaymentEvidence[]
+
+  @@map("users")
+}
+
+// ============================================================
+// MASTER & REFERENCE DATA
+// ============================================================
+
+model EquipmentCategory {
+  id           Int         @id @default(autoincrement())
+  categoryName String      @db.VarChar(100)
+  description  String?     @db.Text
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  equipments Equipment[]
+
+  @@map("equipment_categories")
+}
+
+model Equipment {
+  id               Int      @id @default(autoincrement())
+  sku              String   @unique @db.VarChar(50)
+  equipmentName    String   @db.VarChar(200)
+  specification    String?  @db.Text
+  totalInventory   Int      @default(0)
+  unitPrice        Decimal  @db.Decimal(15, 2)
+  categoryId       Int
+  imageUrl         String?  @db.VarChar(500)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  category             EquipmentCategory      @relation(fields: [categoryId], references: [id])
+  quotationItems       QuotationItem[]
+  inventoryReservations InventoryReservation[]
+  pickListItems        PickListItem[]
+
+  @@map("equipments")
+}
+
+model Warehouse {
+  id            Int      @id @default(autoincrement())
+  warehouseName String   @db.VarChar(200)
+  address       String   @db.Text
+  managerName   String?  @db.VarChar(200)
+  phone         String?  @db.VarChar(20)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  pickLists PickList[]
+
+  @@map("warehouses")
+}
+
+model Supplier {
+  id                 Int      @id @default(autoincrement())
+  supplierCode       String   @unique @db.VarChar(50)
+  companyName        String   @db.VarChar(200)
+  representativeName String?  @db.VarChar(200)
+  taxCode            String?  @db.VarChar(50)
+  phone              String?  @db.VarChar(20)
+  email              String?  @db.VarChar(200)
+  address            String?  @db.Text
+  website            String?  @db.VarChar(500)
+  paymentTerms       String?  @db.VarChar(100)
+  currentDebt        Decimal  @default(0) @db.Decimal(15, 2)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("suppliers")
+}
+
+model Policy {
+  id            Int        @id @default(autoincrement())
+  policyName    String     @db.VarChar(200)
+  type          PolicyType
+  rulesJson     Json
+  effectiveDate DateTime
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("policies")
+}
+
+// ============================================================
+// CUSTOMER MANAGEMENT
+// ============================================================
+
+model Customer {
+  id             Int      @id @default(autoincrement())
+  customerCode   String   @unique @db.VarChar(50)
+  fullName       String   @db.VarChar(200)
+  phone          String   @db.VarChar(20)
+  email          String?  @db.VarChar(200)
+  address        String?  @db.Text
+  companyTaxCode String?  @db.VarChar(50)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  orders Order[]
+
+  @@map("customers")
+}
+
+// ============================================================
+// ORDER LIFECYCLE MANAGEMENT
+// ============================================================
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  orderCode     String      @unique @db.VarChar(50)
+  status        OrderStatus @default(DRAFT)
+  customerId    Int
+  eventDate     DateTime
+  eventLocation String      @db.Text
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  customer              Customer               @relation(fields: [customerId], references: [id])
+  quotations            Quotation[]
+  inventoryReservations InventoryReservation[]
+  surveys               Survey[]
+  pickLists             PickList[]
+  fieldProgresses       FieldProgress[]
+  changeRequests        ChangeRequest[]
+  payments              Payment[]
+  settlements           Settlement[]
+  workSessions          WorkSession[]
+
+  @@map("orders")
+}
+
+model Quotation {
+  id            Int             @id @default(autoincrement())
+  orderId       Int
+  totalAmount   Decimal         @db.Decimal(15, 2)
+  depositAmount Decimal         @db.Decimal(15, 2)
+  discountRate  Decimal?        @default(0) @db.Decimal(5, 2)
+  notes         String?         @db.Text
+  status        QuotationStatus @default(DRAFT)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relations
+  order          Order           @relation(fields: [orderId], references: [id])
+  quotationItems QuotationItem[]
+
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          Int     @id @default(autoincrement())
+  quotationId Int
+  equipmentId Int
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(15, 2)
+  subtotal    Decimal @db.Decimal(15, 2)
+
+  // Relations
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+
+  @@map("quotation_items")
+}
+
+model InventoryReservation {
+  id           Int      @id @default(autoincrement())
+  orderId      Int
+  equipmentId  Int
+  quantity     Int
+  reservedDate DateTime
+  createdAt    DateTime @default(now())
+
+  // Relations
+  order     Order     @relation(fields: [orderId], references: [id])
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+
+  @@map("inventory_reservations")
+}
+
+// ============================================================
+// SURVEY MANAGEMENT
+// ============================================================
+
+model Survey {
+  id             Int          @id @default(autoincrement())
+  orderId        Int
+  leaderStaffId  Int
+  surveyDate     DateTime
+  locationNotes  String?      @db.Text
+  status         SurveyStatus @default(ASSIGNED)
+  surveyNotes    String?      @db.Text
+  siteConditions String?      @db.Text
+  evidenceImages Json?
+  submittedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  order       Order @relation(fields: [orderId], references: [id])
+  leaderStaff User  @relation("LeaderSurveys", fields: [leaderStaffId], references: [id])
+
+  @@map("surveys")
+}
+
+// ============================================================
+// INVENTORY & FIELD OPERATIONS
+// ============================================================
+
+model PickList {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  warehouseId Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  order         Order          @relation(fields: [orderId], references: [id])
+  warehouse     Warehouse      @relation(fields: [warehouseId], references: [id])
+  pickListItems PickListItem[]
+
+  @@map("pick_lists")
+}
+
+model PickListItem {
+  id               Int     @id @default(autoincrement())
+  pickListId       Int
+  equipmentId      Int
+  plannedQuantity  Int
+  actualQuantity   Int?
+  deviationReason  String? @db.Text
+
+  // Relations
+  pickList  PickList  @relation(fields: [pickListId], references: [id])
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+
+  @@map("pick_list_items")
+}
+
+model FieldProgress {
+  id        Int                 @id @default(autoincrement())
+  orderId   Int
+  step      FieldProgressStep
+  status    FieldProgressStatus @default(PROCESSING)
+  notes     String?             @db.Text
+  updatedAt DateTime            @updatedAt
+  createdAt DateTime            @default(now())
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("field_progresses")
+}
+
+model ChangeRequest {
+  id                Int      @id @default(autoincrement())
+  orderId           Int
+  submittedByLeaderId Int
+  reason            String   @db.Text
+  requestedChanges  Json
+  isApproved        Boolean?
+  rejectReason      String?  @db.Text
+  resolvedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  order       Order @relation(fields: [orderId], references: [id])
+  leaderStaff User  @relation("LeaderChangeRequests", fields: [submittedByLeaderId], references: [id])
+
+  @@map("change_requests")
+}
+
+// ============================================================
+// PAYMENT & SETTLEMENT MANAGEMENT
+// ============================================================
+
+model Payment {
+  id               Int           @id @default(autoincrement())
+  orderId          Int
+  paymentType      PaymentType
+  amount           Decimal       @db.Decimal(15, 2)
+  paymentReference String?       @db.VarChar(200)
+  qrCodeString     String?       @db.Text
+  qrImageUrl       String?       @db.VarChar(500)
+  status           PaymentStatus @default(PENDING)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  order            Order             @relation(fields: [orderId], references: [id])
+  paymentEvidences PaymentEvidence[]
+
+  @@map("payments")
+}
+
+model PaymentEvidence {
+  id                Int      @id @default(autoincrement())
+  paymentId         Int
+  evidenceImageUrl  String   @db.VarChar(500)
+  transactionAmount Decimal  @db.Decimal(15, 2)
+  submittedByUserId Int
+  createdAt         DateTime @default(now())
+
+  // Relations
+  payment       Payment @relation(fields: [paymentId], references: [id])
+  submittedBy   User    @relation(fields: [submittedByUserId], references: [id])
+
+  @@map("payment_evidences")
+}
+
+model Settlement {
+  id                    Int              @id @default(autoincrement())
+  orderId               Int
+  arisingFee            Decimal          @default(0) @db.Decimal(15, 2)
+  damageCompensationFee Decimal          @default(0) @db.Decimal(15, 2)
+  totalFinalAmount      Decimal          @db.Decimal(15, 2)
+  settlementNotes       String?          @db.Text
+  status                SettlementStatus @default(DRAFT)
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("settlements")
+}
+
+// ============================================================
+// ATTENDANCE & WORK SESSION
+// ============================================================
+
+model WorkSession {
+  id            Int      @id @default(autoincrement())
+  orderId       Int
+  taskType      String   @db.VarChar(100)
+  scheduledDate DateTime
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  order             Order              @relation(fields: [orderId], references: [id])
+  attendanceRecords AttendanceRecord[]
+
+  @@map("work_sessions")
+}
+
+model AttendanceRecord {
+  id             Int              @id @default(autoincrement())
+  workSessionId  Int
+  staffId        Int
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  gpsLatIn       Decimal?         @db.Decimal(10, 8)
+  gpsLngIn       Decimal?         @db.Decimal(11, 8)
+  gpsLatOut      Decimal?         @db.Decimal(10, 8)
+  gpsLngOut      Decimal?         @db.Decimal(11, 8)
+  status         AttendanceStatus @default(PENDING_CONFIRMATION)
+  confirmedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Relations
+  workSession WorkSession @relation(fields: [workSessionId], references: [id])
+  staff       User        @relation(fields: [staffId], references: [id])
+
+  @@unique([workSessionId, staffId])
+  @@map("attendance_records")
+}
+
+// ============================================================
+// SYSTEM: AUDIT LOG & NOTIFICATIONS
+// ============================================================
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  action     String   @db.VarChar(200)
+  entityType String   @db.VarChar(100)
+  entityId   Int?
+  details    Json?
+  ipAddress  String?  @db.VarChar(50)
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String   @db.VarChar(200)
+  body      String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
