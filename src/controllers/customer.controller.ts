@@ -1,25 +1,37 @@
 import { Request, Response, NextFunction } from 'express';
-import { customerService } from '../services/customer.service';
+import { CustomerService } from '../services/customer.service';
+import { sendSuccess } from '../utils/response';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
-export const customerController = {
-  async getCustomers(req: Request, res: Response, next: NextFunction): Promise<void> {
+export class CustomerController {
+  static async createCustomer(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const data = await customerService.getCustomers();
-      res.status(200).json({ success: true, statusCode: 200, data });
-    } catch (err) { next(err); }
-  },
+      const customer = await CustomerService.createCustomer(req.body, req.user!.userId);
+      sendSuccess(res, 'Customer created successfully', customer, 'CREATE_SUCCESS', 201);
+    } catch (error) { next(error); }
+  }
 
-  async getCustomerById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  static async getCustomers(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await customerService.getCustomerById(Number(req.params.id));
-      res.status(200).json({ success: true, statusCode: 200, data });
-    } catch (err) { next(err); }
-  },
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string;
+      const result = await CustomerService.getCustomers(page, limit, search);
+      sendSuccess(res, 'Customers retrieved successfully', result.data, 'SUCCESS', 200, { total: result.total, page, limit });
+    } catch (error) { next(error); }
+  }
 
-  async createCustomer(req: Request, res: Response, next: NextFunction): Promise<void> {
+  static async getCustomerById(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await customerService.createCustomer(req.body);
-      res.status(201).json({ success: true, statusCode: 201, data });
-    } catch (err) { next(err); }
-  },
-};
+      const customer = await CustomerService.getCustomerById(req.params.id);
+      sendSuccess(res, 'Customer retrieved successfully', customer);
+    } catch (error) { next(error); }
+  }
+
+  static async updateCustomer(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const customer = await CustomerService.updateCustomer(req.params.id, req.body, req.user!.userId);
+      sendSuccess(res, 'Customer updated successfully', customer);
+    } catch (error) { next(error); }
+  }
+}

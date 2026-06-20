@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { attendanceController } from '../controllers/attendance.controller';
-import { verifyToken, requireRole } from '../middlewares/auth.middleware';
+import { AttendanceController } from '../controllers/attendance.controller';
+import { verifyToken, authorizeRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
-router.use(verifyToken);
 
-// POST /api/v1/attendance/record
-router.post('/record', requireRole('Leader Staff'), attendanceController.recordAttendance);
+router.use(verifyToken);
+router.post('/', AttendanceController.checkIn);
+router.patch('/:id/check-out', AttendanceController.checkOut);
+router.post('/:id/verify', authorizeRoles('admin', 'manager', 'leader_staff'), AttendanceController.verifyAttendance);
 
 export default router;

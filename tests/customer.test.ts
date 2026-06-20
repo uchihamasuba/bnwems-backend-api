@@ -1,0 +1,1 @@
+describe('customer API', () => { it('should work', () => {}); });

@@ -1,37 +1,61 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
 import userRoutes from './user.routes';
-import equipmentRoutes from './equipment.routes';
+import catalogRoutes from './catalog.routes';
+import supplierRoutes from './supplier.routes';
+import inventoryRoutes from './inventory.routes';
 import policyRoutes from './policy.routes';
 import customerRoutes from './customer.routes';
+import quotationRoutes from './quotation.routes';
 import orderRoutes from './order.routes';
 import surveyRoutes from './survey.routes';
-import inventoryRoutes from './inventory.routes';
-import fieldRoutes from './field.routes';
+import paymentRoutes from './payment.routes';
+import settlementRoutes from './settlement.routes';
+import evidenceRoutes from './evidence.routes';
+import picklistRoutes from './picklist.routes';
 import attendanceRoutes from './attendance.routes';
-import { paymentRouter, settlementRouter, quotationRouter } from './payment.routes';
+import wageRoutes from './wage.routes';
+import changeRequestRoutes from './changerequest.routes';
+import handoverRoutes from './handover.routes';
+import damageLossRoutes from './damageloss.routes';
+import reportRoutes from './report.routes';
+import meRoutes from './me.routes';
+import notificationRoutes from './notification.routes';
+import roleRoutes from './role.routes';
+import permissionRoutes from './permission.routes';
+import assignmentRoutes from './assignment.routes';
+import taskRoutes from './task.routes';
+import warehouseRoutes from './warehouse.routes';
+import equipmentRoutes from './equipment.routes';
 
 const router = Router();
-
-// Health check
-router.get('/health', (req, res) => {
-  res.json({ success: true, message: 'BNWEMS API is running.', timestamp: new Date().toISOString() });
-});
-
-// Module routes
 router.use('/auth', authRoutes);
-router.use('/admin/users', userRoutes);
-router.use('/admin/policies', policyRoutes);
+router.use('/users', userRoutes);
+router.use('/', meRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/roles', roleRoutes);
+router.use('/permissions', permissionRoutes);
+router.use('/', catalogRoutes);
 router.use('/equipment', equipmentRoutes);
+router.use('/', supplierRoutes);
+router.use('/inventory', inventoryRoutes);
+router.use('/', policyRoutes);
 router.use('/customers', customerRoutes);
+router.use('/quotations', quotationRoutes);
 router.use('/orders', orderRoutes);
 router.use('/surveys', surveyRoutes);
-router.use('/inventory', inventoryRoutes);
-router.use('/operations', inventoryRoutes);
-router.use('/field', fieldRoutes);
-router.use('/payments', paymentRouter);
-router.use('/settlements', settlementRouter);
-router.use('/quotations', quotationRouter);
+router.use('/payments', paymentRoutes);
+router.use('/settlements', settlementRoutes);
+router.use('/evidence-files', evidenceRoutes);
+router.use('/pick-lists', picklistRoutes);
 router.use('/attendance', attendanceRoutes);
+router.use('/wage-summaries', wageRoutes);
+router.use('/change-requests', changeRequestRoutes);
+router.use('/handovers', handoverRoutes);
+router.use('/damage-loss-reports', damageLossRoutes);
+router.use('/', reportRoutes);
+router.use('/assignments', assignmentRoutes);
+router.use('/tasks', taskRoutes);
+router.use('/warehouses', warehouseRoutes);
 
 export default router;

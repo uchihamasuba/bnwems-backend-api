@@ -1,52 +1,34 @@
 import prisma from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 
-export const attendanceService = {
-  async recordAttendance(payload: {
-    workSessionId: number;
-    attendedStaffIds: number[];
-    recordedByLeaderId: number;
-  }) {
-    const workSession = await prisma.workSession.findUnique({
-      where: { id: payload.workSessionId },
+export class AttendanceService {
+  static async checkIn(assignmentId: string, sessionType: string, userId: string) {
+    return prisma.attendance.create({
+      data: {
+        assignmentId: BigInt(assignmentId),
+        userId: BigInt(userId),
+        workDate: new Date(),
+        sessionType,
+        checkInTime: new Date()
+      }
     });
+  }
 
-    if (!workSession) {
-      const err: Error & { statusCode?: number } = new Error(
-        'Bạn không được phân công phụ trách quản lý tác vụ này (MSG-RA01).'
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-
-    // Check for duplicate attendance records
-    const existing = await prisma.attendanceRecord.findFirst({
-      where: {
-        workSessionId: payload.workSessionId,
-        status: { not: 'REJECTED' },
-      },
+  static async checkOut(attendanceId: string) {
+    return prisma.attendance.update({
+      where: { id: BigInt(attendanceId) },
+      data: { checkOutTime: new Date() }
     });
+  }
 
-    if (existing) {
-      const err: Error & { statusCode?: number } = new Error(
-        'Dữ liệu chấm công ca làm việc này đã được ghi nhận trước đó (MSG-RA02).'
-      );
-      err.statusCode = 409;
-      throw err;
-    }
-
-    const records = await prisma.$transaction(
-      payload.attendedStaffIds.map((staffId) =>
-        prisma.attendanceRecord.create({
-          data: {
-            workSessionId: payload.workSessionId,
-            staffId,
-            checkInTime: new Date(),
-            status: 'PENDING_CONFIRMATION',
-          },
-        })
-      )
-    );
-
-    return records;
-  },
-};
+  static async verifyAttendance(attendanceId: string) {
+    const updated = await prisma.attendance.update({
+      where: { id: BigInt(attendanceId) },
+      data: { status: 'verified' }
+    });
+    return {
+      id: Number(updated.id),
+      status: updated.status
+    };
+  }
+}

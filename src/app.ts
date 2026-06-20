@@ -1,23 +1,18 @@
 import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { env } from './config/env';
-import apiRoutes from './routes';
-import { globalErrorHandler, notFoundHandler } from './middlewares/error.middleware';
+import path from 'path';
+import routes from './routes';
 
 const app = express();
+app.use(express.json());
 
-// Security & parsing middleware
-app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Serve static files from public/uploads
+app.use('/uploads', express.static(path.join(__dirname, '../../public/uploads')));
 
-// API routes under /api/v1
-app.use('/api/v1', apiRoutes);
+import { errorMiddleware } from './middlewares/error.middleware';
 
-// 404 and error handlers — must be last
-app.use(notFoundHandler);
-app.use(globalErrorHandler);
+app.use('/api/v1', routes);
+
+// Error handling
+app.use(errorMiddleware);
 
 export default app;

@@ -1,14 +1,13 @@
 import { Router } from 'express';
-import { surveyController } from '../controllers/survey.controller';
-import { verifyToken, requireRole } from '../middlewares/auth.middleware';
+import { SurveyController } from '../controllers/survey.controller';
+import { verifyToken, authorizeRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
+
 router.use(verifyToken);
-
-// POST /api/v1/surveys/schedule
-router.post('/schedule', requireRole('Manager'), surveyController.scheduleSurvey);
-
-// PUT /api/v1/surveys/:id/report
-router.put('/:id/report', requireRole('Leader Staff'), surveyController.submitReport);
+router.get('/:id', authorizeRoles('admin', 'manager', 'leader_staff'), SurveyController.getSurveyReportById);
+router.post('/:id/assign', authorizeRoles('admin', 'manager'), SurveyController.assignSurvey);
+router.put('/:id', authorizeRoles('admin', 'manager', 'leader_staff'), SurveyController.updateSurveyReport);
+router.post('/:id/submit', authorizeRoles('admin', 'manager', 'leader_staff'), SurveyController.submitSurveyReport);
 
 export default router;

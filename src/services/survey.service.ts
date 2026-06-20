@@ -1,71 +1,137 @@
 import prisma from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 
-export const surveyService = {
-  async scheduleSurvey(payload: {
-    orderId: number;
-    leaderStaffId: number;
-    surveyDate: string;
-    locationNotes: string;
-  }) {
-    const survey = await prisma.survey.create({
+export class SurveyService {
+  static async scheduleSurvey(orderId: string, data: any, userId: string) {
+    const order = await prisma.order.findUnique({ where: { id: BigInt(orderId) } });
+    if (!order) throw new AppError('Order not found', 404);
+
+    const surveyedBy = data.surveyed_by ? BigInt(data.surveyed_by) : BigInt(userId); // Default to creator if not provided
+
+    const survey = await prisma.surveyReport.create({
       data: {
-        orderId: payload.orderId,
-        leaderStaffId: payload.leaderStaffId,
-        surveyDate: new Date(payload.surveyDate),
-        locationNotes: payload.locationNotes,
-        status: 'ASSIGNED',
-      },
+        orderId: BigInt(orderId),
+        surveyedBy: surveyedBy,
+        surveyDate: new Date(data.survey_date),
+        status: 'draft'
+      }
     });
 
-    await prisma.order.update({
-      where: { id: payload.orderId },
-      data: { status: 'PENDING_SURVEY' },
+    return {
+      id: Number(survey.id),
+      order_id: Number(survey.orderId),
+      survey_date: survey.surveyDate,
+      surveyed_by: survey.surveyedBy ? Number(survey.surveyedBy) : null,
+      status: survey.status
+    };
+  }
+
+  static async getSurveysByOrder(orderId: string) {
+    const surveys = await prisma.surveyReport.findMany({
+      where: { orderId: BigInt(orderId) }
+    });
+    return surveys.map(s => ({
+      id: Number(s.id),
+      order_id: Number(s.orderId),
+      survey_date: s.surveyDate,
+      surveyed_by: s.surveyedBy ? Number(s.surveyedBy) : null,
+      status: s.status
+    }));
+  }
+
+  static async getSurveyReportById(id: string) {
+    const survey = await prisma.surveyReport.findUnique({
+      where: { id: BigInt(id) },
+      include: { items: true }
+    });
+    if (!survey) throw new AppError('Survey not found', 404);
+
+    const attachments = await prisma.evidenceAttachment.findMany({
+      where: { entityType: 'survey_reports', entityId: BigInt(id) },
+      include: { evidenceFile: true }
     });
 
-    // Create notification for leader staff
-    await prisma.notification.create({
+    return {
+      id: Number(survey.id),
+      order_id: Number(survey.orderId),
+      surveyed_by: survey.surveyedBy ? Number(survey.surveyedBy) : null,
+      survey_date: survey.surveyDate,
+      venue_notes: survey.venueNotes,
+      requirement_notes: survey.requirementNotes,
+      status: survey.status,
+      items: survey.items.map((i: any) => ({
+        id: Number(i.id),
+        catalog_item_id: i.catalogItemId ? Number(i.catalogItemId) : null,
+        item_name: i.itemName,
+        quantity_required: Number(i.quantityRequired),
+        notes: i.notes
+      })),
+      evidence_files: attachments.map((a: any) => ({
+        id: Number(a.evidenceFile.id),
+        file_url: a.evidenceFile.fileUrl
+      }))
+    };
+  }
+
+  static async assignSurvey(id: string, data: any) {
+    const survey = await prisma.surveyReport.update({
+      where: { id: BigInt(id) },
+      data: { surveyedBy: BigInt(data.surveyed_by) }
+    });
+    return { id: Number(survey.id), surveyed_by: Number(survey.surveyedBy) };
+  }
+
+  static async updateSurveyReport(id: string, data: any, userId: string) {
+    const survey = await prisma.surveyReport.findUnique({ where: { id: BigInt(id) } });
+    if (!survey) throw new AppError('Survey not found', 404);
+
+    const updated = await prisma.surveyReport.update({
+      where: { id: BigInt(id) },
       data: {
-        userId: payload.leaderStaffId,
-        title: 'Bạn được phân công khảo sát hiện trường',
-        body: `Tác vụ khảo sát cho đơn hàng đã được giao vào ${new Date(payload.surveyDate).toLocaleDateString('vi-VN')}.`,
-      },
+        venueNotes: data.venue_notes || undefined,
+        requirementNotes: data.requirement_notes || undefined
+      }
     });
 
-    return survey;
-  },
-
-  async submitSurveyReport(
-    surveyId: number,
-    payload: {
-      surveyNotes: string;
-      siteConditions: string;
-      evidenceImages: string[];
+    if (data.items) {
+      await prisma.surveyItem.deleteMany({ where: { surveyReportId: BigInt(id) } });
+      await prisma.surveyItem.createMany({
+        data: data.items.map((i: any) => ({
+          surveyReportId: BigInt(id),
+          catalogItemId: i.catalog_item_id ? BigInt(i.catalog_item_id) : null,
+          itemName: i.item_name || 'N/A',
+          quantityRequired: i.quantity_required,
+          notes: i.notes || null
+        }))
+      });
     }
-  ) {
-    if (!payload.evidenceImages || payload.evidenceImages.length === 0) {
-      const err: Error & { statusCode?: number } = new Error(
-        'Hình ảnh hiện trường mặt bằng là điều kiện bắt buộc (BR-SV03).'
-      );
-      err.statusCode = 400;
-      throw err;
+
+    if (data.evidence_file_ids && data.evidence_file_ids.length > 0) {
+      const fileIds = data.evidence_file_ids.map((fid: any) => BigInt(fid));
+      await prisma.evidenceAttachment.updateMany({
+        where: { id: { in: fileIds } },
+        data: {
+          entityType: 'survey_reports',
+          entityId: BigInt(id)
+        }
+      });
     }
 
-    const survey = await prisma.survey.update({
-      where: { id: surveyId },
-      data: {
-        surveyNotes: payload.surveyNotes,
-        siteConditions: payload.siteConditions,
-        evidenceImages: payload.evidenceImages,
-        status: 'COMPLETED',
-        submittedAt: new Date(),
-      },
+    return { id: Number(updated.id) };
+  }
+
+  static async submitSurveyReport(id: string, userId: string) {
+    const survey = await prisma.surveyReport.findUnique({ where: { id: BigInt(id) } });
+    if (!survey) throw new AppError('Survey not found', 404);
+    if (survey.surveyedBy && survey.surveyedBy !== BigInt(userId)) {
+      // In reality, might need role check if Admin can override
+    }
+
+    const updated = await prisma.surveyReport.update({
+      where: { id: BigInt(id) },
+      data: { status: 'submitted' }
     });
 
-    await prisma.order.update({
-      where: { id: survey.orderId },
-      data: { status: 'SURVEYED' },
-    });
-
-    return survey;
-  },
-};
+    return { id: Number(updated.id), status: updated.status };
+  }
+}

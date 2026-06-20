@@ -1,4 +1,5 @@
-import prisma from '../config/database';
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 
 export interface GetEquipmentQuery {
   categoryId?: number;
@@ -7,16 +8,31 @@ export interface GetEquipmentQuery {
 
 export const equipmentService = {
   async getEquipments(query: GetEquipmentQuery) {
-    const where: Record<string, unknown> = { isActive: true };
-    if (query.categoryId) where.categoryId = Number(query.categoryId);
-    if (query.search) where.equipmentName = { contains: query.search };
+    if (query.categoryId !== undefined && isNaN(query.categoryId)) {
+      throw new AppError('Invalid categoryId', 400);
+    }
 
-    const equipments = await prisma.equipment.findMany({
-      where,
-      include: { category: { select: { id: true, categoryName: true } } },
-      orderBy: { equipmentName: 'asc' },
-    });
+    const where: any = { type: 'equipment' };
+    if (query.categoryId) {
+      where.categoryId = BigInt(query.categoryId);
+    }
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search } },
+        { code: { contains: query.search } },
+      ];
+    }
 
-    return equipments;
+    const items = await prisma.catalogItem.findMany({ where, include: { category: true } });
+
+    return items.map((item: any) => ({
+      id: Number(item.id),
+      code: item.code,
+      name: item.name,
+      category: item.category ? {
+        id: Number(item.category.id),
+        name: item.category.name,
+      } : null
+    }));
   },
 };
