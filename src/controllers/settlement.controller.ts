@@ -1,18 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
-import { settlementService } from '../services/settlement.service';
+import { SettlementService } from '../services/settlement.service';
+import { sendSuccess } from '../utils/response';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
-export const settlementController = {
-  async createSettlement(req: Request, res: Response, next: NextFunction): Promise<void> {
+export class SettlementController {
+  static async approveSettlement(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await settlementService.createSettlement(req.body);
-      res.status(201).json({ success: true, statusCode: 201, message: 'Thông tin quyết toán đã được ghi nhận thành công (MSG-ST02).' });
-    } catch (err) { next(err); }
-  },
+      const result = await SettlementService.approveSettlement(req.params.id, req.user!.userId);
+      sendSuccess(res, 'Đã xác nhận quyết toán', result, 'MSG-STA-01');
+    } catch (error) { next(error); }
+  }
 
-  async submitForApproval(req: Request, res: Response, next: NextFunction): Promise<void> {
+  static async submitSettlement(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await settlementService.submitForApproval(Number(req.params.id));
-      res.status(200).json({ success: true, statusCode: 200, message: 'Hồ sơ quyết toán đã được trình duyệt thành công (MSG-SA02).' });
-    } catch (err) { next(err); }
-  },
-};
+      const result = await SettlementService.submitSettlement(req.params.id, req.user!.userId);
+      sendSuccess(res, 'Đã nộp quyết toán', result, 'MSG-SA-01');
+    } catch (error) { next(error); }
+  }
+}

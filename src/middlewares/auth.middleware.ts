@@ -1,67 +1,58 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
-
-export interface JwtPayload {
-  userId: number;
-  roleId: number;
-  roleName: string;
-}
+import { AppError } from './error.middleware';
 
 export interface AuthRequest extends Request {
-  user?: JwtPayload;
+  user?: {
+    userId: string;
+    role: string;
+  };
 }
 
-/**
- * Middleware: Verify Bearer JWT token from Authorization header.
- */
-export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers['authorization'];
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({
-      success: false,
-      statusCode: 401,
-      message: 'Unauthorized: No token provided.',
-    });
-    return;
-  }
-
-  const token = authHeader.split(' ')[1];
-
+export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new AppError('Authentication required. Please provide a valid token.', 401);
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Verify token
+    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; role: string };
+    
+    // Attach user to request
     req.user = decoded;
+    
     next();
-  } catch {
-    res.status(401).json({
-      success: false,
-      statusCode: 401,
-      message: 'Unauthorized: Token is invalid or has expired.',
-    });
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return next(new AppError('Token has expired. Please login again.', 401));
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      return next(new AppError('Invalid token.', 401));
+    }
+    next(error);
   }
 };
 
-/**
- * Middleware factory: Restrict access to specific role names.
- * Usage: requireRole('Admin', 'Manager')
- */
-export const requireRole = (...allowedRoles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+// RBAC Authorization Middleware
+export const authorizeRoles = (...roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      res.status(401).json({ success: false, statusCode: 401, message: 'Unauthorized.' });
-      return;
+      return next(new AppError('Not authenticated.', 401));
     }
 
-    if (!allowedRoles.includes(req.user.roleName)) {
-      res.status(403).json({
-        success: false,
-        statusCode: 403,
-        message: 'Forbidden: You do not have permission to access this resource.',
-      });
-      return;
+    const userRole = req.user.role.toLowerCase().replace(/ /g, '_');
+    const allowedRoles = roles.map(r => r.toLowerCase().replace(/ /g, '_'));
+
+    if (!allowedRoles.includes(userRole)) {
+      return next(new AppError('You do not have permission to perform this action.', 403));
     }
 
     next();
   };
 };
+
+export { authenticate as verifyToken };

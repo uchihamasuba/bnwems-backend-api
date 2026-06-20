@@ -1,18 +1,53 @@
 import { Request, Response, NextFunction } from 'express';
-import { policyService } from '../services/policy.service';
+import { PolicyService } from '../services/policy.service';
 
-export const policyController = {
-  async createPolicy(req: Request, res: Response, next: NextFunction): Promise<void> {
+export class PolicyController {
+  static async getBusinessPolicies(req: Request, res: Response, next: NextFunction) {
     try {
-      await policyService.createPolicy(req.body);
-      res.status(201).json({ success: true, statusCode: 201, message: 'Chính sách mới đã được cấu hình thành công.' });
-    } catch (err) { next(err); }
-  },
+      const data = await PolicyService.getBusinessPolicies();
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
 
-  async getPolicies(req: Request, res: Response, next: NextFunction): Promise<void> {
+  static async updateBusinessPolicy(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await policyService.getPolicies(req.query.type as string | undefined);
-      res.status(200).json({ success: true, statusCode: 200, data });
-    } catch (err) { next(err); }
-  },
-};
+      const code = req.params.code;
+      const updatedBy = Number((req as any).user?.userId);
+      const data = await PolicyService.updateBusinessPolicy(code, req.body, updatedBy);
+      res.status(200).json({ success: true, code: 'MSG-DP-01', message: 'Cập nhật chính sách thành công', data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getWageRules(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await PolicyService.getWageRules();
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async createWageRule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const createdBy = Number((req as any).user?.userId);
+      const data = await PolicyService.createWageRule(req.body, createdBy);
+      res.status(201).json({ success: true, code: 'MSG-WR-01', message: 'Tạo quy tắc lương thành công', data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateWageRule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id);
+      const data = await PolicyService.updateWageRule(id, req.body);
+      res.status(200).json({ success: true, message: 'Cập nhật quy tắc lương thành công', data });
+    } catch (error) {
+      next(error);
+    }
+  }
+}

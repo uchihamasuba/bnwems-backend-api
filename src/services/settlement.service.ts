@@ -1,38 +1,34 @@
 import prisma from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 
-export const settlementService = {
-  async createSettlement(payload: {
-    orderId: number;
-    arisingFee: number;
-    damageCompensationFee: number;
-    totalFinalAmount: number;
-    settlementNotes?: string;
-  }) {
-    const settlement = await prisma.settlement.create({
+export class SettlementService {
+  static async approveSettlement(id: string, userId: string) {
+    const settlement = await prisma.settlement.update({
+      where: { id: BigInt(id) },
       data: {
-        orderId: payload.orderId,
-        arisingFee: payload.arisingFee,
-        damageCompensationFee: payload.damageCompensationFee,
-        totalFinalAmount: payload.totalFinalAmount,
-        settlementNotes: payload.settlementNotes,
-        status: 'DRAFT',
-      },
+        status: 'approved',
+        approvedBy: BigInt(userId),
+        approvedAt: new Date()
+      }
     });
 
-    return settlement;
-  },
+    return {
+      id: Number(settlement.id),
+      order_id: Number(settlement.orderId),
+      balance: Number(settlement.balance),
+      status: settlement.status
+    };
+  }
 
-  async submitForApproval(settlementId: number) {
-    const settlement = await prisma.settlement.findUnique({ where: { id: settlementId } });
-    if (!settlement) {
-      const err: Error & { statusCode?: number } = new Error('Không tìm thấy biên bản quyết toán.');
-      err.statusCode = 404;
-      throw err;
-    }
-
-    await prisma.settlement.update({
-      where: { id: settlementId },
-      data: { status: 'SUBMITTED', submittedAt: new Date() },
+  static async submitSettlement(id: string, userId: string) {
+    const settlement = await prisma.settlement.update({
+      where: { id: BigInt(id) },
+      data: { status: 'pending_approval' }
     });
-  },
-};
+
+    return {
+      id: Number(settlement.id),
+      status: settlement.status
+    };
+  }
+}

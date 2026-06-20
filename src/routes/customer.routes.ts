@@ -1,17 +1,13 @@
 import { Router } from 'express';
-import { customerController } from '../controllers/customer.controller';
-import { verifyToken, requireRole } from '../middlewares/auth.middleware';
+import { CustomerController } from '../controllers/customer.controller';
+import { verifyToken, authorizeRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
-router.use(verifyToken, requireRole('Manager'));
 
-// GET /api/v1/customers
-router.get('/', customerController.getCustomers);
-
-// GET /api/v1/customers/:id
-router.get('/:id', customerController.getCustomerById);
-
-// POST /api/v1/customers
-router.post('/', customerController.createCustomer);
+router.use(verifyToken);
+router.post('/', authorizeRoles('admin', 'sales'), CustomerController.createCustomer);
+router.get('/', CustomerController.getCustomers);
+router.get('/:id', CustomerController.getCustomerById);
+router.put('/:id', authorizeRoles('admin', 'sales'), CustomerController.updateCustomer);
 
 export default router;

@@ -1,19 +1,14 @@
 import { Router } from 'express';
-import { authController } from '../controllers/auth.controller';
+import * as authController from '../controllers/auth.controller';
 import { verifyToken } from '../middlewares/auth.middleware';
-import { validateBody } from '../middlewares/validation.middleware';
 
 const router = Router();
 
-// POST /api/v1/auth/login
-router.post('/login', validateBody(['username', 'password']), authController.login);
-
-// PUT /api/v1/auth/change-password
-router.put(
-  '/change-password',
-  verifyToken,
-  validateBody(['oldPassword', 'newPassword']),
-  authController.changePassword
-);
+router.post('/login', authController.login);
+router.post('/logout', verifyToken, authController.logout);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/forgot-password/verify', authController.verifyForgotPasswordOTP);
+router.post('/reset-password', authController.resetPassword);
+router.post('/refresh', verifyToken, authController.refresh);
 
 export default router;

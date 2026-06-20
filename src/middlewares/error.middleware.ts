@@ -1,44 +1,53 @@
 import { Request, Response, NextFunction } from 'express';
 
-export interface AppError extends Error {
-  statusCode?: number;
-  isOperational?: boolean;
+export class AppError extends Error {
+  public readonly statusCode: number;
+  public readonly code: string;
+  public readonly isOperational: boolean;
+
+  constructor(message: string, statusCode: number, code: string = 'ERROR', isOperational = true) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.isOperational = isOperational;
+    Object.setPrototypeOf(this, new.target.prototype); // restore prototype chain
+    Error.captureStackTrace(this);
+  }
 }
 
-/**
- * Global error handling middleware.
- * Catches all errors passed via next(err) and returns a standardized JSON response.
- */
-export const globalErrorHandler = (
-  err: AppError,
+export const errorMiddleware = (
+  err: Error | AppError,
   req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
-): void => {
-  const statusCode = err.statusCode || 500;
-  const message =
-    process.env.NODE_ENV === 'production' && statusCode === 500
-      ? 'An internal server error occurred.'
-      : err.message;
+) => {
+  let statusCode = 500;
+  let message = 'Internal Server Error';
+  let code = 'SERVER_ERROR';
 
-  console.error(`[ERROR] ${req.method} ${req.path} — ${err.message}`, err.stack);
+  if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    message = err.message;
+    code = err.code;
+  } else if (err.name === 'PrismaClientKnownRequestError') {
+    // Handle Prisma specific errors if needed
+    statusCode = 400;
+    message = 'Database request error';
+    code = 'DB_ERROR';
+  }
+
+  // Log error stack in development
+  if (process.env.NODE_ENV !== 'production') {
+    console.error(`[Error] ${err.stack}`);
+  } else {
+    console.error(`[Error] ${err.message}`);
+  }
 
   res.status(statusCode).json({
     success: false,
-    statusCode,
+    code,
     message,
-    errorDetails: process.env.NODE_ENV === 'development' ? err.stack : null,
-  });
-};
-
-/**
- * 404 Not Found handler — mount after all routes.
- */
-export const notFoundHandler = (req: Request, res: Response): void => {
-  res.status(404).json({
-    success: false,
-    statusCode: 404,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
