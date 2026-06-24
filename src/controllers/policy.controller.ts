@@ -1,53 +1,90 @@
 import { Request, Response, NextFunction } from 'express';
-import { PolicyService } from '../services/policy.service';
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
-export class PolicyController {
-  static async getBusinessPolicies(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await PolicyService.getBusinessPolicies();
-      res.status(200).json({ success: true, data });
-    } catch (error) {
-      next(error);
-    }
-  }
+export const getPolicies = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const policyType = req.query.policyType as string;
+    const isActiveParam = req.query.isActive as string;
 
-  static async updateBusinessPolicy(req: Request, res: Response, next: NextFunction) {
-    try {
-      const code = req.params.code;
-      const updatedBy = Number((req as any).user?.userId);
-      const data = await PolicyService.updateBusinessPolicy(code, req.body, updatedBy);
-      res.status(200).json({ success: true, code: 'MSG-DP-01', message: 'Cập nhật chính sách thành công', data });
-    } catch (error) {
-      next(error);
-    }
-  }
+    const whereClause: any = {};
+    if (policyType) whereClause.policyType = policyType;
+    if (isActiveParam !== undefined) whereClause.isActive = isActiveParam === 'true';
 
-  static async getWageRules(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await PolicyService.getWageRules();
-      res.status(200).json({ success: true, data });
-    } catch (error) {
-      next(error);
-    }
-  }
+    const policies = await prisma.businessPolicy.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+    });
 
-  static async createWageRule(req: Request, res: Response, next: NextFunction) {
-    try {
-      const createdBy = Number((req as any).user?.userId);
-      const data = await PolicyService.createWageRule(req.body, createdBy);
-      res.status(201).json({ success: true, code: 'MSG-WR-01', message: 'Tạo quy tắc lương thành công', data });
-    } catch (error) {
-      next(error);
-    }
+    res.status(200).json({
+      success: true,
+      data: policies,
+      meta: { totalCount: policies.length },
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async updateWageRule(req: Request, res: Response, next: NextFunction) {
-    try {
-      const id = parseInt(req.params.id);
-      const data = await PolicyService.updateWageRule(id, req.body);
-      res.status(200).json({ success: true, message: 'Cập nhật quy tắc lương thành công', data });
-    } catch (error) {
-      next(error);
+export const createPolicy = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { policyType, name, rules } = req.body;
+
+    if (!policyType || !name || !rules) {
+      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC06-01'));
     }
+
+    const newPolicy = await prisma.businessPolicy.create({
+      data: { policyType, name, rules },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'CREATE_POLICY',
+        entityType: 'BusinessPolicy',
+        entityId: newPolicy.id,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Policy created successfully.',
+    });
+  } catch (error) {
+    next(error);
   }
-}
+};
+
+export const updatePolicy = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { rules } = req.body;
+
+    if (!rules) {
+      return next(new AppError('Rules are required.', 400, 'MSG-UC06-01'));
+    }
+
+    await prisma.businessPolicy.update({
+      where: { id },
+      data: { rules },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'UPDATE_POLICY',
+        entityType: 'BusinessPolicy',
+        entityId: id,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Policy updated successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

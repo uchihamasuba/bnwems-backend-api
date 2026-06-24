@@ -1,41 +1,172 @@
 import { Request, Response, NextFunction } from 'express';
-import { QuotationService } from '../services/quotation.service';
-import { sendSuccess } from '../utils/response';
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
-export class QuotationController {
-  static async getQuotationsByOrder(req: Request, res: Response, next: NextFunction) {
-    try {
-      const quotations = await QuotationService.getQuotationsByOrder(req.params.id);
-      sendSuccess(res, 'Lấy danh sách báo giá thành công', quotations);
-    } catch (error) { next(error); }
-  }
+export const getQuotationsByOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orderId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
 
-  static async getQuotationById(req: Request, res: Response, next: NextFunction) {
-    try {
-      const quotation = await QuotationService.getQuotationById(req.params.id);
-      sendSuccess(res, 'Lấy chi tiết báo giá thành công', quotation);
-    } catch (error) { next(error); }
-  }
+    const [quotations, totalCount] = await Promise.all([
+      prisma.quotation.findMany({
+        where: { orderId },
+        skip,
+        take: limit,
+        orderBy: { version: 'desc' },
+      }),
+      prisma.quotation.count({ where: { orderId } }),
+    ]);
 
-  static async createQuotation(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const quotation = await QuotationService.createQuotation(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Tạo báo giá thành công', quotation, 'MSG-QT-01', 201);
-    } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      data: quotations,
+      meta: { page, limit, totalCount },
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async updateQuotation(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const quotation = await QuotationService.updateQuotation(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Cập nhật báo giá thành công (tạo version mới)', quotation, 'MSG-UQ-01');
-    } catch (error) { next(error); }
-  }
+export const getQuotationById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const quotation = await prisma.quotation.findUnique({ where: { id } });
 
-  static async approveQuotation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const quotation = await QuotationService.approveQuotation(req.params.id);
-      sendSuccess(res, 'Xác nhận báo giá thành công', quotation, 'MSG-CQ-01');
-    } catch (error) { next(error); }
+    if (!quotation) return next(new AppError('Quotation not found.', 404));
+
+    res.status(200).json({
+      success: true,
+      data: quotation,
+    });
+  } catch (error) {
+    next(error);
   }
-}
+};
+
+export const createQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { orderId } = req.params;
+    const { subtotal, tax, discount, totalAmount, details } = req.body;
+
+    if (subtotal === undefined || totalAmount === undefined) {
+      return next(new AppError('Required information is missing.', 400, 'MSG-UC10-01'));
+    }
+
+    const latestQuote = await prisma.quotation.findFirst({
+      where: { orderId },
+      orderBy: { version: 'desc' },
+    });
+
+    const version = latestQuote ? latestQuote.version + 1 : 1;
+
+    const newQuote = await prisma.quotation.create({
+      data: {
+        orderId,
+        version,
+        subtotal,
+        tax: tax || 0,
+        discount: discount || 0,
+        totalAmount,
+        details,
+        status: 'DRAFT',
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'CREATE_QUOTATION',
+        entityType: 'Quotation',
+        entityId: newQuote.id,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Quotation created.',
+      data: { id: newQuote.id, version: newQuote.version },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { subtotal, tax, discount, totalAmount, details } = req.body;
+
+    const existing = await prisma.quotation.findUnique({ where: { id } });
+    if (!existing) return next(new AppError('Quotation not found.', 404));
+
+    if (existing.status === 'ACCEPTED' || existing.status === 'SENT') {
+      return next(new AppError('Cannot modify after confirmation.', 400, 'MSG-UC10-04'));
+    }
+
+    await prisma.quotation.update({
+      where: { id },
+      data: { subtotal, tax, discount, totalAmount, details },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Quotation updated successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.quotation.findUnique({ where: { id } });
+    if (!existing) return next(new AppError('Quotation not found.', 404));
+
+    if (existing.status === 'ACCEPTED') {
+      return next(new AppError('Cannot delete accepted quotation.', 400, 'MSG-UC10-05'));
+    }
+
+    await prisma.quotation.delete({ where: { id } });
+
+    res.status(200).json({
+      success: true,
+      message: 'Quotation deleted successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const confirmQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const quote = await prisma.quotation.findUnique({ where: { id } });
+    if (!quote) return next(new AppError('Quotation not found.', 404));
+
+    await prisma.$transaction([
+      prisma.quotation.update({ where: { id }, data: { status: 'ACCEPTED' } }),
+      prisma.order.update({ where: { id: quote.orderId }, data: { status: 'QUOTED' } }),
+    ]);
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'CONFIRM_QUOTATION',
+        entityType: 'Quotation',
+        entityId: id,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Quotation confirmed.',
+      data: { status: 'ACCEPTED' },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

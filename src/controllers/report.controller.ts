@@ -1,73 +1,164 @@
 import { Request, Response, NextFunction } from 'express';
-import { ReportService } from '../services/report.service';
-import { sendSuccess } from '../utils/response';
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 
-export class ReportController {
-  static async getAdminDashboard(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await ReportService.getAdminDashboard();
-      sendSuccess(res, 'Dữ liệu dashboard quản trị', data);
-    } catch (error) { next(error); }
-  }
+export const getRevenueReport = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return next(new AppError('Invalid date range for reports.', 400, 'MSG-UC07-01'));
+    }
 
-  static async getOperationsDashboard(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await ReportService.getOperationsDashboard();
-      sendSuccess(res, 'Dữ liệu dashboard vận hành', data);
-    } catch (error) { next(error); }
-  }
+    // Simplified aggregation for revenue (based on COMPLETED payments or settled orders)
+    const payments = await prisma.payment.findMany({
+      where: {
+        status: 'COMPLETED',
+        paymentDate: {
+          gte: new Date(startDate as string),
+          lte: new Date(endDate as string),
+        },
+      },
+    });
 
-  static async getRevenueReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { start_date, end_date, period } = req.query;
-      const data = await ReportService.getRevenueReport(start_date as string, end_date as string, period as string);
-      sendSuccess(res, 'Báo cáo doanh thu', data);
-    } catch (error) { next(error); }
-  }
+    const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
 
-  static async getOrdersReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { start_date, end_date } = req.query;
-      const data = await ReportService.getOrdersReport(start_date as string, end_date as string);
-      sendSuccess(res, 'Báo cáo đơn hàng', data);
-    } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      data: {
+        totalRevenue,
+        breakdownByMonth: [], // Mocked
+        topCustomers: [], // Mocked
+      },
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async getInventoryReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await ReportService.getInventoryReport();
-      sendSuccess(res, 'Thống kê tồn kho', data);
-    } catch (error) { next(error); }
-  }
+export const getInventoryReport = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { startDate, endDate } = req.query;
 
-  static async getStaffReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { start_date, end_date } = req.query;
-      const data = await ReportService.getStaffReport(start_date as string, end_date as string);
-      sendSuccess(res, 'Báo cáo nhân sự', data);
-    } catch (error) { next(error); }
-  }
+    const inventories = await prisma.inventory.findMany({
+      include: { catalogItem: true },
+    });
 
-  static async getWarehouseReturnsReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { start_date, end_date } = req.query;
-      const data = await ReportService.getWarehouseReturnsReport(start_date as string, end_date as string);
-      sendSuccess(res, 'Báo cáo hoàn trả kho', data);
-    } catch (error) { next(error); }
-  }
+    const totalDamaged = inventories.reduce((sum, inv) => sum + inv.damagedQuantity, 0);
+    const totalLost = inventories.reduce((sum, inv) => sum + inv.lostQuantity, 0);
 
-  static async getSupplierDebtReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await ReportService.getSupplierDebtReport();
-      sendSuccess(res, 'Báo cáo công nợ nhà cung cấp', data);
-    } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      data: {
+        totalDamaged,
+        totalLost,
+        mostUsedItems: [], // Mocked
+      },
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async getWagesReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { start_date, end_date } = req.query;
-      const data = await ReportService.getWagesReport(start_date as string, end_date as string);
-      sendSuccess(res, 'Báo cáo quỹ lương', data);
-    } catch (error) { next(error); }
+export const getAdminDashboard = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const activeOrdersCount = await prisma.order.count({
+      where: { status: { in: ['CONFIRMED', 'IN_PROGRESS'] } },
+    });
+
+    const recentOrders = await prisma.order.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, status: true },
+    });
+
+    const debts = await prisma.supplierDebt.findMany({
+      where: { status: { in: ['UNPAID', 'PARTIALLY_PAID'] } },
+    });
+    const unpaidSupplierDebt = debts.reduce((sum, d) => sum + (d.amountOwed - d.amountPaid), 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        activeOrders: activeOrdersCount,
+        totalRevenueMonth: 0, // Mocked
+        unpaidSupplierDebt,
+        recentOrders: recentOrders.map(o => ({ orderId: o.id, status: o.status })),
+      },
+    });
+  } catch (error) {
+    next(error);
   }
-}
+};
+
+export const getManagerDashboard = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ordersInProgress = await prisma.order.count({
+      where: { status: 'IN_PROGRESS' },
+    });
+
+    const pendingChangeRequests = await prisma.changeRequest.count({
+      where: { status: 'PENDING' },
+    });
+
+    // Today's tasks
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const tasksToday = await prisma.workTask.count({
+      where: {
+        scheduledStart: {
+          gte: new Date(today.setHours(0,0,0,0)),
+          lt: new Date(tomorrow.setHours(0,0,0,0)),
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ordersInProgress,
+        pendingChangeRequests,
+        tasksToday,
+        alerts: [], // Mocked
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getVerificationReport = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orderId } = req.query;
+    if (!orderId) {
+      return next(new AppError('orderId is required', 400));
+    }
+
+    const tasks = await prisma.workTask.findMany({ where: { orderId: orderId as string } });
+    const totalTasks = tasks.length;
+    const tasksCompleted = tasks.filter(t => t.status === 'COMPLETED').length;
+
+    if (totalTasks > 0 && tasksCompleted < totalTasks) {
+      return next(new AppError('Order results are incomplete for verification.', 400, 'MSG-UC15-01'));
+    }
+
+    const handover = await prisma.handoverRecord.findUnique({ where: { orderId: orderId as string } });
+    const damageLoss = await prisma.damageLossReport.findFirst({ where: { orderId: orderId as string } });
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        orderId,
+        tasksCompleted,
+        totalTasks,
+        handoverStatus: handover ? 'AGREED' : 'PENDING',
+        damageLossRecorded: !!damageLoss,
+        changeRequestsProcessed: true, // Mocked
+        verificationStatus: 'READY_FOR_SETTLEMENT',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

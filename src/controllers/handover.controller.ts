@@ -1,35 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
-import { HandoverService } from '../services/handover.service';
-import { sendSuccess } from '../utils/response';
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
-export class HandoverController {
-  static async confirmHandover(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const { decision, notes } = req.body;
-      const result = await HandoverService.confirmHandover(req.params.id, decision || 'confirmed', notes || '', req.user!.userId);
-      sendSuccess(res, 'Đã xác nhận biên bản bàn giao', result, 'MSG-HO-03');
-    } catch (error) { next(error); }
-  }
+export const recordHandover = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { orderId } = req.params;
+    const { customerAgreed, notes, evidences } = req.body;
 
-  static async createWarehouseReceipt(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await HandoverService.createWarehouseReceipt(req.params.id, req.user!.userId);
-      sendSuccess(res, 'Đã ghi nhận hoàn trả kho nội bộ', result, 'MSG-IER-01');
-    } catch (error) { next(error); }
-  }
+    if (customerAgreed === undefined || !evidences || !Array.isArray(evidences) || evidences.length === 0) {
+      return next(new AppError('Missing customer signature/evidence for handover.', 400, 'MSG-UC26-01'));
+    }
 
-  static async updateHandoverItem(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await HandoverService.updateHandoverItem(req.params.id, req.params.itemId, req.body, req.user!.userId);
-      sendSuccess(res, 'Đã phân loại thiết bị', result, 'MSG-CL-01');
-    } catch (error) { next(error); }
-  }
+    const newHandover = await prisma.handoverRecord.create({
+      data: {
+        orderId,
+        customerAgreed,
+        notes,
+        evidences: {
+          create: evidences.map(e => ({
+            fileUrl: e.fileUrl,
+            evidenceType: 'HANDOVER_PHOTO',
+            uploadedBy: req.user!.userId,
+          })),
+        },
+      },
+    });
 
-  static async submitHandover(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await HandoverService.submitHandover(req.params.id, req.user!.userId);
-      sendSuccess(res, 'Đã nộp báo cáo hoàn trả kho', result, 'MSG-IR-01');
-    } catch (error) { next(error); }
+    res.status(201).json({
+      success: true,
+      message: 'Handover record created.',
+      data: { id: newHandover.id },
+    });
+  } catch (error) {
+    next(error);
   }
-}
+};
