@@ -1,0 +1,586 @@
+# Database Schema
+
+## 1. Overview
+The database schema has been refactored to align with the 23 core business entities defined in the System Requirement Specification (Report 3). 
+An additional `AuditLog` entity is included to fulfill the strict Business Rules (e.g., BR-53-04: "Successful business activities must be recorded in the Activity Log for audit purposes").
+The schema uses Prisma ORM notation, adhering to the `camelCase` naming convention for all properties.
+
+## 2. Prisma Schema Definition
+
+```prisma
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ---------------------------------------------------------
+// 1. Internal User (Replaces old users/roles)
+// ---------------------------------------------------------
+model InternalUser {
+  id                String       @id @default(uuid())
+  username          String       @unique
+  passwordHash      String
+  fullName          String
+  role              RoleType
+  status            AccountStatus @default(ACTIVE)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  assignments       Assignment[]
+  attendances       Attendance[]
+  wageSummaries     WageSummary[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+}
+
+enum RoleType {
+  ADMIN
+  MANAGER
+  LEADER_STAFF
+  TECHNICAL_STAFF
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+// ---------------------------------------------------------
+// 2. Customer
+// ---------------------------------------------------------
+model Customer {
+  id                String    @id @default(uuid())
+  fullName          String
+  phone             String    @unique
+  email             String?
+  address           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  orders            Order[]
+}
+
+// ---------------------------------------------------------
+// 3. Supplier
+// ---------------------------------------------------------
+model Supplier {
+  id                String    @id @default(uuid())
+  name              String
+  contactPerson     String?
+  phone             String?
+  email             String?
+  address           String?
+  status            SupplierStatus @default(ACTIVE)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  transactions      SupplierTransaction[]
+  debts             SupplierDebt[]
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ---------------------------------------------------------
+// 4. Catalog Item
+// ---------------------------------------------------------
+model CatalogItem {
+  id                String    @id @default(uuid())
+  name              String
+  description       String?
+  itemType          ItemType
+  basePrice         Float
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  inventories       Inventory[]
+}
+
+enum ItemType {
+  SERVICE
+  EQUIPMENT
+  MATERIAL
+  PACKAGE
+}
+
+// ---------------------------------------------------------
+// 5. Business Policy
+// ---------------------------------------------------------
+model BusinessPolicy {
+  id                String    @id @default(uuid())
+  policyType        PolicyType
+  name              String
+  description       String?
+  rules             Json      // Stores specific rules, percentages, or conditions
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+enum PolicyType {
+  DEPOSIT
+  REFUND
+  CANCELLATION
+  DATE_CHANGE
+  ADDITIONAL_FEE
+  DISCOUNT
+  COMPENSATION
+  WAGE
+}
+
+// ---------------------------------------------------------
+// 6. Order
+// ---------------------------------------------------------
+model Order {
+  id                String    @id @default(uuid())
+  orderNumber       String    @unique
+  customerId        String
+  customer          Customer  @relation(fields: [customerId], references: [id])
+  eventDate         DateTime
+  venueAddress      String?
+  status            OrderStatus @default(DRAFT)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  quotations        Quotation[]
+  payments          Payment[]
+  settlement        Settlement?
+  changeRequests    ChangeRequest[]
+  workTasks         WorkTask[]
+  handoverRecord    HandoverRecord?
+  damageLossReports DamageLossReport[]
+  supplierTransactions SupplierTransaction[]
+}
+
+enum OrderStatus {
+  DRAFT
+  QUOTED
+  DEPOSIT_PAID
+  CONFIRMED
+  IN_PROGRESS
+  SETTLEMENT_PENDING
+  COMPLETED
+  CANCELLED
+}
+
+// ---------------------------------------------------------
+// 7. Quotation
+// ---------------------------------------------------------
+model Quotation {
+  id                String    @id @default(uuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id])
+  version           Int       @default(1)
+  subtotal          Float
+  tax               Float     @default(0)
+  discount          Float     @default(0)
+  totalAmount       Float
+  details           Json      // Stores selected catalog items, quantities, prices
+  status            QuotationStatus @default(DRAFT)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+// ---------------------------------------------------------
+// 8. Payment
+// ---------------------------------------------------------
+model Payment {
+  id                String    @id @default(uuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id])
+  amount            Float
+  paymentType       PaymentType
+  paymentMethod     PaymentMethod
+  status            PaymentStatus @default(PENDING)
+  paymentDate       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  evidences         Evidence[]
+}
+
+enum PaymentType {
+  DEPOSIT
+  FINAL_PAYMENT
+  ON_SITE_PAYMENT
+  REFUND
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  VNPAY_QR
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// ---------------------------------------------------------
+// 9. Settlement
+// ---------------------------------------------------------
+model Settlement {
+  id                String    @id @default(uuid())
+  orderId           String    @unique
+  order             Order     @relation(fields: [orderId], references: [id])
+  originalValue     Float
+  additionalFees    Float     @default(0)
+  compensation      Float     @default(0)
+  paidAmount        Float     @default(0)
+  remainingAmount   Float
+  status            SettlementStatus @default(DRAFT)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  evidences         Evidence[]
+}
+
+enum SettlementStatus {
+  DRAFT
+  CONFIRMED
+}
+
+// ---------------------------------------------------------
+// 10. Change Request
+// ---------------------------------------------------------
+model ChangeRequest {
+  id                String    @id @default(uuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id])
+  requestDetails    Json      // Requested changes (add/remove/replace items)
+  additionalCost    Float     @default(0)
+  status            RequestStatus @default(PENDING)
+  requestedBy       String?   // User ID
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  evidences         Evidence[]
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ---------------------------------------------------------
+// 11. Work Task
+// ---------------------------------------------------------
+model WorkTask {
+  id                String    @id @default(uuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id])
+  taskType          TaskType
+  scheduledStart    DateTime
+  scheduledEnd      DateTime
+  actualStart       DateTime?
+  actualEnd         DateTime?
+  location          String?
+  status            TaskStatus @default(PENDING)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  assignments       Assignment[]
+  evidences         Evidence[]
+}
+
+enum TaskType {
+  SURVEY
+  PREPARATION
+  CHECKOUT
+  TRANSPORTATION
+  INSTALLATION
+  COLLECTION
+  WAREHOUSE_RETURN
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ---------------------------------------------------------
+// 12. Assignment
+// ---------------------------------------------------------
+model Assignment {
+  id                String    @id @default(uuid())
+  workTaskId        String
+  workTask          WorkTask  @relation(fields: [workTaskId], references: [id])
+  userId            String
+  user              InternalUser @relation(fields: [userId], references: [id])
+  assignedRole      RoleType
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  attendances       Attendance[]
+}
+
+// ---------------------------------------------------------
+// 13. Warehouse
+// ---------------------------------------------------------
+model Warehouse {
+  id                String    @id @default(uuid())
+  name              String
+  location          String
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  inventories       Inventory[]
+  histories         WarehouseHistory[]
+}
+
+// ---------------------------------------------------------
+// 14. Inventory
+// ---------------------------------------------------------
+model Inventory {
+  id                String    @id @default(uuid())
+  warehouseId       String
+  warehouse         Warehouse @relation(fields: [warehouseId], references: [id])
+  catalogItemId     String
+  catalogItem       CatalogItem @relation(fields: [catalogItemId], references: [id])
+  availableQuantity Int       @default(0)
+  reservedQuantity  Int       @default(0)
+  checkedOutQuantity Int      @default(0)
+  damagedQuantity   Int       @default(0)
+  lostQuantity      Int       @default(0)
+  updatedAt         DateTime  @updatedAt
+}
+
+// ---------------------------------------------------------
+// 15. Warehouse History
+// ---------------------------------------------------------
+model WarehouseHistory {
+  id                String    @id @default(uuid())
+  warehouseId       String
+  warehouse         Warehouse @relation(fields: [warehouseId], references: [id])
+  transactionType   WarehouseTxType
+  details           Json      // Items and quantities moved
+  performedBy       String    // ID of the user who performed the action
+  createdAt         DateTime  @default(now())
+}
+
+enum WarehouseTxType {
+  CHECKOUT
+  RETURN
+  RECEIVE_SUPPLIER
+  RETURN_SUPPLIER
+  ADJUSTMENT
+}
+
+// ---------------------------------------------------------
+// 16. Supplier Transaction
+// ---------------------------------------------------------
+model SupplierTransaction {
+  id                String    @id @default(uuid())
+  supplierId        String
+  supplier          Supplier  @relation(fields: [supplierId], references: [id])
+  orderId           String?
+  order             Order?    @relation(fields: [orderId], references: [id])
+  transactionType   SupplierTxType
+  details           Json      // Items, quantities, agreed costs
+  totalCost         Float
+  status            SupplierTxStatus @default(DRAFT)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  evidences         Evidence[]
+}
+
+enum SupplierTxType {
+  RENTAL
+  PURCHASE
+}
+
+enum SupplierTxStatus {
+  DRAFT
+  CONFIRMED
+  RECEIVED
+  RETURNED
+  COMPLETED
+}
+
+// ---------------------------------------------------------
+// 17. Handover Record
+// ---------------------------------------------------------
+model HandoverRecord {
+  id                String    @id @default(uuid())
+  orderId           String    @unique
+  order             Order     @relation(fields: [orderId], references: [id])
+  customerAgreed    Boolean   @default(false)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  evidences         Evidence[]
+}
+
+// ---------------------------------------------------------
+// 18. Damage/Loss Report
+// ---------------------------------------------------------
+model DamageLossReport {
+  id                String    @id @default(uuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id])
+  reportDetails     Json      // Affected items, quantities, and responsibility
+  status            ReportStatus @default(PENDING)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  evidences         Evidence[]
+}
+
+enum ReportStatus {
+  PENDING
+  VERIFIED
+  RESOLVED
+}
+
+// ---------------------------------------------------------
+// 19. Supplier Debt
+// ---------------------------------------------------------
+model SupplierDebt {
+  id                String    @id @default(uuid())
+  supplierId        String
+  supplier          Supplier  @relation(fields: [supplierId], references: [id])
+  amountOwed        Float
+  amountPaid        Float     @default(0)
+  status            DebtStatus @default(UNPAID)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+enum DebtStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+// ---------------------------------------------------------
+// 20. Attendance
+// ---------------------------------------------------------
+model Attendance {
+  id                String    @id @default(uuid())
+  userId            String
+  user              InternalUser @relation(fields: [userId], references: [id])
+  assignmentId      String
+  assignment        Assignment @relation(fields: [assignmentId], references: [id])
+  checkInTime       DateTime?
+  checkOutTime      DateTime?
+  status            AttendanceStatus @default(PENDING)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+enum AttendanceStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+// ---------------------------------------------------------
+// 21. Wage Summary
+// ---------------------------------------------------------
+model WageSummary {
+  id                String    @id @default(uuid())
+  userId            String
+  user              InternalUser @relation(fields: [userId], references: [id])
+  wagePeriod        String    // e.g. "2026-06"
+  totalWage         Float
+  deductions        Float     @default(0)
+  netWage           Float
+  status            WageStatus @default(DRAFT)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+enum WageStatus {
+  DRAFT
+  CONFIRMED
+  PAID
+}
+
+// ---------------------------------------------------------
+// 22. Evidence
+// ---------------------------------------------------------
+model Evidence {
+  id                String    @id @default(uuid())
+  fileUrl           String
+  evidenceType      EvidenceType
+  uploadedBy        String    // User ID
+  createdAt         DateTime  @default(now())
+
+  // Optional relations depending on what the evidence is attached to
+  paymentId         String?
+  payment           Payment?  @relation(fields: [paymentId], references: [id])
+  settlementId      String?
+  settlement        Settlement? @relation(fields: [settlementId], references: [id])
+  changeRequestId   String?
+  changeRequest     ChangeRequest? @relation(fields: [changeRequestId], references: [id])
+  workTaskId        String?
+  workTask          WorkTask? @relation(fields: [workTaskId], references: [id])
+  handoverRecordId  String?
+  handoverRecord    HandoverRecord? @relation(fields: [handoverRecordId], references: [id])
+  damageLossReportId String?
+  damageLossReport  DamageLossReport? @relation(fields: [damageLossReportId], references: [id])
+  supplierTxId      String?
+  supplierTx        SupplierTransaction? @relation(fields: [supplierTxId], references: [id])
+}
+
+enum EvidenceType {
+  PAYMENT_RECEIPT
+  HANDOVER_PHOTO
+  SURVEY_PHOTO
+  DAMAGE_PHOTO
+  LOSS_REPORT
+  OTHER
+}
+
+// ---------------------------------------------------------
+// 23. Notification
+// ---------------------------------------------------------
+model Notification {
+  id                String    @id @default(uuid())
+  userId            String
+  user              InternalUser @relation(fields: [userId], references: [id])
+  title             String
+  content           String
+  isRead            Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+}
+
+// ---------------------------------------------------------
+// 24. Audit Log
+// ---------------------------------------------------------
+model AuditLog {
+  id                String    @id @default(uuid())
+  userId            String
+  user              InternalUser @relation(fields: [userId], references: [id])
+  action            String
+  entityType        String
+  entityId          String
+  details           Json?
+  ipAddress         String?
+  createdAt         DateTime  @default(now())
+}
+```

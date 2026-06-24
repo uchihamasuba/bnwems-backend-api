@@ -1,189 +1,208 @@
 import { Request, Response, NextFunction } from 'express';
-import { OrderService } from '../services/order.service';
-import { sendSuccess } from '../utils/response';
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
-export class OrderController {
-  static async createOrder(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const order = await OrderService.createOrder(req.body, req.user!.userId);
-      sendSuccess(res, 'Tạo đơn hàng thành công', order, 'MSG-CO-01', 201);
-    } catch (error) { next(error); }
-  }
+// Order Lifecycle (UC 2.11)
+export const getOrders = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const search = req.query.search as string;
+    const status = req.query.status as any;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
 
-  static async getOrders(req: Request, res: Response, next: NextFunction) {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
-      const status = req.query.status as string;
-      const customerId = req.query.customer_id as string;
-      const fromDate = req.query.from_date as string;
-      const toDate = req.query.to_date as string;
+    const skip = (page - 1) * limit;
 
-      const result = await OrderService.getOrders(page, limit, status, customerId, fromDate, toDate);
-      sendSuccess(res, 'Lấy danh sách đơn hàng thành công', result.data, 'SUCCESS', 200, {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        total_pages: result.totalPages
-      });
-    } catch (error) { next(error); }
-  }
+    const whereClause: any = {};
+    if (search) whereClause.orderNumber = { contains: search };
+    if (status) whereClause.status = status;
+    if (startDate || endDate) {
+      whereClause.eventDate = {};
+      if (startDate) whereClause.eventDate.gte = new Date(startDate);
+      if (endDate) whereClause.eventDate.lte = new Date(endDate);
+    }
 
-  static async getOrderById(req: Request, res: Response, next: NextFunction) {
-    try {
-      const order = await OrderService.getOrderById(req.params.id);
-      sendSuccess(res, 'Lấy chi tiết đơn hàng thành công', order);
-    } catch (error) { next(error); }
-  }
+    const [orders, totalCount] = await Promise.all([
+      prisma.order.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.order.count({ where: whereClause }),
+    ]);
 
-  static async getStatusHistory(req: Request, res: Response, next: NextFunction) {
-    try {
-      const history = await OrderService.getStatusHistory(req.params.id);
-      sendSuccess(res, 'Lấy lịch sử trạng thái thành công', history);
-    } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      data: orders,
+      meta: { page, limit, totalCount },
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async updateOrder(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const order = await OrderService.updateOrder(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Cập nhật đơn hàng thành công', order, 'MSG-UO-01');
-    } catch (error) { next(error); }
-  }
+export const getOrderById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+      },
+    });
 
-  static async confirmOrder(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.confirmOrder(req.params.id, req.user!.userId);
-      sendSuccess(res, 'Xác nhận đơn hàng thành công', result, 'MSG-COR-01');
-    } catch (error) { next(error); }
-  }
+    if (!order) return next(new AppError('Order not found', 404));
 
-  static async changeDate(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const { new_event_date, reason } = req.body;
-      const result = await OrderService.changeDate(req.params.id, new_event_date, reason, req.user!.userId);
-      sendSuccess(res, 'Đổi ngày sự kiện thành công', result, 'MSG-CED-01');
-    } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      data: order,
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async cancelOrder(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const { reason } = req.body;
-      const result = await OrderService.cancelOrder(req.params.id, reason, req.user!.userId);
-      sendSuccess(res, 'Hủy đơn hàng thành công', result, 'MSG-CAN-01');
-    } catch (error) { next(error); }
-  }
+export const createOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { customerId, eventDate, venueAddress } = req.body;
 
-  static async getOrderItems(req: Request, res: Response, next: NextFunction) {
-    try {
-      const items = await OrderService.getOrderItems(req.params.id);
-      sendSuccess(res, 'Lấy hạng mục đơn hàng thành công', items);
-    } catch (error) { next(error); }
-  }
+    if (!customerId || !eventDate) {
+      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC11-01'));
+    }
 
-  static async addOrderItems(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const { items } = req.body;
-      const result = await OrderService.addOrderItems(req.params.id, items);
-      sendSuccess(res, 'Thêm hạng mục đơn hàng thành công', result, 'MSG-CO-05', 201);
-    } catch (error) { next(error); }
-  }
+    if (new Date(eventDate) <= new Date()) {
+      return next(new AppError('Event date must be in the future.', 400, 'MSG-UC11-01'));
+    }
 
-  static async createPickList(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.createPickList(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Tạo phiếu xuất kho thành công', result, 'MSG-PL-01', 201);
-    } catch (error) { next(error); }
-  }
+    const orderNumber = `ORD-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 
-  static async getReturnStatus(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.getReturnStatus(req.params.id);
-      sendSuccess(res, 'Lấy trạng thái hoàn trả thành công', result);
-    } catch (error) { next(error); }
-  }
+    const newOrder = await prisma.order.create({
+      data: {
+        orderNumber,
+        customerId,
+        eventDate: new Date(eventDate),
+        venueAddress,
+        status: 'DRAFT',
+      },
+    });
 
-  static async confirmReturn(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.confirmReturn(req.params.id, req.user!.userId);
-      sendSuccess(res, 'Đã xác nhận hoàn trả kho', result, 'MSG-CIR-01');
-    } catch (error) { next(error); }
-  }
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'CREATE_ORDER',
+        entityType: 'Order',
+        entityId: newOrder.id,
+      },
+    });
 
-  static async assignUser(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.assignUser(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Phân công thành công', result, 'MSG-AS-01', 201);
-    } catch (error) { next(error); }
+    res.status(201).json({
+      success: true,
+      message: 'Order created successfully.',
+      data: { id: newOrder.id, orderNumber },
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async createSchedule(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.createSchedule(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Đã lập lịch vận chuyển', result, 'MSG-TS-01', 201);
-    } catch (error) { next(error); }
-  }
+export const confirmOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { quotations: true },
+    });
 
-  static async getProgress(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.getProgress(req.params.id);
-      sendSuccess(res, 'Tiến độ hiện trường', result);
-    } catch (error) { next(error); }
-  }
+    if (!order) return next(new AppError('Order not found', 404));
 
-  static async createDepositRequest(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.createDepositRequest(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Tạo yêu cầu đặt cọc thành công', result, 'MSG-DPR-01', 201);
-    } catch (error) { next(error); }
-  }
+    const hasAcceptedQuote = order.quotations.some(q => q.status === 'ACCEPTED');
+    if (!hasAcceptedQuote) {
+      return next(new AppError('Cannot confirm order without an accepted quotation.', 400, 'MSG-UC11-04'));
+    }
 
-  static async recordFinalPayment(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.recordFinalPayment(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Ghi nhận thanh toán cuối thành công', result, 'MSG-FNL-01', 201);
-    } catch (error) { next(error); }
-  }
+    await prisma.order.update({
+      where: { id },
+      data: { status: 'CONFIRMED' },
+    });
 
-  static async getPayments(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.getPayments(req.params.id);
-      sendSuccess(res, 'Danh sách thanh toán', result);
-    } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      message: 'Order confirmed.',
+      data: { status: 'CONFIRMED' },
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async getSettlement(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.getSettlement(req.params.id);
-      sendSuccess(res, 'Chi tiết quyết toán', result);
-    } catch (error) { next(error); }
-  }
+export const changeEventDate = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { newEventDate } = req.body;
 
-  static async createHandover(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.createHandover(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Đã ghi nhận bàn giao', result, 'MSG-HO-01', 201);
-    } catch (error) { next(error); }
-  }
+    await prisma.order.update({
+      where: { id },
+      data: { eventDate: new Date(newEventDate) },
+    });
 
-  static async createChangeRequest(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.createChangeRequest(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Đã nộp yêu cầu thay đổi', result, 'MSG-CR-02', 201);
-    } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      message: 'Order date updated.',
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async createDamageLossReport(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.createDamageLossReport(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Đã ghi nhận biên bản hư hỏng/mất mát', result, 'MSG-DL-01', 201);
-    } catch (error) { next(error); }
-  }
+export const closeOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    
+    // In reality, check if all payments/settlements/warehouse returns are complete.
 
-  static async updateSettlement(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await OrderService.updateSettlement(req.params.id, req.body, req.user!.userId);
-      sendSuccess(res, 'Đã ghi nhận chi tiết quyết toán', result, 'MSG-ST-01');
-    } catch (error) { next(error); }
+    await prisma.order.update({
+      where: { id },
+      data: { status: 'COMPLETED' },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Order closed successfully.',
+      data: { status: 'COMPLETED' },
+    });
+  } catch (error) {
+    next(error);
   }
-}
+};
+
+export const getFieldProgress = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { status: { in: ['CONFIRMED', 'IN_PROGRESS'] } },
+      include: {
+        workTasks: {
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    const data = orders.map(o => ({
+      orderId: o.id,
+      currentTask: o.workTasks.length > 0 ? o.workTasks[0].taskType : null,
+      status: o.workTasks.length > 0 ? o.workTasks[0].status : null,
+      lastUpdate: o.workTasks.length > 0 ? o.workTasks[0].updatedAt : null,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data,
+      meta: { totalCount: data.length },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

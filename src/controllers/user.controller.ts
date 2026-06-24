@@ -1,106 +1,206 @@
 import { Request, Response, NextFunction } from 'express';
-import * as userService from '../services/user.service';
-import { sendSuccess } from '../utils/response';
+import bcrypt from 'bcryptjs';
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
-export const getProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const data = await userService.getProfile(req.user!.userId);
-    sendSuccess(res, 'Success', data);
-  } catch (error) { next(error); }
-};
-
-export const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    await userService.updateProfile(req.user!.userId, req.body);
-    sendSuccess(res, 'Cập nhật hồ sơ thành công', null, 'MSG-UC-06');
-  } catch (error) { next(error); }
-};
-
-export const changePassword = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    await userService.changePassword(
-      req.user!.userId, 
-      req.body.current_password, 
-      req.body.new_password,
-      req.ip,
-      req.headers['user-agent']
-    );
-    sendSuccess(res, 'Đổi mật khẩu thành công', null, 'MSG-CP-01');
-  } catch (error) { next(error); }
-};
-
-export const getAssignments = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const { assigned_date, status } = req.query;
-    const result = await userService.getAssignments(req.user!.userId, page, limit, assigned_date as string, status as string);
-    sendSuccess(res, 'Danh sách nhiệm vụ', result.data, 'MSG-SUCCESS', 200, result.meta);
-  } catch (error) { next(error); }
-};
+    const search = req.query.search as string;
+    const role = req.query.role as any;
+    const status = req.query.status as any;
 
-export const getNotifications = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const isRead = req.query.is_read ? req.query.is_read === 'true' : undefined;
+    const skip = (page - 1) * limit;
 
-    const { data, meta } = await userService.getNotifications(req.user!.userId, page, limit, isRead);
-    sendSuccess(res, 'Success', data, 'SUCCESS', 200, meta);
-  } catch (error) { next(error); }
-};
+    const whereClause: any = {};
+    if (search) {
+      whereClause.OR = [
+        { username: { contains: search } },
+        { fullName: { contains: search } },
+      ];
+    }
+    if (role) whereClause.role = role;
+    if (status) whereClause.status = status;
 
-export const markNotificationRead = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const data = await userService.markNotificationRead(req.user!.userId, req.params.id);
-    sendSuccess(res, 'Đã đánh dấu đã đọc', data);
-  } catch (error) { next(error); }
-};
+    const [users, totalCount] = await Promise.all([
+      prisma.internalUser.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.internalUser.count({ where: whereClause }),
+    ]);
 
-// Admin
-export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const page = parseInt((req.query && req.query.page) as string) || 1;
-    const limit = parseInt((req.query && req.query.limit) as string) || 20;
-    const { search, role_id, status } = req.query || {};
-
-    const { data, meta } = await userService.getAllUsers(page, limit, search as string, role_id as string, status as string);
-    sendSuccess(res, 'Success', data, 'SUCCESS', 200, meta);
-  } catch (error) { next(error); }
+    res.status(200).json({
+      success: true,
+      data: users,
+      meta: {
+        page,
+        limit,
+        totalCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const createUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const data = await userService.createUser({ ...req.body, created_by: req.user!.userId });
-    sendSuccess(res, 'Tạo tài khoản thành công', data, 'MSG-AU-01', 201);
-  } catch (error) { next(error); }
+    const { username, password, fullName, role } = req.body;
+
+    if (!username || !password || !fullName || !role) {
+      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC04-01'));
+    }
+
+    const existingUser = await prisma.internalUser.findUnique({ where: { username } });
+    if (existingUser) {
+      return next(new AppError('Username already exists.', 400, 'MSG-UC04-05'));
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.internalUser.create({
+      data: {
+        username,
+        passwordHash,
+        fullName,
+        role,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'CREATE_USER',
+        entityType: 'InternalUser',
+        entityId: newUser.id,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      data: {
+        id: newUser.id,
+        username: newUser.username,
+        fullName: newUser.fullName,
+        role: newUser.role,
+        status: newUser.status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
-export const updateUser = async (req: Request, res: Response, next: NextFunction) => {
+export const updateUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const data = await userService.updateUser(req.params.id, req.body);
-    sendSuccess(res, 'Cập nhật người dùng thành công', data, 'MSG-AU-05');
-  } catch (error) { next(error); }
+    const { id } = req.params;
+    const { fullName, role } = req.body;
+
+    if (!fullName || !role) {
+      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC04-01'));
+    }
+
+    const updatedUser = await prisma.internalUser.update({
+      where: { id },
+      data: { fullName, role },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'UPDATE_USER',
+        entityType: 'InternalUser',
+        entityId: updatedUser.id,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
-export const updateUserStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const updateStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const data = await userService.updateUserStatus(req.user!.userId, req.params.id, req.body.status);
-    sendSuccess(res, 'Đã cập nhật trạng thái tài khoản', data, 'MSG-DU-01');
-  } catch (error) { next(error); }
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return next(new AppError('Status is required.', 400, 'MSG-UC04-01'));
+    }
+
+    await prisma.internalUser.update({
+      where: { id },
+      data: { status },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'UPDATE_USER_STATUS',
+        entityType: 'InternalUser',
+        entityId: id,
+        details: { status },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User status updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const resetPassword = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const data = await userService.resetPassword(req.user!.userId, req.params.id, req.body.new_password);
-    sendSuccess(res, 'Đặt lại mật khẩu thành công', data, 'MSG-RP-01');
-  } catch (error) { next(error); }
-};
+    const { id } = req.params;
+    const { newPassword } = req.body;
 
-export const assignRole = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = await userService.assignRole(req.params.id, req.body.role_id);
-    sendSuccess(res, 'Gán vai trò thành công', data, 'MSG-AR-01');
-  } catch (error) { next(error); }
+    if (!newPassword) {
+      return next(new AppError('New password is required.', 400, 'MSG-UC04-01'));
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.internalUser.update({
+      where: { id },
+      data: { passwordHash },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'RESET_PASSWORD',
+        entityType: 'InternalUser',
+        entityId: id,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User password reset successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
 };

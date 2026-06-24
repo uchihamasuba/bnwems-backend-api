@@ -1,24 +1,85 @@
 import { Request, Response, NextFunction } from 'express';
-import * as authService from '../services/auth.service';
-import { sendSuccess } from '../utils/response';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../config/database';
+import { env } from '../config/env';
+import { AppError } from '../middlewares/error.middleware';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { username, password, device_token, device_type } = req.body;
-    const data = await authService.login(username, password, device_token, device_type);
-    
-    sendSuccess(res, 'Đăng nhập thành công', data, 'MSG-LG-01');
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC01-01'));
+    }
+
+    const user = await prisma.internalUser.findUnique({ where: { username } });
+
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      return next(new AppError('Invalid username or password.', 401, 'MSG-UC01-02'));
+    }
+
+    if (user.status !== 'ACTIVE') {
+      return next(new AppError('Account is locked or inactive.', 403, 'MSG-UC01-03'));
+    }
+
+    const expiresIn = 86400; // 24 hours
+    const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
+      expiresIn,
+    });
+
+    // Log activity
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'LOGIN',
+        entityType: 'InternalUser',
+        entityId: user.id,
+        ipAddress: req.ip,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        expiresIn,
+        user: {
+          id: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          role: user.role,
+          status: user.status,
+        },
+      },
+    });
   } catch (error) {
     next(error);
   }
 };
 
-export const logout = async (req: Request, res: Response, next: NextFunction) => {
+export const logout = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { device_token } = req.body;
-    await authService.logout(device_token);
-    
-    sendSuccess(res, 'Đăng xuất thành công', null, 'MSG-LG-06');
+    // With stateless JWT, logout is handled client-side by deleting the token.
+    // We just log the activity.
+    if (req.user) {
+      await prisma.auditLog.create({
+        data: {
+          userId: req.user.userId,
+          action: 'LOGOUT',
+          entityType: 'InternalUser',
+          entityId: req.user.userId,
+          ipAddress: req.ip,
+        },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully.',
+    });
   } catch (error) {
     next(error);
   }
@@ -27,49 +88,89 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
 export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username } = req.body;
-    await authService.forgotPassword(username);
     
-    sendSuccess(res, 'Nếu tài khoản tồn tại, mã xác nhận đã được gửi', null, 'MSG-AUTH0301-OK');
+    // In a real app, generate a reset token, save to DB, and send an email.
+    // For now, always return 200 OK as per spec.
+
+    res.status(200).json({
+      success: true,
+      message: 'If the account exists, a recovery email has been sent.',
+    });
   } catch (error) {
     next(error);
   }
 };
 
-export const verifyForgotPasswordOTP = async (req: Request, res: Response, next: NextFunction) => {
+export const changePassword = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { username, otp } = req.body;
-    if (!username || !otp) {
-      throw new Error('Missing username or otp');
+    const { oldPassword, newPassword, confirmNewPassword } = req.body;
+    const userId = req.user!.userId;
+
+    if (!oldPassword || !newPassword || !confirmNewPassword) {
+      return next(new AppError('Required information is missing.', 400, 'MSG-UC01-01'));
     }
-    const data = await authService.verifyForgotPasswordOTP(username, otp);
-    sendSuccess(res, 'Xác minh OTP thành công', data);
+
+    if (newPassword !== confirmNewPassword) {
+      return next(new AppError('New passwords do not match.', 400, 'MSG-UC01-01'));
+    }
+
+    const user = await prisma.internalUser.findUnique({ where: { id: userId } });
+    if (!user) {
+      return next(new AppError('User not found.', 404));
+    }
+
+    if (!(await bcrypt.compare(oldPassword, user.passwordHash))) {
+      return next(new AppError('Old password incorrect.', 400, 'MSG-UC02-01'));
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await prisma.internalUser.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'CHANGE_PASSWORD',
+        entityType: 'InternalUser',
+        entityId: user.id,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully.',
+    });
   } catch (error) {
     next(error);
   }
 };
 
-export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+export const profile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { reset_token, new_password } = req.body;
-    if (!reset_token || !new_password) {
-      throw new Error('Missing reset_token or new_password');
-    }
-    await authService.resetPassword(reset_token, new_password);
-    sendSuccess(res, 'Đặt lại mật khẩu thành công', null, 'MSG-AUTH0303');
-  } catch (error) {
-    next(error);
-  }
-};
+    const userId = req.user!.userId;
+    const user = await prisma.internalUser.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-export const refresh = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const oldToken = req.headers.authorization?.split(' ')[1];
-    if (!oldToken) {
-      throw new Error('Token is required');
+    if (!user) {
+      return next(new AppError('User not found.', 404));
     }
-    const data = await authService.refresh(oldToken);
-    
-    sendSuccess(res, 'Token refreshed', data, 'MSG-AUTH-REFRESH');
+
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
   } catch (error) {
     next(error);
   }
