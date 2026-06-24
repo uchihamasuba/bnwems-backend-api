@@ -3,25 +3,28 @@ import * as taskController from '../controllers/task.controller';
 import * as assignmentController from '../controllers/assignment.controller';
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 
-const router = Router({ mergeParams: true });
+export const nestedTaskRouter = Router({ mergeParams: true });
+nestedTaskRouter.use(authenticate);
 
-router.use(authenticate);
+import { validate } from '../middlewares/validate.middleware';
+import {
+  getTasksSchema, getAssignedTasksSchema, createTaskSchema,
+  updateTaskSchema, deleteTaskSchema, updateTaskProgressSchema,
+  recordSurveyReportSchema, viewSurveyReportSchema, viewPickListSchema
+} from '../validators/task.validator';
+import { assignStaffSchema } from '../validators/assignment.validator';
 
-// These routes may be mounted on /api/v1/orders/:orderId/tasks
-// or /api/v1/tasks
+nestedTaskRouter.post('/', authorizeRoles('ADMIN', 'MANAGER'), validate(createTaskSchema), taskController.createTask);
 
-router.get('/', authorizeRoles('ADMIN', 'MANAGER'), taskController.getTasks);
-router.get('/assigned', taskController.getAssignedTasks);
-router.post('/', authorizeRoles('ADMIN', 'MANAGER'), taskController.createTask);
-
-router.get('/:id/pick-list', taskController.viewPickList);
-router.get('/:id/survey-report', authorizeRoles('ADMIN', 'MANAGER'), taskController.viewSurveyReport);
-router.post('/:id/survey-report', authorizeRoles('LEADER_STAFF', 'MANAGER'), taskController.recordSurveyReport);
-
-router.put('/:id/progress', authorizeRoles('LEADER_STAFF', 'MANAGER'), taskController.updateTaskProgress);
-router.post('/:id/assignments', authorizeRoles('ADMIN', 'MANAGER'), assignmentController.assignStaff);
-
-router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), taskController.updateTask);
-router.delete('/:id', authorizeRoles('ADMIN', 'MANAGER'), taskController.deleteTask);
-
-export default router;
+export const taskRouter = Router();
+taskRouter.use(authenticate);
+taskRouter.post('/', authorizeRoles('ADMIN', 'MANAGER'), validate(createTaskSchema), taskController.createTask);
+taskRouter.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getTasksSchema), taskController.getTasks);
+taskRouter.get('/assigned', validate(getAssignedTasksSchema), taskController.getAssignedTasks);
+taskRouter.get('/:id/pick-list', validate(viewPickListSchema), taskController.viewPickList);
+taskRouter.get('/:id/survey-report', authorizeRoles('ADMIN', 'MANAGER'), validate(viewSurveyReportSchema), taskController.viewSurveyReport);
+taskRouter.post('/:id/survey-report', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(recordSurveyReportSchema), taskController.recordSurveyReport);
+taskRouter.put('/:id/progress', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(updateTaskProgressSchema), taskController.updateTaskProgress);
+taskRouter.post('/:id/assignments', authorizeRoles('ADMIN', 'MANAGER'), validate(assignStaffSchema), assignmentController.assignStaff);
+taskRouter.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(updateTaskSchema), taskController.updateTask);
+taskRouter.delete('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(deleteTaskSchema), taskController.deleteTask);

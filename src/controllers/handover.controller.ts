@@ -1,31 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
-import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { handoverService } from '../services/handover.service';
 
 export const recordHandover = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { orderId } = req.params;
-    const { customerAgreed, notes, evidences } = req.body;
+    const userId = req.user!.userId;
 
-    if (customerAgreed === undefined || !evidences || !Array.isArray(evidences) || evidences.length === 0) {
-      return next(new AppError('Missing customer signature/evidence for handover.', 400, 'MSG-UC26-01'));
-    }
-
-    const newHandover = await prisma.handoverRecord.create({
-      data: {
-        orderId,
-        customerAgreed,
-        notes,
-        evidences: {
-          create: evidences.map(e => ({
-            fileUrl: e.fileUrl,
-            evidenceType: 'HANDOVER_PHOTO',
-            uploadedBy: req.user!.userId,
-          })),
-        },
-      },
-    });
+    const newHandover = await handoverService.recordHandover(orderId, req.body, userId);
 
     res.status(201).json({
       success: true,

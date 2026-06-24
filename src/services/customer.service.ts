@@ -1,0 +1,81 @@
+import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
+
+class CustomerService {
+  public async getCustomers(page: number, limit: number, search?: string) {
+    const skip = (page - 1) * limit;
+    const whereClause: any = {};
+    
+    if (search) {
+      whereClause.OR = [
+        { fullName: { contains: search } },
+        { phone: { contains: search } },
+        { email: { contains: search } },
+      ];
+    }
+
+    const [customers, totalCount] = await Promise.all([
+      prisma.customer.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.customer.count({ where: whereClause }),
+    ]);
+
+    return { customers, totalCount };
+  }
+
+  public async getCustomerById(id: string) {
+    const customer = await prisma.customer.findUnique({ where: { id } });
+    if (!customer) throw new AppError('Customer not found', 404);
+    return customer;
+  }
+
+  public async createCustomer(data: any, actionUserId: string) {
+    const { fullName, phone, email, address } = data;
+
+    const existing = await prisma.customer.findUnique({ where: { phone } });
+    if (existing) {
+      throw new AppError('Phone number already exists.', 400, 'MSG-UC09-05');
+    }
+
+    const newCustomer = await prisma.customer.create({
+      data: { fullName, phone, email, address },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actionUserId,
+        action: 'CREATE_CUSTOMER',
+        entityType: 'Customer',
+        entityId: newCustomer.id,
+      },
+    });
+
+    return newCustomer;
+  }
+
+  public async updateCustomer(id: string, data: any, actionUserId: string) {
+    const { fullName, email, address } = data;
+
+    const updatedCustomer = await prisma.customer.update({
+      where: { id },
+      data: { fullName, email, address },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actionUserId,
+        action: 'UPDATE_CUSTOMER',
+        entityType: 'Customer',
+        entityId: id,
+      },
+    });
+
+    return updatedCustomer;
+  }
+}
+
+export const customerService = new CustomerService();

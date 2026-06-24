@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
-import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { orderService } from '../services/order.service';
 
 // Order Lifecycle (UC 2.11)
 export const getOrders = async (req: Request, res: Response, next: NextFunction) => {
@@ -9,30 +8,11 @@ export const getOrders = async (req: Request, res: Response, next: NextFunction)
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string;
-    const status = req.query.status as any;
+    const status = req.query.status as string;
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
 
-    const skip = (page - 1) * limit;
-
-    const whereClause: any = {};
-    if (search) whereClause.orderNumber = { contains: search };
-    if (status) whereClause.status = status;
-    if (startDate || endDate) {
-      whereClause.eventDate = {};
-      if (startDate) whereClause.eventDate.gte = new Date(startDate);
-      if (endDate) whereClause.eventDate.lte = new Date(endDate);
-    }
-
-    const [orders, totalCount] = await Promise.all([
-      prisma.order.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.order.count({ where: whereClause }),
-    ]);
+    const { orders, totalCount } = await orderService.getOrders(page, limit, search, status, startDate, endDate);
 
     res.status(200).json({
       success: true,
@@ -47,14 +27,7 @@ export const getOrders = async (req: Request, res: Response, next: NextFunction)
 export const getOrderById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const order = await prisma.order.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-      },
-    });
-
-    if (!order) return next(new AppError('Order not found', 404));
+    const order = await orderService.getOrderById(id);
 
     res.status(200).json({
       success: true,
@@ -67,41 +40,13 @@ export const getOrderById = async (req: Request, res: Response, next: NextFuncti
 
 export const createOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { customerId, eventDate, venueAddress } = req.body;
-
-    if (!customerId || !eventDate) {
-      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC11-01'));
-    }
-
-    if (new Date(eventDate) <= new Date()) {
-      return next(new AppError('Event date must be in the future.', 400, 'MSG-UC11-01'));
-    }
-
-    const orderNumber = `ORD-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-
-    const newOrder = await prisma.order.create({
-      data: {
-        orderNumber,
-        customerId,
-        eventDate: new Date(eventDate),
-        venueAddress,
-        status: 'DRAFT',
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'CREATE_ORDER',
-        entityType: 'Order',
-        entityId: newOrder.id,
-      },
-    });
+    const actionUserId = req.user!.userId;
+    const result = await orderService.createOrder(req.body, actionUserId);
 
     res.status(201).json({
       success: true,
       message: 'Order created successfully.',
-      data: { id: newOrder.id, orderNumber },
+      data: result,
     });
   } catch (error) {
     next(error);
@@ -111,22 +56,8 @@ export const createOrder = async (req: AuthRequest, res: Response, next: NextFun
 export const confirmOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const order = await prisma.order.findUnique({
-      where: { id },
-      include: { quotations: true },
-    });
 
-    if (!order) return next(new AppError('Order not found', 404));
-
-    const hasAcceptedQuote = order.quotations.some(q => q.status === 'ACCEPTED');
-    if (!hasAcceptedQuote) {
-      return next(new AppError('Cannot confirm order without an accepted quotation.', 400, 'MSG-UC11-04'));
-    }
-
-    await prisma.order.update({
-      where: { id },
-      data: { status: 'CONFIRMED' },
-    });
+    await orderService.confirmOrder(id);
 
     res.status(200).json({
       success: true,
@@ -143,10 +74,7 @@ export const changeEventDate = async (req: AuthRequest, res: Response, next: Nex
     const { id } = req.params;
     const { newEventDate } = req.body;
 
-    await prisma.order.update({
-      where: { id },
-      data: { eventDate: new Date(newEventDate) },
-    });
+    await orderService.changeEventDate(id, newEventDate);
 
     res.status(200).json({
       success: true,
@@ -161,12 +89,7 @@ export const closeOrder = async (req: AuthRequest, res: Response, next: NextFunc
   try {
     const { id } = req.params;
     
-    // In reality, check if all payments/settlements/warehouse returns are complete.
-
-    await prisma.order.update({
-      where: { id },
-      data: { status: 'COMPLETED' },
-    });
+    await orderService.closeOrder(id);
 
     res.status(200).json({
       success: true,
@@ -180,22 +103,7 @@ export const closeOrder = async (req: AuthRequest, res: Response, next: NextFunc
 
 export const getFieldProgress = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orders = await prisma.order.findMany({
-      where: { status: { in: ['CONFIRMED', 'IN_PROGRESS'] } },
-      include: {
-        workTasks: {
-          orderBy: { updatedAt: 'desc' },
-          take: 1,
-        },
-      },
-    });
-
-    const data = orders.map(o => ({
-      orderId: o.id,
-      currentTask: o.workTasks.length > 0 ? o.workTasks[0].taskType : null,
-      status: o.workTasks.length > 0 ? o.workTasks[0].status : null,
-      lastUpdate: o.workTasks.length > 0 ? o.workTasks[0].updatedAt : null,
-    }));
+    const data = await orderService.getFieldProgress();
 
     res.status(200).json({
       success: true,

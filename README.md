@@ -96,7 +96,11 @@ npm install
 ```
 
 **Bước 2:** Cấu hình biến môi trường:
-Tạo file `.env` ở thư mục gốc của `backend-api` và thiết lập các thông số cơ bản (có thể tham khảo cấu trúc nếu có file mẫu):
+Copy file `.env.example` thành file `.env` ở thư mục gốc của `backend-api` và thiết lập các thông số cơ bản.
+```bash
+cp .env.example .env
+```
+Nội dung file `.env` cơ bản (nếu tự tạo tay):
 ```env
 PORT=3000
 DATABASE_URL="mysql://user:password@localhost:3306/wedding_event_db"

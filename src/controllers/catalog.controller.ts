@@ -1,34 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
-import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { catalogService } from '../services/catalog.service';
 
 export const getCatalogItems = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string;
-    const itemType = req.query.itemType as any;
+    const itemType = req.query.itemType as string;
     const isActiveParam = req.query.isActive as string;
 
-    const skip = (page - 1) * limit;
-
-    const whereClause: any = {};
-    if (search) {
-      whereClause.name = { contains: search };
-    }
-    if (itemType) whereClause.itemType = itemType;
-    if (isActiveParam !== undefined) whereClause.isActive = isActiveParam === 'true';
-
-    const [items, totalCount] = await Promise.all([
-      prisma.catalogItem.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.catalogItem.count({ where: whereClause }),
-    ]);
+    const { items, totalCount } = await catalogService.getCatalogItems(page, limit, search, itemType, isActiveParam);
 
     res.status(200).json({
       success: true,
@@ -43,11 +25,7 @@ export const getCatalogItems = async (req: Request, res: Response, next: NextFun
 export const getCatalogItemById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const item = await prisma.catalogItem.findUnique({ where: { id } });
-
-    if (!item) {
-      return next(new AppError('Catalog item not found.', 404));
-    }
+    const item = await catalogService.getCatalogItemById(id);
 
     res.status(200).json({
       success: true,
@@ -60,28 +38,8 @@ export const getCatalogItemById = async (req: Request, res: Response, next: Next
 
 export const createCatalogItem = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, description, itemType, basePrice } = req.body;
-
-    if (!name || !itemType || basePrice === undefined) {
-      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC05-01'));
-    }
-
-    if (basePrice <= 0) {
-      return next(new AppError('Base price must be positive.', 400, 'MSG-UC05-01'));
-    }
-
-    const newItem = await prisma.catalogItem.create({
-      data: { name, description, itemType, basePrice },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'CREATE_CATALOG_ITEM',
-        entityType: 'CatalogItem',
-        entityId: newItem.id,
-      },
-    });
+    const actionUserId = req.user!.userId;
+    const newItem = await catalogService.createCatalogItem(req.body, actionUserId);
 
     res.status(201).json({
       success: true,
@@ -96,21 +54,9 @@ export const createCatalogItem = async (req: AuthRequest, res: Response, next: N
 export const updateCatalogItem = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, description, basePrice } = req.body;
+    const actionUserId = req.user!.userId;
 
-    const item = await prisma.catalogItem.update({
-      where: { id },
-      data: { name, description, basePrice },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'UPDATE_CATALOG_ITEM',
-        entityType: 'CatalogItem',
-        entityId: id,
-      },
-    });
+    await catalogService.updateCatalogItem(id, req.body, actionUserId);
 
     res.status(200).json({
       success: true,
@@ -125,29 +71,9 @@ export const deactivateCatalogItem = async (req: AuthRequest, res: Response, nex
   try {
     const { id } = req.params;
     const { isActive } = req.body;
+    const actionUserId = req.user!.userId;
 
-    if (isActive === undefined) {
-      return next(new AppError('isActive status is required.', 400, 'MSG-UC05-01'));
-    }
-
-    // BR-05-06: Cannot deactivate if part of active order. 
-    // In a full implementation, we'd query Quotation details/Order details. 
-    // Assuming simple check for now.
-
-    await prisma.catalogItem.update({
-      where: { id },
-      data: { isActive },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'DEACTIVATE_CATALOG_ITEM',
-        entityType: 'CatalogItem',
-        entityId: id,
-        details: { isActive },
-      },
-    });
+    await catalogService.deactivateCatalogItem(id, isActive, actionUserId);
 
     res.status(200).json({
       success: true,

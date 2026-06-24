@@ -40,3 +40,9 @@ Thumbs.db
 # Coverage
 coverage/
 .nyc_output/
+
+# Temporary output files
+test_output.log
+results.json
+results2.json
+test-results.json

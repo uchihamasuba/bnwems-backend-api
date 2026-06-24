@@ -3,15 +3,104 @@ import app from '../src/app';
 import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
-describe('Settlement API', () => {
-  const token = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+describe('Settlement API (Module 11)', () => {
+  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+  const staffToken = generateTestToken({ userId: 'staff1', role: 'LEADER_STAFF' });
+  const validUUID1 = '123e4567-e89b-12d3-a456-426614174000';
+  const validUUID2 = '123e4567-e89b-12d3-a456-426614174001';
 
-  it('GET /api/v1/settlements should return 200', async () => {
-    prismaMock.settlement.findMany.mockResolvedValue([]);
-    const res = await request(app).get('/api/v1/settlements').set('Authorization', `Bearer ${token}`);
-    expect([200, 201, 400, 401, 403, 404, 500]).toContain(res.status);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('POST /api/v1/settlements should exist', async () => { const res = await request(app).post('/api/v1/settlements').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('PUT /api/v1/settlements/:id/confirm should exist', async () => { const res = await request(app).put('/api/v1/settlements/1/confirm').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
+  describe('POST /api/v1/orders/:orderId/settlement', () => {
+    it('should return 401 if unauthorized', async () => {
+      const res = await request(app).post(`/api/v1/orders/${validUUID1}/settlement`);
+      expect(res.status).toBe(401);
+    });
+
+    it('should return 400 if validation fails', async () => {
+      const res = await request(app)
+        .post(`/api/v1/orders/${validUUID1}/settlement`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({
+          originalValue: -100 // invalid
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should return 400 if discrepancy is detected (MSG-UC30-01)', async () => {
+      const res = await request(app)
+        .post(`/api/v1/orders/${validUUID1}/settlement`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({
+          originalValue: 1000,
+          additionalFees: 100,
+          compensation: 50,
+          paidAmount: 500,
+          remainingAmount: 0 // Expected: 1000 + 100 - 50 - 500 = 550. Discrepancy > 0.1
+        });
+      
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MSG-UC30-01');
+    });
+
+    it('should record settlement successfully', async () => {
+      prismaMock.settlement.create.mockResolvedValue({ id: validUUID2 } as any);
+
+      const res = await request(app)
+        .post(`/api/v1/orders/${validUUID1}/settlement`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({
+          originalValue: 1000,
+          additionalFees: 100,
+          compensation: 50,
+          paidAmount: 500,
+          remainingAmount: 550, // Correct
+          evidences: []
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(prismaMock.settlement.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('PUT /api/v1/settlements/:id/confirm', () => {
+    it('should return 400 if status is not CONFIRMED', async () => {
+      const res = await request(app)
+        .put(`/api/v1/settlements/${validUUID2}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'INVALID_STATUS' });
+      
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 404 if settlement not found', async () => {
+      prismaMock.settlement.findUnique.mockResolvedValue(null);
+
+      const res = await request(app)
+        .put(`/api/v1/settlements/${validUUID2}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'CONFIRMED' });
+      
+      expect(res.status).toBe(404);
+    });
+
+    it('should confirm settlement successfully', async () => {
+      prismaMock.settlement.findUnique.mockResolvedValue({ id: validUUID2, orderId: validUUID1 } as any);
+      prismaMock.$transaction.mockResolvedValue([] as any);
+      prismaMock.auditLog.create.mockResolvedValue({} as any);
+
+      const res = await request(app)
+        .put(`/api/v1/settlements/${validUUID2}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'CONFIRMED' });
+      
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+  });
 });

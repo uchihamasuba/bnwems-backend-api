@@ -2,13 +2,16 @@ import { Router } from 'express';
 import * as changerequestController from '../controllers/changerequest.controller';
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 
-const router = Router({ mergeParams: true });
+export const nestedChangeRequestRouter = Router({ mergeParams: true });
+nestedChangeRequestRouter.use(authenticate);
+nestedChangeRequestRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
 
-router.use(authenticate);
-router.use(authorizeRoles('ADMIN', 'MANAGER'));
+import { validate } from '../middlewares/validate.middleware';
+import { createChangeRequestSchema, approveChangeRequestSchema } from '../validators/changerequest.validator';
 
-// Mounted on /api/v1/orders/:orderId/change-requests or /api/v1/change-requests
-router.post('/', changerequestController.createChangeRequest);
-router.put('/:id/approve', changerequestController.approveChangeRequest);
+nestedChangeRequestRouter.post('/', validate(createChangeRequestSchema), changerequestController.createChangeRequest);
 
-export default router;
+export const changeRequestRouter = Router();
+changeRequestRouter.use(authenticate);
+changeRequestRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
+changeRequestRouter.put('/:id/approve', validate(approveChangeRequestSchema), changerequestController.approveChangeRequest);

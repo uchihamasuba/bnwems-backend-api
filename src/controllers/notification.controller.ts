@@ -1,7 +1,6 @@
 import { Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { AppError } from '../middlewares/error.middleware';
+import { notificationService } from '../services/notification.service';
 
 export const getNotifications = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -10,22 +9,7 @@ export const getNotifications = async (req: AuthRequest, res: Response, next: Ne
     const limit = parseInt(req.query.limit as string) || 20;
     const isReadParam = req.query.isRead as string;
 
-    const skip = (page - 1) * limit;
-
-    const whereClause: any = { userId };
-    if (isReadParam !== undefined) {
-      whereClause.isRead = isReadParam === 'true';
-    }
-
-    const [notifications, totalCount] = await Promise.all([
-      prisma.notification.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.notification.count({ where: whereClause }),
-    ]);
+    const { notifications, totalCount } = await notificationService.getNotifications(userId, page, limit, isReadParam);
 
     res.status(200).json({
       success: true,
@@ -46,18 +30,7 @@ export const markAsRead = async (req: AuthRequest, res: Response, next: NextFunc
     const userId = req.user!.userId;
     const { id } = req.params;
 
-    const notification = await prisma.notification.findUnique({
-      where: { id },
-    });
-
-    if (!notification || notification.userId !== userId) {
-      return next(new AppError('Notification not found or access denied.', 404, 'MSG-UC03-01'));
-    }
-
-    await prisma.notification.update({
-      where: { id },
-      data: { isRead: true },
-    });
+    await notificationService.markAsRead(id, userId);
 
     res.status(200).json({
       success: true,

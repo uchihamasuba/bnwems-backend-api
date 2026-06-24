@@ -2,15 +2,15 @@ import { Router } from 'express';
 import * as paymentController from '../controllers/payment.controller';
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 
-const router = Router({ mergeParams: true });
+export const nestedPaymentRouter = Router({ mergeParams: true });
+nestedPaymentRouter.use(authenticate);
 
-router.use(authenticate);
+import { validate } from '../middlewares/validate.middleware';
+import { getPaymentsByOrderSchema, requestPaymentSchema, confirmPaymentSchema } from '../validators/payment.validator';
 
-// Mounted on /api/v1/orders/:orderId/payments or /api/v1/payments
-router.get('/', authorizeRoles('ADMIN', 'MANAGER'), paymentController.getPaymentsByOrder);
-router.post('/request', authorizeRoles('ADMIN', 'MANAGER'), paymentController.requestPayment);
+nestedPaymentRouter.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getPaymentsByOrderSchema), paymentController.getPaymentsByOrder);
+nestedPaymentRouter.post('/request', authorizeRoles('ADMIN', 'MANAGER'), validate(requestPaymentSchema), paymentController.requestPayment);
 
-// Standalone endpoint: /api/v1/payments/:id/confirm
-router.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), paymentController.confirmPayment);
-
-export default router;
+export const paymentRouter = Router();
+paymentRouter.use(authenticate);
+paymentRouter.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmPaymentSchema), paymentController.confirmPayment);

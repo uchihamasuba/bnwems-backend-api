@@ -2,17 +2,20 @@ import { Router } from 'express';
 import * as quotationController from '../controllers/quotation.controller';
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 
-const router = Router({ mergeParams: true });
+export const nestedQuotationRouter = Router({ mergeParams: true });
+nestedQuotationRouter.use(authenticate);
+nestedQuotationRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
 
-router.use(authenticate);
-router.use(authorizeRoles('ADMIN', 'MANAGER'));
+import { validate } from '../middlewares/validate.middleware';
+import { getQuotationsByOrderSchema, getQuotationByIdSchema, createQuotationSchema, updateQuotationSchema, deleteQuotationSchema, confirmQuotationSchema } from '../validators/quotation.validator';
 
-// Mounted on /api/v1/orders/:orderId/quotations or /api/v1/quotations
-router.get('/', quotationController.getQuotationsByOrder);
-router.get('/:id', quotationController.getQuotationById);
-router.post('/', quotationController.createQuotation);
-router.put('/:id', quotationController.updateQuotation);
-router.delete('/:id', quotationController.deleteQuotation);
-router.put('/:id/confirm', quotationController.confirmQuotation);
+nestedQuotationRouter.get('/', validate(getQuotationsByOrderSchema), quotationController.getQuotationsByOrder);
+nestedQuotationRouter.post('/', validate(createQuotationSchema), quotationController.createQuotation);
 
-export default router;
+export const quotationRouter = Router();
+quotationRouter.use(authenticate);
+quotationRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
+quotationRouter.get('/:id', validate(getQuotationByIdSchema), quotationController.getQuotationById);
+quotationRouter.put('/:id', validate(updateQuotationSchema), quotationController.updateQuotation);
+quotationRouter.delete('/:id', validate(deleteQuotationSchema), quotationController.deleteQuotation);
+quotationRouter.put('/:id/confirm', validate(confirmQuotationSchema), quotationController.confirmQuotation);

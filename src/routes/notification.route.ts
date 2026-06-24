@@ -6,7 +6,10 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', notificationController.getNotifications);
-router.put('/:id/read', notificationController.markAsRead);
+import { validate } from '../middlewares/validate.middleware';
+import { getNotificationsSchema, markAsReadSchema } from '../validators/notification.validator';
+
+router.get('/', validate(getNotificationsSchema), notificationController.getNotifications);
+router.put('/:id/read', validate(markAsReadSchema), notificationController.markAsRead);
 
 export default router;
