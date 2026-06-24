@@ -2,14 +2,14 @@ import { Router } from 'express';
 import * as settlementController from '../controllers/settlement.controller';
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 
-const router = Router({ mergeParams: true });
+export const nestedSettlementRouter = Router({ mergeParams: true });
+nestedSettlementRouter.use(authenticate);
 
-router.use(authenticate);
+import { validate } from '../middlewares/validate.middleware';
+import { recordSettlementSchema, confirmSettlementSchema } from '../validators/settlement.validator';
 
-// Mounted on /api/v1/orders/:orderId/settlement
-router.post('/', authorizeRoles('LEADER_STAFF', 'MANAGER'), settlementController.recordSettlement);
+nestedSettlementRouter.post('/', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(recordSettlementSchema), settlementController.recordSettlement);
 
-// Mounted on /api/v1/settlements
-router.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), settlementController.confirmSettlement);
-
-export default router;
+export const settlementRouter = Router();
+settlementRouter.use(authenticate);
+settlementRouter.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmSettlementSchema), settlementController.confirmSettlement);

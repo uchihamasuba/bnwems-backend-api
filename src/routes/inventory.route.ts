@@ -6,8 +6,11 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF'), inventoryController.getInventory);
-router.get('/availability', authorizeRoles('ADMIN', 'MANAGER'), inventoryController.checkAvailability);
-router.post('/reserve', authorizeRoles('ADMIN', 'MANAGER'), inventoryController.reserveInventory);
+import { validate } from '../middlewares/validate.middleware';
+import { getInventorySchema, checkAvailabilitySchema, reserveInventorySchema } from '../validators/inventory.validator';
+
+router.get('/', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF'), validate(getInventorySchema), inventoryController.getInventory);
+router.get('/availability', authorizeRoles('ADMIN', 'MANAGER'), validate(checkAvailabilitySchema), inventoryController.checkAvailability);
+router.post('/reserve', authorizeRoles('ADMIN', 'MANAGER'), validate(reserveInventorySchema), inventoryController.reserveInventory);
 
 export default router;

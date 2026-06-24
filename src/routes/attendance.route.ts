@@ -6,7 +6,10 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post('/check-in', authorizeRoles('TECHNICAL_STAFF'), attendanceController.checkIn);
-router.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF'), attendanceController.confirmAttendance);
+import { validate } from '../middlewares/validate.middleware';
+import { checkInSchema, confirmAttendanceSchema } from '../validators/attendance.validator';
+
+router.post('/check-in', authorizeRoles('TECHNICAL_STAFF'), validate(checkInSchema), attendanceController.checkIn);
+router.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF'), validate(confirmAttendanceSchema), attendanceController.confirmAttendance);
 
 export default router;

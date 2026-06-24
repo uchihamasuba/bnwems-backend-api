@@ -7,7 +7,10 @@ const router = Router();
 router.use(authenticate);
 router.use(authorizeRoles('ADMIN', 'MANAGER'));
 
-router.get('/summary', wageController.getWagesSummary);
-router.post('/summary/:id/confirm', wageController.confirmWage);
+import { validate } from '../middlewares/validate.middleware';
+import { getWagesSummarySchema, confirmWageSchema } from '../validators/wage.validator';
+
+router.get('/summary', validate(getWagesSummarySchema), wageController.getWagesSummary);
+router.post('/summary/:id/confirm', validate(confirmWageSchema), wageController.confirmWage);
 
 export default router;

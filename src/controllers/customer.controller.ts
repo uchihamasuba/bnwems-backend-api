@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
-import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { customerService } from '../services/customer.service';
 
 export const getCustomers = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -9,26 +8,7 @@ export const getCustomers = async (req: Request, res: Response, next: NextFuncti
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string;
 
-    const skip = (page - 1) * limit;
-
-    const whereClause: any = {};
-    if (search) {
-      whereClause.OR = [
-        { fullName: { contains: search } },
-        { phone: { contains: search } },
-        { email: { contains: search } },
-      ];
-    }
-
-    const [customers, totalCount] = await Promise.all([
-      prisma.customer.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.customer.count({ where: whereClause }),
-    ]);
+    const { customers, totalCount } = await customerService.getCustomers(page, limit, search);
 
     res.status(200).json({
       success: true,
@@ -43,9 +23,7 @@ export const getCustomers = async (req: Request, res: Response, next: NextFuncti
 export const getCustomerById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const customer = await prisma.customer.findUnique({ where: { id } });
-
-    if (!customer) return next(new AppError('Customer not found', 404));
+    const customer = await customerService.getCustomerById(id);
 
     res.status(200).json({
       success: true,
@@ -58,29 +36,8 @@ export const getCustomerById = async (req: Request, res: Response, next: NextFun
 
 export const createCustomer = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { fullName, phone, email, address } = req.body;
-
-    if (!fullName || !phone) {
-      return next(new AppError('Full name and phone are required.', 400, 'MSG-UC09-01'));
-    }
-
-    const existing = await prisma.customer.findUnique({ where: { phone } });
-    if (existing) {
-      return next(new AppError('Phone number already exists.', 400, 'MSG-UC09-05'));
-    }
-
-    const newCustomer = await prisma.customer.create({
-      data: { fullName, phone, email, address },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'CREATE_CUSTOMER',
-        entityType: 'Customer',
-        entityId: newCustomer.id,
-      },
-    });
+    const actionUserId = req.user!.userId;
+    const newCustomer = await customerService.createCustomer(req.body, actionUserId);
 
     res.status(201).json({
       success: true,
@@ -95,21 +52,9 @@ export const createCustomer = async (req: AuthRequest, res: Response, next: Next
 export const updateCustomer = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { fullName, email, address } = req.body;
+    const actionUserId = req.user!.userId;
 
-    await prisma.customer.update({
-      where: { id },
-      data: { fullName, email, address },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'UPDATE_CUSTOMER',
-        entityType: 'Customer',
-        entityId: id,
-      },
-    });
+    await customerService.updateCustomer(id, req.body, actionUserId);
 
     res.status(200).json({
       success: true,

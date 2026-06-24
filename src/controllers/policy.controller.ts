@@ -1,21 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
-import { AppError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { policyService } from '../services/policy.service';
 
 export const getPolicies = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const policyType = req.query.policyType as string;
     const isActiveParam = req.query.isActive as string;
 
-    const whereClause: any = {};
-    if (policyType) whereClause.policyType = policyType;
-    if (isActiveParam !== undefined) whereClause.isActive = isActiveParam === 'true';
-
-    const policies = await prisma.businessPolicy.findMany({
-      where: whereClause,
-      orderBy: { createdAt: 'desc' },
-    });
+    const policies = await policyService.getPolicies(policyType, isActiveParam);
 
     res.status(200).json({
       success: true,
@@ -29,24 +21,8 @@ export const getPolicies = async (req: Request, res: Response, next: NextFunctio
 
 export const createPolicy = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { policyType, name, rules } = req.body;
-
-    if (!policyType || !name || !rules) {
-      return next(new AppError('Required information is missing or invalid.', 400, 'MSG-UC06-01'));
-    }
-
-    const newPolicy = await prisma.businessPolicy.create({
-      data: { policyType, name, rules },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'CREATE_POLICY',
-        entityType: 'BusinessPolicy',
-        entityId: newPolicy.id,
-      },
-    });
+    const actionUserId = req.user!.userId;
+    const newPolicy = await policyService.createPolicy(req.body, actionUserId);
 
     res.status(201).json({
       success: true,
@@ -61,24 +37,9 @@ export const updatePolicy = async (req: AuthRequest, res: Response, next: NextFu
   try {
     const { id } = req.params;
     const { rules } = req.body;
+    const actionUserId = req.user!.userId;
 
-    if (!rules) {
-      return next(new AppError('Rules are required.', 400, 'MSG-UC06-01'));
-    }
-
-    await prisma.businessPolicy.update({
-      where: { id },
-      data: { rules },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'UPDATE_POLICY',
-        entityType: 'BusinessPolicy',
-        entityId: id,
-      },
-    });
+    await policyService.updatePolicy(id, rules, actionUserId);
 
     res.status(200).json({
       success: true,

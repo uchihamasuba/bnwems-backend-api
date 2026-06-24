@@ -6,8 +6,11 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/revenue', authorizeRoles('ADMIN'), reportController.getRevenueReport);
-router.get('/inventory', authorizeRoles('ADMIN', 'MANAGER'), reportController.getInventoryReport);
-router.get('/verification', authorizeRoles('ADMIN', 'MANAGER'), reportController.getVerificationReport);
+import { validate } from '../middlewares/validate.middleware';
+import { getRevenueReportSchema, getInventoryReportSchema, getVerificationReportSchema } from '../validators/report.validator';
+
+router.get('/revenue', authorizeRoles('ADMIN'), validate(getRevenueReportSchema), reportController.getRevenueReport);
+router.get('/inventory', authorizeRoles('ADMIN', 'MANAGER'), validate(getInventoryReportSchema), reportController.getInventoryReport);
+router.get('/verification', authorizeRoles('ADMIN', 'MANAGER'), validate(getVerificationReportSchema), reportController.getVerificationReport);
 
 export default router;

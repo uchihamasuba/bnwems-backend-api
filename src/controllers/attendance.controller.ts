@@ -1,27 +1,13 @@
-import { Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
-import { AppError } from '../middlewares/error.middleware';
+import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { attendanceService } from '../services/attendance.service';
 
 export const checkIn = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { assignmentId, checkInTime } = req.body;
     const userId = req.user!.userId;
 
-    if (!assignmentId || !checkInTime) {
-      return next(new AppError('Required information missing.', 400));
-    }
-
-    // In a real app, verify location bounds to throw MSG-UC29-01 if needed.
-    
-    const newAttendance = await prisma.attendance.create({
-      data: {
-        assignmentId,
-        userId,
-        checkInTime: new Date(checkInTime),
-        status: 'PENDING', // default pending until confirmed
-      },
-    });
+    await attendanceService.checkIn(assignmentId, checkInTime, userId);
 
     res.status(200).json({
       success: true,
@@ -37,17 +23,7 @@ export const confirmAttendance = async (req: AuthRequest, res: Response, next: N
     const { id } = req.params;
     const { status, checkOutTime } = req.body;
 
-    if (!status) {
-      return next(new AppError('Status is required.', 400));
-    }
-
-    await prisma.attendance.update({
-      where: { id },
-      data: {
-        status,
-        checkOutTime: checkOutTime ? new Date(checkOutTime) : undefined,
-      },
-    });
+    await attendanceService.confirmAttendance(id, status, checkOutTime);
 
     res.status(200).json({
       success: true,

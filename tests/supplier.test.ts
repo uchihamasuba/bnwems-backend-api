@@ -3,10 +3,19 @@ import app from '../src/app';
 import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
-describe('Supplier API (Module 4 - Master Data)', () => {
-  const token = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+describe('Supplier API (Module 4 & 12)', () => {
+  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   describe('GET /api/v1/suppliers', () => {
+    it('should return 401 if unauthorized', async () => {
+      const res = await request(app).get('/api/v1/suppliers');
+      expect(res.status).toBe(401);
+    });
+
     it('should return list of suppliers', async () => {
       prismaMock.supplier.findMany.mockResolvedValue([
         { id: 'supp1', name: 'Audio Corp' } as any
@@ -15,10 +24,11 @@ describe('Supplier API (Module 4 - Master Data)', () => {
 
       const res = await request(app)
         .get('/api/v1/suppliers')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${adminToken}`);
 
-      expect([200, 201, 400, 401, 403, 404, 500]).toContain(res.status);
-      expect(res.body.data.length).toBe(1);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
     });
   });
 
@@ -29,27 +39,29 @@ describe('Supplier API (Module 4 - Master Data)', () => {
 
       const res = await request(app)
         .post('/api/v1/suppliers')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           name: 'Visual Corp',
           contactPerson: 'John Doe',
           phone: '123456789',
         });
 
-      expect([201, 400, 404, 500]).toContain(res.status);
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
     });
 
-    it('should return 400 if supplier name is missing (MSG-UC16-01)', async () => {
+    it('should return 400 if validation fails', async () => {
       const res = await request(app)
         .post('/api/v1/suppliers')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           contactPerson: 'John Doe',
           phone: '123456789',
+          // missing name
         });
 
       expect(res.status).toBe(400);
-      expect(res.body.code).toBe('MSG-UC16-01');
+      expect(res.body.code).toBe('VALIDATION_ERROR');
     });
   });
 });
