@@ -15,15 +15,13 @@ export const createUserSchema = z.object({
     username: z.string().min(3, 'Username must be at least 3 characters'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     fullName: z.string().min(1, 'Full name is required'),
-    role: z.enum(['ADMIN', 'MANAGER', 'STAFF'], {
-      message: 'Invalid role',
-    }),
+    roleId: z.string().regex(/^\d+$/, 'Invalid role ID format'),
   }),
 });
 
 export const updateUserSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid user ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     fullName: z.string().min(1, 'Full name is required'),
@@ -35,7 +33,7 @@ export const updateUserSchema = z.object({
 
 export const updateStatusSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid user ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     status: z.enum(['ACTIVE', 'INACTIVE', 'LOCKED'], {
@@ -46,7 +44,7 @@ export const updateStatusSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid user ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     newPassword: z.string().min(6, 'New password must be at least 6 characters'),

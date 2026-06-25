@@ -43,12 +43,13 @@ export const createTask = async (req: AuthRequest, res: Response, next: NextFunc
     // If called via POST /tasks, orderId is in body
     const finalOrderId = req.params.orderId || req.body.orderId;
     
-    const newTask = await taskService.createTask(finalOrderId, req.body);
+    const actionUserId = req.user!.userId;
+    const newTask = await taskService.createTask(finalOrderId, req.body, actionUserId);
 
     res.status(201).json({
       success: true,
       message: 'Task created successfully.',
-      data: { id: newTask.id },
+      data: { id: newTask.workTaskId },
     });
   } catch (error) {
     next(error);

@@ -4,8 +4,8 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Wage API (Module 4)', () => {
-  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
-  const validUUID1 = '123e4567-e89b-12d3-a456-426614174000';
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const validId1 = '1';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -14,7 +14,7 @@ describe('Wage API (Module 4)', () => {
   describe('GET /api/v1/wages/summary', () => {
     it('should return list of wage summaries', async () => {
       prismaMock.wageSummary.findMany.mockResolvedValue([
-        { id: validUUID1, userId: validUUID1, period: '2023-10' } as any
+        { wageId: 1n, userId: validId1, period: '2023-10' } as any
       ]);
       prismaMock.wageSummary.count.mockResolvedValue(1);
 
@@ -30,11 +30,11 @@ describe('Wage API (Module 4)', () => {
 
   describe('POST /api/v1/wages/summary/:id/confirm', () => {
     it('should confirm wage successfully', async () => {
-      prismaMock.wageSummary.findUnique.mockResolvedValue({ id: validUUID1 } as any);
+      prismaMock.wageSummary.findUnique.mockResolvedValue({ wageId: 1n } as any);
       prismaMock.wageSummary.update.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .post(`/api/v1/wages/summary/${validUUID1}/confirm`)
+        .post(`/api/v1/wages/summary/${validId1}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'CONFIRMED' });
 
@@ -44,7 +44,7 @@ describe('Wage API (Module 4)', () => {
 
     it('should return 400 if validation fails', async () => {
       const res = await request(app)
-        .post(`/api/v1/wages/summary/${validUUID1}/confirm`)
+        .post(`/api/v1/wages/summary/${validId1}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: '' }); // invalid status
 
@@ -56,7 +56,7 @@ describe('Wage API (Module 4)', () => {
       prismaMock.wageSummary.findUnique.mockResolvedValue(null);
 
       const res = await request(app)
-        .post(`/api/v1/wages/summary/${validUUID1}/confirm`)
+        .post(`/api/v1/wages/summary/${validId1}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'CONFIRMED' });
 

@@ -4,11 +4,11 @@ import { warehouseService } from '../services/warehouse.service';
 
 export const getWarehouseHistories = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const transactionType = req.query.transactionType as string;
+    const movementType = req.query.transactionType as string; // API still sends transactionType
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
-    const { histories, totalCount } = await warehouseService.getWarehouseHistories(page, limit, transactionType);
+    const { histories, totalCount } = await warehouseService.getWarehouseHistories(page, limit, movementType);
 
     res.status(200).json({
       success: true,

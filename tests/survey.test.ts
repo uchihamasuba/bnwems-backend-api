@@ -4,7 +4,7 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Survey & Task API', () => {
-  const token = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+  const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
 
   it('GET /api/v1/tasks should return 200', async () => {
     prismaMock.workTask.findMany.mockResolvedValue([]);

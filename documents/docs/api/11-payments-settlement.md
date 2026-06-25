@@ -21,11 +21,11 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
   "success": true,
   "data": [
     {
-      "id": "payment-uuid",
+      "paymentId": 1,
       "amount": 500.00,
-      "paymentType": "DEPOSIT",
-      "paymentMethod": "BANK_TRANSFER",
-      "status": "COMPLETED",
+      "paymentType": "deposit",
+      "paymentMethod": "bank_transfer",
+      "status": "completed",
       "paymentDate": "2026-06-22T10:00:00Z",
       "evidences": [{ "fileUrl": "https://storage.example.com/receipt.jpg" }]
     }
@@ -42,8 +42,8 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 ```json
 {
   "amount": 500.00,
-  "paymentType": "DEPOSIT",
-  "paymentMethod": "VNPAY_QR"
+  "paymentType": "deposit",
+  "paymentMethod": "vnpay_qr"
 }
 ```
 - **Response (201 Created):**
@@ -51,7 +51,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 {
   "success": true,
   "message": "Payment request created.",
-  "data": { "id": "payment-uuid", "paymentUrl": "vnpay-qr-url" }
+  "data": { "paymentRequestId": 1, "paymentUrl": "vnpay-qr-url" }
 }
 ```
 
@@ -64,7 +64,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 - **Request Body:**
 ```json
 {
-  "status": "COMPLETED",
+  "status": "completed",
   "evidenceUrl": "https://storage.example.com/receipt.jpg"
 }
 ```
@@ -100,7 +100,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 {
   "success": true,
   "message": "Field settlement recorded.",
-  "data": { "id": "settlement-uuid" }
+  "data": { "settlementId": 1 }
 }
 ```
 
@@ -112,7 +112,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 - **Request Body:**
 ```json
 {
-  "status": "CONFIRMED"
+  "status": "confirmed"
 }
 ```
 - **Response (200 OK):**

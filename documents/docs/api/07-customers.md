@@ -25,7 +25,7 @@ It deals with the registration, retrieval, and updating of `Customer` records. C
   "success": true,
   "data": [
     {
-      "id": "customer-uuid",
+      "customerId": 1,
       "fullName": "Jane Doe",
       "phone": "+198765432",
       "email": "jane@example.com",
@@ -45,7 +45,7 @@ It deals with the registration, retrieval, and updating of `Customer` records. C
 {
   "success": true,
   "data": {
-    "id": "customer-uuid",
+    "customerId": 1,
     "fullName": "Jane Doe",
     "phone": "+198765432",
     "email": "jane@example.com",
@@ -76,7 +76,7 @@ It deals with the registration, retrieval, and updating of `Customer` records. C
 {
   "success": true,
   "message": "Customer registered successfully.",
-  "data": { "id": "customer-uuid" }
+  "data": { "customerId": 1 }
 }
 ```
 

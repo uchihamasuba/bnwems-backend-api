@@ -4,9 +4,9 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('User API (Module 2)', () => {
-  const adminToken = generateTestToken({ userId: 'admin-uuid', role: 'ADMIN' });
-  const staffToken = generateTestToken({ userId: 'staff-uuid', role: 'STAFF' });
-  const validUUID = '123e4567-e89b-12d3-a456-426614174000';
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const staffToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'STAFF' } });
+  const validId = '1';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -65,8 +65,8 @@ describe('User API (Module 2)', () => {
         .send({
           username: 'existinguser',
           password: 'Password123!',
-          fullName: 'Test User',
-          role: 'STAFF',
+          fullName: 'Existing User',
+          roleId: '3',
         });
 
       expect(res.status).toBe(400);
@@ -75,7 +75,7 @@ describe('User API (Module 2)', () => {
 
     it('should create user successfully', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue(null);
-      prismaMock.internalUser.create.mockResolvedValue({ id: 'new-user', username: 'newuser', fullName: 'New User', role: 'STAFF', status: 'ACTIVE' } as any);
+      prismaMock.internalUser.create.mockResolvedValue({ id: 'new-user', username: 'newuser', fullName: 'New User', role: { roleId: '3', roleName: 'STAFF' }, status: 'active' } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
@@ -85,7 +85,7 @@ describe('User API (Module 2)', () => {
           username: 'newuser',
           password: 'Password123!',
           fullName: 'New User',
-          role: 'STAFF',
+          roleId: '3',
         });
 
       expect(res.status).toBe(201);
@@ -97,7 +97,7 @@ describe('User API (Module 2)', () => {
   describe('PUT /api/v1/users/:id', () => {
     it('should return 400 for invalid UUID format', async () => {
       const res = await request(app)
-        .put('/api/v1/users/invalid-id')
+        .put('/api/v1/users/abc')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ fullName: 'Updated Name', role: 'MANAGER' });
       expect(res.status).toBe(400);
@@ -105,11 +105,11 @@ describe('User API (Module 2)', () => {
     });
 
     it('should update user successfully', async () => {
-      prismaMock.internalUser.update.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.internalUser.update.mockResolvedValue({ userId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/users/${validUUID}`)
+        .put(`/api/v1/users/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ fullName: 'Updated Name', role: 'MANAGER' });
       
@@ -122,7 +122,7 @@ describe('User API (Module 2)', () => {
   describe('PUT /api/v1/users/:id/status', () => {
     it('should return 400 for invalid status', async () => {
       const res = await request(app)
-        .put(`/api/v1/users/${validUUID}/status`)
+        .put(`/api/v1/users/${validId}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'DELETED' }); // invalid enum
       expect(res.status).toBe(400);
@@ -130,11 +130,11 @@ describe('User API (Module 2)', () => {
     });
 
     it('should update user status successfully', async () => {
-      prismaMock.internalUser.update.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.internalUser.update.mockResolvedValue({ userId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/users/${validUUID}/status`)
+        .put(`/api/v1/users/${validId}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'INACTIVE' });
         
@@ -146,7 +146,7 @@ describe('User API (Module 2)', () => {
   describe('POST /api/v1/users/:id/reset-password', () => {
     it('should return 400 if new password too short', async () => {
       const res = await request(app)
-        .post(`/api/v1/users/${validUUID}/reset-password`)
+        .post(`/api/v1/users/${validId}/reset-password`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ newPassword: '123' });
       expect(res.status).toBe(400);
@@ -154,11 +154,11 @@ describe('User API (Module 2)', () => {
     });
 
     it('should reset password successfully', async () => {
-      prismaMock.internalUser.update.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.internalUser.update.mockResolvedValue({ userId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .post(`/api/v1/users/${validUUID}/reset-password`)
+        .post(`/api/v1/users/${validId}/reset-password`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ newPassword: 'NewPassword123' });
         

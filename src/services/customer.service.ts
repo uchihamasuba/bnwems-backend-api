@@ -28,7 +28,7 @@ class CustomerService {
   }
 
   public async getCustomerById(id: string) {
-    const customer = await prisma.customer.findUnique({ where: { id } });
+    const customer = await prisma.customer.findUnique({ where: { customerId: BigInt(id) } });
     if (!customer) throw new AppError('Customer not found', 404);
     return customer;
   }
@@ -47,10 +47,10 @@ class CustomerService {
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'CREATE_CUSTOMER',
         entityType: 'Customer',
-        entityId: newCustomer.id,
+        entityId: newCustomer.customerId,
       },
     });
 
@@ -61,16 +61,16 @@ class CustomerService {
     const { fullName, email, address } = data;
 
     const updatedCustomer = await prisma.customer.update({
-      where: { id },
+      where: { customerId: BigInt(id) },
       data: { fullName, email, address },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'UPDATE_CUSTOMER',
         entityType: 'Customer',
-        entityId: id,
+        entityId: BigInt(id),
       },
     });
 

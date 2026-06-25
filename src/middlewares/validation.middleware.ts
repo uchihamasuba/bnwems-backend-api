@@ -11,14 +11,15 @@ export const validateRequest = (schema: ZodSchema) => {
       });
       return next();
     } catch (error) {
-      if (error instanceof ZodError) {
+      if (error instanceof ZodError || (error && typeof error === 'object' && (error as any).name === 'ZodError')) {
+        const issues = (error as ZodError).issues;
         return res.status(400).json({
           success: false,
           message: 'Validation failed',
-          errors: error.issues.map((err: any) => ({
-            path: err.path.join('.'),
-            message: err.message,
-          })),
+          errors: issues ? issues.map((e: any) => ({
+            path: e.path.join('.'),
+            message: e.message,
+          })) : (error as any).message,
         });
       }
       return next(error);

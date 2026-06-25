@@ -26,11 +26,13 @@ export const errorMiddleware = (
   let message = 'Internal Server Error';
   let code = 'SERVER_ERROR';
 
-  if (err instanceof AppError) {
-    statusCode = err.statusCode;
+  console.log('DEBUG ERR:', err, 'isOperational:', (err as any).isOperational, 'statusCode:', (err as any).statusCode);
+
+  if (err instanceof AppError || (err && typeof err === 'object' && (err as any).isOperational)) {
+    statusCode = (err as AppError).statusCode || 500;
     message = err.message;
-    code = err.code;
-  } else if (err.name === 'PrismaClientKnownRequestError') {
+    code = (err as AppError).code || 'ERROR';
+  } else if (err && typeof err === 'object' && err.name === 'PrismaClientKnownRequestError') {
     // Handle Prisma specific errors if needed
     statusCode = 400;
     message = 'Database request error';
@@ -39,9 +41,9 @@ export const errorMiddleware = (
 
   // Log error stack in development
   if (process.env.NODE_ENV !== 'production') {
-    console.error(`[Error] ${err.stack}`);
+    console.error(`[Error] ${err?.stack || err}`);
   } else {
-    console.error(`[Error] ${err.message}`);
+    console.error(`[Error] ${err?.message || err}`);
   }
 
   res.status(statusCode).json({

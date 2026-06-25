@@ -29,96 +29,97 @@ class OrderService {
 
   public async getOrderById(id: string) {
     const order = await prisma.order.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-      },
+      where: { orderId: BigInt(id) },
     });
 
     if (!order) throw new AppError('Order not found', 404);
-    return order;
+    
+    // Manual join to avoid relation naming issues if not mapped properly in schema
+    const customer = await prisma.customer.findUnique({ where: { customerId: order.customerId } });
+    
+    return { ...order, customer };
   }
 
   public async createOrder(data: any, actionUserId: string) {
-    const { customerId, eventDate, venueAddress } = data;
+    const { customerId, eventStartDate, venueAddress } = data;
 
-    if (new Date(eventDate) <= new Date()) {
+    if (new Date(eventStartDate) <= new Date()) {
       throw new AppError('Event date must be in the future.', 400, 'MSG-UC11-01');
     }
 
-    const orderNumber = `ORD-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-
     const newOrder = await prisma.order.create({
       data: {
-        orderNumber,
-        customerId,
-        eventDate: new Date(eventDate),
-        venueAddress,
-        status: 'DRAFT',
+        customerId: BigInt(customerId),
+        eventDate: new Date(eventStartDate),
+        eventLocation: venueAddress,
+        status: 'draft',
+        createdBy: BigInt(actionUserId)
       },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'CREATE_ORDER',
         entityType: 'Order',
-        entityId: newOrder.id,
+        entityId: newOrder.orderId,
       },
     });
 
-    return { id: newOrder.id, orderNumber };
+    return { id: newOrder.orderId };
   }
 
   public async confirmOrder(id: string) {
     const order = await prisma.order.findUnique({
-      where: { id },
-      include: { quotations: true },
+      where: { orderId: BigInt(id) },
     });
-
     if (!order) throw new AppError('Order not found', 404);
 
-    const hasAcceptedQuote = order.quotations.some(q => q.status === 'ACCEPTED');
-    if (!hasAcceptedQuote) {
+    const quote = await prisma.quotation.findUnique({
+      where: { orderId: BigInt(id) }
+    });
+
+    if (!quote || quote.status !== 'confirmed') {
       throw new AppError('Cannot confirm order without an accepted quotation.', 400, 'MSG-UC11-04');
     }
 
     await prisma.order.update({
-      where: { id },
-      data: { status: 'CONFIRMED' },
+      where: { orderId: BigInt(id) },
+      data: { status: 'confirmed' },
     });
   }
 
   public async changeEventDate(id: string, newEventDate: string) {
     await prisma.order.update({
-      where: { id },
+      where: { orderId: BigInt(id) },
       data: { eventDate: new Date(newEventDate) },
     });
   }
 
   public async closeOrder(id: string) {
     await prisma.order.update({
-      where: { id },
-      data: { status: 'COMPLETED' },
+      where: { orderId: BigInt(id) },
+      data: { status: 'completed' },
     });
   }
 
   public async getFieldProgress() {
     const orders = await prisma.order.findMany({
-      where: { status: { in: ['CONFIRMED', 'IN_PROGRESS'] } as any },
-      include: {
-        workTasks: {
-          orderBy: { updatedAt: 'desc' },
-          take: 1,
-        },
-      },
+      where: { status: { in: ['confirmed', 'in_progress'] } },
     });
-
-    const data = orders.map(o => ({
-      orderId: o.id,
-      currentTask: o.workTasks.length > 0 ? o.workTasks[0].taskType : null,
-      status: o.workTasks.length > 0 ? o.workTasks[0].status : null,
-      lastUpdate: o.workTasks.length > 0 ? o.workTasks[0].updatedAt : null,
+    
+    // Map order progress manually as relations might be named differently
+    const data = await Promise.all(orders.map(async (o) => {
+      const task = await prisma.workTask.findFirst({
+        where: { orderId: o.orderId },
+        orderBy: { updatedAt: 'desc' }
+      });
+      return {
+        orderId: o.orderId,
+        currentTask: task ? task.taskCategory : null,
+        status: task ? task.status : null,
+        lastUpdate: task ? task.updatedAt : null,
+      };
     }));
 
     return data;

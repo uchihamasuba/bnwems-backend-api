@@ -13,51 +13,61 @@ class SettlementService {
 
     const newSettlement = await prisma.settlement.create({
       data: {
-        orderId,
+        orderId: BigInt(orderId),
         originalValue,
-        additionalFees: additionalFees || 0,
+        additionalFee: additionalFees || 0,
         compensation: compensation || 0,
-        paidAmount: paidAmount || 0,
+        totalPaid: paidAmount || 0,
         remainingAmount,
-        status: 'DRAFT',
-        evidences: evidences && Array.isArray(evidences) ? {
-          create: evidences.map((e: any) => ({
-            fileUrl: e.fileUrl,
-            evidenceType: 'OTHER',
-            uploadedBy: userId,
-          })),
-        } : undefined,
+        status: 'draft',
+        recordedBy: BigInt(userId),
       },
     });
+
+    if (evidences && Array.isArray(evidences)) {
+      for (const e of evidences) {
+        await prisma.evidence.create({
+          data: {
+            refType: 'Settlement',
+            refId: newSettlement.settlementId,
+            fileUrl: e.fileUrl,
+            uploadedBy: BigInt(userId)
+          }
+        });
+      }
+    }
 
     return newSettlement;
   }
 
   public async confirmSettlement(id: string, status: string, userId: string) {
-    if (status !== 'CONFIRMED') {
-      throw new AppError('Status must be CONFIRMED.', 400);
+    if (status !== 'confirmed' && status !== 'CONFIRMED') {
+      throw new AppError('Status must be confirmed.', 400);
     }
 
-    const settlement = await prisma.settlement.findUnique({ where: { id } });
+    const settlement = await prisma.settlement.findUnique({ where: { settlementId: BigInt(id) } });
     if (!settlement) throw new AppError('Settlement not found', 404);
 
     await prisma.$transaction([
       prisma.settlement.update({
-        where: { id },
-        data: { status: 'CONFIRMED' },
+        where: { settlementId: BigInt(id) },
+        data: { 
+          status: 'confirmed',
+          confirmedBy: BigInt(userId) 
+        },
       }),
       prisma.order.update({
-        where: { id: settlement.orderId },
-        data: { status: 'SETTLEMENT_PENDING' },
+        where: { orderId: settlement.orderId },
+        data: { status: 'settlement_pending' },
       }),
     ]);
 
     await prisma.auditLog.create({
       data: {
-        userId,
+        userId: BigInt(userId),
         action: 'CONFIRM_SETTLEMENT',
         entityType: 'Settlement',
-        entityId: id,
+        entityId: BigInt(id),
       },
     });
   }

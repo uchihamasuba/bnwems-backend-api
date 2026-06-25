@@ -13,20 +13,38 @@ class DamageLossService {
 
     const newReport = await prisma.damageLossReport.create({
       data: {
-        orderId,
-        reportDetails,
-        status: 'PENDING',
-        evidences: {
-          create: evidences.map((e: any) => ({
-            fileUrl: e.fileUrl,
-            evidenceType: 'LOSS_REPORT',
-            uploadedBy: userId,
-          })),
-        },
+        orderId: BigInt(orderId),
+        recordedBy: BigInt(userId),
+        status: 'submitted',
       },
     });
 
-    return newReport;
+    for (const item of reportDetails.items) {
+      await prisma.damageLossItem.create({
+        data: {
+          damageLossId: newReport.damageLossId,
+          catalogItemId: BigInt(item.catalogItemId),
+          quantity: item.quantity,
+          damageType: item.type,
+          source: item.responsible === 'supplier' ? 'supplier' : 'internal'
+        }
+      });
+    }
+    
+    if (evidences && Array.isArray(evidences)) {
+      for (const e of evidences) {
+        await prisma.evidence.create({
+          data: {
+            refType: 'DamageLossReport',
+            refId: newReport.damageLossId,
+            fileUrl: e.fileUrl,
+            uploadedBy: BigInt(userId)
+          }
+        });
+      }
+    }
+
+    return { id: newReport.damageLossId };
   }
 }
 

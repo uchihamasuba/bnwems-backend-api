@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const getQuotationsByOrderSchema = z.object({
   params: z.object({
-    orderId: z.string().uuid('Invalid order ID').optional(), // Sometimes it's mounted on /quotations
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(), // Sometimes it's mounted on /quotations
   }),
   query: z.object({
     page: z.string().regex(/^\d+$/, 'Page must be a number').optional(),
@@ -12,13 +12,13 @@ export const getQuotationsByOrderSchema = z.object({
 
 export const getQuotationByIdSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid quotation ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
 
 export const createQuotationSchema = z.object({
   params: z.object({
-    orderId: z.string().uuid('Invalid order ID'),
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     subtotal: z.number().min(0, 'Subtotal must be non-negative'),
@@ -31,7 +31,7 @@ export const createQuotationSchema = z.object({
 
 export const updateQuotationSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid quotation ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     subtotal: z.number().min(0).optional(),
@@ -44,12 +44,12 @@ export const updateQuotationSchema = z.object({
 
 export const deleteQuotationSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid quotation ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
 
 export const confirmQuotationSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid quotation ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });

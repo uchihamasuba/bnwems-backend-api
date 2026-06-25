@@ -4,8 +4,8 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Policy API (Module 6)', () => {
-  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
-  const validUUID1 = '123e4567-e89b-12d3-a456-426614174000';
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const validId1 = '1';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -14,7 +14,7 @@ describe('Policy API (Module 6)', () => {
   describe('GET /api/v1/policies', () => {
     it('should return list of policies', async () => {
       prismaMock.businessPolicy.findMany.mockResolvedValue([
-        { id: validUUID1, policyType: 'DEPOSIT' } as any
+        { policyId: 1n, policyType: 'DEPOSIT' } as any
       ]);
 
       const res = await request(app)
@@ -29,7 +29,7 @@ describe('Policy API (Module 6)', () => {
 
   describe('POST /api/v1/policies', () => {
     it('should create new policy', async () => {
-      prismaMock.businessPolicy.create.mockResolvedValue({ id: validUUID1 } as any);
+      prismaMock.businessPolicy.create.mockResolvedValue({ policyId: 1n } as any);
 
       const res = await request(app)
         .post('/api/v1/policies')
@@ -60,11 +60,11 @@ describe('Policy API (Module 6)', () => {
 
   describe('PUT /api/v1/policies/:id', () => {
     it('should update policy successfully', async () => {
-      prismaMock.businessPolicy.findUnique.mockResolvedValue({ id: validUUID1 } as any);
-      prismaMock.businessPolicy.update.mockResolvedValue({ id: validUUID1 } as any);
+      prismaMock.businessPolicy.findUnique.mockResolvedValue({ policyId: 1n } as any);
+      prismaMock.businessPolicy.update.mockResolvedValue({ policyId: 1n } as any);
 
       const res = await request(app)
-        .put(`/api/v1/policies/${validUUID1}`)
+        .put(`/api/v1/policies/${validId1}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ rules: { percentage: 60 } });
 
@@ -76,7 +76,7 @@ describe('Policy API (Module 6)', () => {
       prismaMock.businessPolicy.findUnique.mockResolvedValue(null);
 
       const res = await request(app)
-        .put(`/api/v1/policies/${validUUID1}`)
+        .put(`/api/v1/policies/${validId1}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ rules: { percentage: 60 } });
 

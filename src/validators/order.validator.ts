@@ -13,13 +13,13 @@ export const getOrdersSchema = z.object({
 
 export const getOrderByIdSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid order ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
 
 export const createOrderSchema = z.object({
   body: z.object({
-    customerId: z.string().uuid('Invalid customer ID'),
+    customerId: z.string().regex(/^\d+$/, 'Invalid ID format'),
     eventDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: 'Invalid date format' }),
     venueAddress: z.string().optional(),
   }),
@@ -27,13 +27,13 @@ export const createOrderSchema = z.object({
 
 export const confirmOrderSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid order ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
 
 export const changeEventDateSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid order ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     newEventDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: 'Invalid date format' }),
@@ -42,6 +42,6 @@ export const changeEventDateSchema = z.object({
 
 export const closeOrderSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid order ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });

@@ -10,10 +10,10 @@ export const getWarehouseHistoriesSchema = z.object({
 
 export const checkoutWarehouseSchema = z.object({
   body: z.object({
-    warehouseId: z.string().uuid('Invalid warehouse ID'),
-    orderId: z.string().uuid('Invalid order ID'),
+    warehouseId: z.string().regex(/^\d+$/, 'Invalid ID format'),
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
     items: z.array(z.object({
-      catalogItemId: z.string().uuid('Invalid catalog item ID'),
+      catalogItemId: z.string().regex(/^\d+$/, 'Invalid ID format'),
       quantity: z.number().int().positive('Quantity must be positive'),
     })).min(1, 'Items cannot be empty'),
   }),
@@ -21,10 +21,10 @@ export const checkoutWarehouseSchema = z.object({
 
 export const returnWarehouseSchema = z.object({
   body: z.object({
-    warehouseId: z.string().uuid('Invalid warehouse ID'),
-    orderId: z.string().uuid('Invalid order ID'),
+    warehouseId: z.string().regex(/^\d+$/, 'Invalid ID format'),
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
     items: z.array(z.object({
-      catalogItemId: z.string().uuid('Invalid catalog item ID'),
+      catalogItemId: z.string().regex(/^\d+$/, 'Invalid ID format'),
       quantity: z.number().int().positive('Quantity must be positive'),
       condition: z.string().optional(),
     })).min(1, 'Items cannot be empty'),

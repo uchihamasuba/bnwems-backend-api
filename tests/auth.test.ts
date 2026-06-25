@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { generateTestToken } from './setup/authMock';
 
 describe('Auth API (Module 1)', () => {
-  const token = generateTestToken({ userId: 'user-uuid', role: 'ADMIN' });
+  const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -20,7 +20,7 @@ describe('Auth API (Module 1)', () => {
 
     it('should return 401 for incorrect password (MSG-UC01-02)', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue({
-        id: 'user-uuid',
+        userId: 1n,
         username: 'admin',
         passwordHash: await bcrypt.hash('correctpass', 10),
         status: 'ACTIVE',
@@ -37,7 +37,7 @@ describe('Auth API (Module 1)', () => {
 
     it('should return 403 for inactive account (MSG-UC01-03)', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue({
-        id: 'user-uuid',
+        userId: 1n,
         username: 'admin',
         passwordHash: await bcrypt.hash('correctpass', 10),
         status: 'INACTIVE',
@@ -54,11 +54,11 @@ describe('Auth API (Module 1)', () => {
 
     it('should return 200 and tokens on successful login', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue({
-        id: 'user-uuid',
+        userId: 1n,
         username: 'admin',
         passwordHash: await bcrypt.hash('correctpass', 10),
-        status: 'ACTIVE',
-        role: 'ADMIN',
+        status: 'active',
+        role: { roleId: 1n, roleName: 'ADMIN' },
       } as any);
       
       prismaMock.auditLog.create.mockResolvedValue({} as any);
@@ -107,7 +107,7 @@ describe('Auth API (Module 1)', () => {
 
     it('should return 400 if old password incorrect (MSG-UC02-01)', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue({
-        id: 'user-uuid',
+        userId: 1n,
         passwordHash: await bcrypt.hash('realold', 10),
       } as any);
 
@@ -122,7 +122,7 @@ describe('Auth API (Module 1)', () => {
 
     it('should return 200 on success', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue({
-        id: 'user-uuid',
+        userId: 1n,
         passwordHash: await bcrypt.hash('realold', 10),
       } as any);
       prismaMock.internalUser.update.mockResolvedValue({} as any);

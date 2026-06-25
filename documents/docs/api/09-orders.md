@@ -27,12 +27,12 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
   "success": true,
   "data": [
     {
-      "id": "order-uuid",
+      "orderId": 1,
       "orderNumber": "ORD-2026-0001",
-      "customerId": "customer-uuid",
-      "eventDate": "2026-10-15T00:00:00Z",
+      "customerId": 1,
+      "eventStartDate": "2026-10-15T00:00:00Z",
       "venueAddress": "123 Event Hall",
-      "status": "CONFIRMED",
+      "status": "confirmed",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -48,12 +48,12 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 {
   "success": true,
   "data": {
-    "id": "order-uuid",
+    "orderId": 1,
     "orderNumber": "ORD-2026-0001",
-    "customerId": "customer-uuid",
-    "eventDate": "2026-10-15T00:00:00Z",
+    "customerId": 1,
+    "eventStartDate": "2026-10-15T00:00:00Z",
     "venueAddress": "123 Event Hall",
-    "status": "CONFIRMED",
+    "status": "confirmed",
     "customer": {
       "fullName": "Jane Doe",
       "phone": "+198765432"
@@ -73,8 +73,8 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 - **Request Body:**
 ```json
 {
-  "customerId": "customer-uuid",
-  "eventDate": "2026-10-15T00:00:00Z",
+  "customerId": 1,
+  "eventStartDate": "2026-10-15T00:00:00Z",
   "venueAddress": "123 Event Hall"
 }
 ```
@@ -83,7 +83,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 {
   "success": true,
   "message": "Order created successfully.",
-  "data": { "id": "new-order-uuid" }
+  "data": { "orderId": 1 }
 }
 ```
 
@@ -99,7 +99,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 {
   "success": true,
   "message": "Order confirmed.",
-  "data": { "status": "CONFIRMED" }
+  "data": { "status": "confirmed" }
 }
 ```
 
@@ -112,7 +112,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 - **Request Body:**
 ```json
 {
-  "newEventDate": "2026-11-01T00:00:00Z"
+  "newEventStartDate": "2026-11-01T00:00:00Z"
 }
 ```
 - **Response (200 OK):**
@@ -133,7 +133,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 {
   "success": true,
   "message": "Order closed successfully.",
-  "data": { "status": "COMPLETED" }
+  "data": { "status": "completed" }
 }
 ```
 
@@ -146,7 +146,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "requestDetails": {
-    "addedItems": [{ "catalogItemId": "item-uuid", "quantity": 1 }],
+    "addedItems": [{ "catalogItemId": 1, "quantity": 1 }],
     "removedItems": []
   },
   "additionalCost": 150.00
@@ -168,7 +168,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 - **Request Body:**
 ```json
 {
-  "status": "APPROVED"
+  "status": "approved"
 }
 ```
 - **Response (200 OK):**

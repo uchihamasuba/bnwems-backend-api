@@ -12,7 +12,7 @@ export const recordSettlement = async (req: AuthRequest, res: Response, next: Ne
     res.status(201).json({
       success: true,
       message: 'Field settlement recorded.',
-      data: { id: newSettlement.id },
+      data: { id: newSettlement.settlementId },
     });
   } catch (error) {
     next(error);

@@ -29,7 +29,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
       { "month": "2026-06", "revenue": 25000.00 }
     ],
     "topCustomers": [
-      { "customerId": "customer-uuid", "revenue": 10000.00 }
+      { "customerId": 1, "revenue": 10000.00 }
     ]
   }
 }
@@ -49,7 +49,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
     "totalDamaged": 10,
     "totalLost": 2,
     "mostUsedItems": [ 
-      { "catalogItemId": "item-uuid", "itemName": "Standard Speaker", "usageCount": 50 } 
+      { "catalogItemId": 1, "itemName": "Standard Speaker", "usageCount": 50 } 
     ]
   }
 }
@@ -69,7 +69,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
     "totalRevenueMonth": 25000.00,
     "unpaidSupplierDebt": 2000.00,
     "recentOrders": [
-      { "orderId": "order-uuid", "status": "CONFIRMED" }
+      { "orderId": 1, "status": "confirmed" }
     ]
   }
 }
@@ -87,7 +87,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
     "pendingChangeRequests": 2,
     "tasksToday": 8,
     "alerts": [
-      { "type": "DELAYED_TASK", "taskId": "task-uuid" }
+      { "type": "delayed_task", "workTaskId": 1 }
     ]
   }
 }
@@ -106,13 +106,13 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 {
   "success": true,
   "data": {
-    "orderId": "order-uuid",
+    "orderId": 1,
     "tasksCompleted": 5,
     "totalTasks": 5,
-    "handoverStatus": "AGREED",
+    "handoverStatus": "agreed",
     "damageLossRecorded": true,
     "changeRequestsProcessed": true,
-    "verificationStatus": "READY_FOR_SETTLEMENT"
+    "verificationStatus": "ready_for_settlement"
   }
 }
 ```

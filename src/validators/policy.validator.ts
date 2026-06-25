@@ -17,7 +17,7 @@ export const createPolicySchema = z.object({
 
 export const updatePolicySchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid policy ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     rules: z.any(),

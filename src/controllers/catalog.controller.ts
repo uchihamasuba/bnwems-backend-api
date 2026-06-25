@@ -7,10 +7,10 @@ export const getCatalogItems = async (req: Request, res: Response, next: NextFun
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string;
-    const itemType = req.query.itemType as string;
-    const isActiveParam = req.query.isActive as string;
+    const category = req.query.category as string;
+    const status = req.query.status as string;
 
-    const { items, totalCount } = await catalogService.getCatalogItems(page, limit, search, itemType, isActiveParam);
+    const { items, totalCount } = await catalogService.getCatalogItems(page, limit, search, category, status);
 
     res.status(200).json({
       success: true,
@@ -70,10 +70,10 @@ export const updateCatalogItem = async (req: AuthRequest, res: Response, next: N
 export const deactivateCatalogItem = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { isActive } = req.body;
+    const { status } = req.body;
     const actionUserId = req.user!.userId;
 
-    await catalogService.deactivateCatalogItem(id, isActive, actionUserId);
+    await catalogService.deactivateCatalogItem(id, status, actionUserId);
 
     res.status(200).json({
       success: true,

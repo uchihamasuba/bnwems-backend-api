@@ -35,11 +35,14 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
     "token": "eyJhbGciOiJIUzI1...",
     "expiresIn": 86400,
     "user": {
-      "id": "uuid-1234",
+      "userId": 1,
       "username": "adminUser",
       "fullName": "System Admin",
-      "role": "ADMIN",
-      "status": "ACTIVE"
+      "role": {
+        "roleId": 1,
+        "roleName": "Admin"
+      },
+      "status": "active"
     }
   }
 }
@@ -106,11 +109,14 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 {
   "success": true,
   "data": {
-    "id": "uuid-1234",
+    "userId": 1,
     "username": "adminUser",
     "fullName": "System Admin",
-    "role": "ADMIN",
-    "status": "ACTIVE",
+    "role": {
+      "roleId": 1,
+      "roleName": "Admin"
+    },
+    "status": "active",
     "createdAt": "2026-06-22T10:00:00Z",
     "updatedAt": "2026-06-22T10:00:00Z"
   }

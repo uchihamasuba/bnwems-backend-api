@@ -4,7 +4,7 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Supplier API (Module 4 & 12)', () => {
-  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
 
   beforeEach(() => {
     jest.clearAllMocks();

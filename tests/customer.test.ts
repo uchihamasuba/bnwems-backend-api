@@ -4,8 +4,8 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Customer API (Module 7)', () => {
-  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
-  const validUUID = '123e4567-e89b-12d3-a456-426614174000';
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const validId = '1';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -19,7 +19,7 @@ describe('Customer API (Module 7)', () => {
 
     it('should return list of customers', async () => {
       prismaMock.customer.findMany.mockResolvedValue([
-        { id: validUUID, fullName: 'Test Customer', phone: '0987654321' } as any
+        { customerId: 1n, fullName: 'Test Customer', phone: '0987654321' } as any
       ]);
       prismaMock.customer.count.mockResolvedValue(1);
 
@@ -36,7 +36,7 @@ describe('Customer API (Module 7)', () => {
   describe('GET /api/v1/customers/:id', () => {
     it('should return 400 for invalid ID format', async () => {
       const res = await request(app)
-        .get('/api/v1/customers/invalid-id')
+        .get('/api/v1/customers/abc')
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(400);
     });
@@ -44,18 +44,18 @@ describe('Customer API (Module 7)', () => {
     it('should return 404 if customer not found', async () => {
       prismaMock.customer.findUnique.mockResolvedValue(null);
       const res = await request(app)
-        .get(`/api/v1/customers/${validUUID}`)
+        .get(`/api/v1/customers/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(404);
     });
 
     it('should return 200 and the customer', async () => {
       prismaMock.customer.findUnique.mockResolvedValue({
-        id: validUUID, fullName: 'Test Customer'
+        customerId: 1n, fullName: 'Test Customer'
       } as any);
 
       const res = await request(app)
-        .get(`/api/v1/customers/${validUUID}`)
+        .get(`/api/v1/customers/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -92,7 +92,7 @@ describe('Customer API (Module 7)', () => {
 
     it('should create new customer successfully', async () => {
       prismaMock.customer.findUnique.mockResolvedValue(null);
-      prismaMock.customer.create.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.customer.create.mockResolvedValue({ customerId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
@@ -113,7 +113,7 @@ describe('Customer API (Module 7)', () => {
   describe('PUT /api/v1/customers/:id', () => {
     it('should return 400 for invalid ID format', async () => {
       const res = await request(app)
-        .put('/api/v1/customers/invalid-id')
+        .put('/api/v1/customers/abc')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           fullName: 'Updated',
@@ -122,11 +122,11 @@ describe('Customer API (Module 7)', () => {
     });
 
     it('should update customer successfully', async () => {
-      prismaMock.customer.update.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.customer.update.mockResolvedValue({ customerId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/customers/${validUUID}`)
+        .put(`/api/v1/customers/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           fullName: 'Updated Customer',

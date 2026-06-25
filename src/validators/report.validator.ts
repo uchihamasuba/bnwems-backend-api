@@ -16,6 +16,6 @@ export const getInventoryReportSchema = z.object({
 
 export const getVerificationReportSchema = z.object({
   query: z.object({
-    orderId: z.string().uuid('Invalid order ID'),
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });

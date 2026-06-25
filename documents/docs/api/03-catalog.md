@@ -27,10 +27,10 @@ It manages services, equipment, materials, and packages used in orders.
   "success": true,
   "data": [
     {
-      "id": "item-uuid",
+      "catalogItemId": 1,
       "name": "Standard Speaker Set",
       "description": "High quality speakers",
-      "itemType": "EQUIPMENT",
+      "itemType": "equipment",
       "basePrice": 150.00,
       "isActive": true,
       "createdAt": "2026-06-22T10:00:00Z"
@@ -52,10 +52,10 @@ It manages services, equipment, materials, and packages used in orders.
 {
   "success": true,
   "data": {
-    "id": "item-uuid",
+    "catalogItemId": 1,
     "name": "Standard Speaker Set",
     "description": "High quality speakers",
-    "itemType": "EQUIPMENT",
+    "itemType": "equipment",
     "basePrice": 150.00,
     "isActive": true,
     "createdAt": "2026-06-22T10:00:00Z",
@@ -76,7 +76,7 @@ It manages services, equipment, materials, and packages used in orders.
 {
   "name": "Premium Lighting Setup",
   "description": "Full LED lighting for large events",
-  "itemType": "EQUIPMENT",
+  "itemType": "equipment",
   "basePrice": 300.00
 }
 ```
@@ -86,9 +86,9 @@ It manages services, equipment, materials, and packages used in orders.
   "success": true,
   "message": "Catalog item created successfully.",
   "data": {
-    "id": "new-uuid",
+    "catalogItemId": 2,
     "name": "Premium Lighting Setup",
-    "itemType": "EQUIPMENT",
+    "itemType": "equipment",
     "basePrice": 300.00,
     "isActive": true
   }

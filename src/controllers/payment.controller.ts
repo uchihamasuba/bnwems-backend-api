@@ -21,14 +21,15 @@ export const requestPayment = async (req: AuthRequest, res: Response, next: Next
   try {
     const finalOrderId = req.params.orderId || req.body.orderId;
     const { amount, paymentType, paymentMethod } = req.body;
+    const userId = req.user!.userId;
 
-    const newPayment = await paymentService.requestPayment(finalOrderId, amount, paymentType, paymentMethod);
+    const newPayment = await paymentService.requestPayment(finalOrderId, amount, paymentType, paymentMethod, userId);
 
     res.status(201).json({
       success: true,
       message: 'Payment request created.',
       data: {
-        id: newPayment.id,
+        id: newPayment.paymentRequestId,
         paymentUrl: paymentMethod === 'VNPAY_QR' ? 'vnpay-mock-url' : null,
       },
     });

@@ -27,12 +27,12 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
   "success": true,
   "data": [
     {
-      "id": "supplier-uuid",
+      "supplierId": 1,
       "name": "AudioVisual Pro Inc.",
       "contactPerson": "John Doe",
       "phone": "+123456789",
       "email": "contact@audiovisual.com",
-      "status": "ACTIVE",
+      "status": "active",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -74,19 +74,17 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Request Body:**
 ```json
 {
-  "supplierId": "supplier-uuid",
-  "orderId": "order-uuid",
-  "transactionType": "RENTAL",
+  "supplierId": 1,
+  "orderId": 1,
+  "transactionType": "rental",
   "totalCost": 500.00,
-  "details": {
-    "items": [
-      {
-        "catalogItemId": "item-uuid",
-        "quantity": 2,
-        "cost": 250.00
-      }
-    ]
-  }
+  "items": [
+    {
+      "catalogItemId": 1,
+      "quantity": 2,
+      "unitPrice": 250.00
+    }
+  ]
 }
 ```
 - **Response (201 Created):**
@@ -94,7 +92,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 {
   "success": true,
   "message": "Supplier transaction created.",
-  "data": { "id": "tx-uuid", "status": "DRAFT" }
+  "data": { "supplierTransactionId": 1, "status": "draft" }
 }
 ```
 
@@ -107,9 +105,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Request Body:**
 ```json
 {
-  "receivedItems": {
-    "items": [{ "catalogItemId": "item-uuid", "quantityReceived": 2 }]
-  },
+  "items": [{ "catalogItemId": 1, "quantityReceived": 2 }],
   "evidenceUrls": ["https://storage.example.com/receipt.jpg"]
 }
 ```
@@ -130,10 +126,8 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Request Body:**
 ```json
 {
-  "returnedItems": {
-    "items": [{ "catalogItemId": "item-uuid", "quantityReturned": 2 }]
-  },
-  "condition": "GOOD",
+  "items": [{ "catalogItemId": 1, "quantityReturned": 2 }],
+  "condition": "good",
   "evidenceUrls": ["https://storage.example.com/return_receipt.jpg"]
 }
 ```
@@ -159,11 +153,11 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
   "success": true,
   "data": [
     {
-      "id": "debt-uuid",
-      "supplierId": "supplier-uuid",
+      "supplierDebtId": 1,
+      "supplierId": 1,
       "amountOwed": 500.00,
       "amountPaid": 0.00,
-      "status": "UNPAID",
+      "status": "unpaid",
       "updatedAt": "2026-06-22T10:00:00Z"
     }
   ],

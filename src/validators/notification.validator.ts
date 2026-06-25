@@ -10,6 +10,6 @@ export const getNotificationsSchema = z.object({
 
 export const markAsReadSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid notification ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });

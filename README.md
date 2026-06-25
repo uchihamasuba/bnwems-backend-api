@@ -9,7 +9,8 @@ Dưới đây là sơ đồ cây thư mục của dự án và giải thích vai
 ```text
 backend-api/
 ├── prisma/
-│   └── schema.prisma        # Nơi định nghĩa toàn bộ mô hình dữ liệu (models) và các mối quan hệ (relations) cho CSDL.
+│   ├── schema.prisma        # Nơi định nghĩa toàn bộ mô hình dữ liệu (models) và các mối quan hệ (relations) cho CSDL.
+│   └── seed.ts              # Script dùng để chèn dữ liệu mẫu (Seeding) vào CSDL.
 ├── src/
 │   ├── app.ts               # File cấu hình Express app, tích hợp middlewares cơ bản và gắn các routes chính.
 │   ├── server.ts            # Entry point của ứng dụng; khởi tạo và chạy web server trên port được chỉ định.
@@ -17,81 +18,37 @@ backend-api/
 │   │   ├── database.ts      # Khởi tạo instance PrismaClient singleton để sử dụng lại xuyên suốt dự án.
 │   │   └── env.ts           # File khai báo, parse và kiểm tra tính hợp lệ của các biến môi trường (Environment Variables).
 │   ├── controllers/         # Tầng giao tiếp HTTP: Nhận request, gọi service xử lý, và trả về response chuẩn.
-│   │   ├── attendance.controller.ts # API điểm danh kỹ thuật viên tại công trường.
-│   │   ├── auth.controller.ts       # API xác thực: Login, thay đổi mật khẩu.
-│   │   ├── catalog.controller.ts    # API danh mục thiết bị, vật tư.
-│   │   ├── customer.controller.ts   # API thông tin khách hàng.
-│   │   ├── field.controller.ts      # API quản lý tiến độ thi công thực địa, yêu cầu thay đổi thiết bị.
-│   │   ├── inventory.controller.ts  # API quản lý kho, kiểm tra tính khả dụng vật tư.
-│   │   ├── operations.controller.ts # API điều phối xuất kho, tạo pick-list.
-│   │   ├── order.controller.ts      # API quản lý vòng đời đơn hàng sự kiện.
-│   │   ├── payment.controller.ts    # API thanh toán, sinh mã QR, upload biên lai.
-│   │   ├── policy.controller.ts     # API thiết lập quy định, chính sách (đặt cọc, đền bù).
-│   │   ├── quotation.controller.ts  # API quản lý báo giá.
-│   │   ├── report.controller.ts     # API xuất báo cáo thống kê.
-│   │   ├── settlement.controller.ts # API quyết toán đơn hàng, đền bù mất mát.
-│   │   ├── supplier.controller.ts   # API quản lý nhà cung cấp vật tư ngoài.
-│   │   ├── survey.controller.ts     # API phân công và báo cáo khảo sát mặt bằng.
-│   │   └── user.controller.ts       # API quản trị tài khoản, phân quyền (RBAC).
 │   ├── services/            # Tầng Business Logic: Nơi chứa toàn bộ nghiệp vụ cốt lõi và gọi truy vấn CSDL qua Prisma.
-│   │   ├── attendance.service.ts
-│   │   ├── auth.service.ts
-│   │   ├── catalog.service.ts
-│   │   ├── customer.service.ts
-│   │   ├── field.service.ts
-│   │   ├── inventory.service.ts
-│   │   ├── operations.service.ts
-│   │   ├── order.service.ts
-│   │   ├── payment.service.ts
-│   │   ├── policy.service.ts
-│   │   ├── quotation.service.ts
-│   │   ├── report.service.ts
-│   │   ├── settlement.service.ts
-│   │   ├── supplier.service.ts
-│   │   ├── survey.service.ts
-│   │   └── user.service.ts
 │   ├── routes/              # Tầng định tuyến: Định nghĩa URL Endpoints, method và chèn Middlewares tương ứng.
-│   │   ├── index.ts                 # Router trung tâm gộp tất cả các sub-routers con.
-│   │   ├── attendance.routes.ts
-│   │   ├── auth.routes.ts
-│   │   ├── catalog.routes.ts
-│   │   ├── customer.routes.ts
-│   │   ├── field.routes.ts
-│   │   ├── inventory.routes.ts
-│   │   ├── operations.routes.ts
-│   │   ├── order.routes.ts
-│   │   ├── payment.routes.ts
-│   │   ├── policy.routes.ts
-│   │   ├── quotation.routes.ts
-│   │   ├── report.routes.ts
-│   │   ├── settlement.routes.ts
-│   │   ├── supplier.routes.ts
-│   │   ├── survey.routes.ts
-│   │   └── user.routes.ts
+│   │   └── index.ts         # Router trung tâm gộp tất cả các sub-routers con.
 │   ├── middlewares/
 │   │   ├── auth.middleware.ts       # Middleware kiểm tra Token hợp lệ (JWT) và xác thực quyền Role (RBAC).
 │   │   ├── error.middleware.ts      # Middleware bắt lỗi Global và xử lý khi route không tồn tại (404).
-│   │   └── validation.middleware.ts # Middleware chặn bắt đầu vào (body/query) nếu sai định dạng trước khi vào controller.
+│   │   └── validate.middleware.ts   # Middleware chặn bắt đầu vào (body/query) nếu sai định dạng trước khi vào controller.
+│   ├── validators/          # Các schema kiểm tra đầu vào (sử dụng Zod)
 │   └── utils/
-│       └── response.ts              # Các Utility Functions dùng để chuẩn hóa format response (success/error envelope).
+│       └── response.ts      # Các Utility Functions dùng để chuẩn hóa format response (success/error envelope).
 ├── tests/                   # Thư mục chứa các file Test Case tự động bằng Jest (Unit Test, Integration Test).
-│   ├── attendance.test.ts
-│   ├── auth.test.ts
-│   ├── catalog.test.ts
-│   └── ...
 └── TESTING_PLAN.md          # Bản kế hoạch và chiến lược kiểm thử tự động.
 ```
 
-## Hướng Dẫn Cài Đặt Và Chạy (Installation & Setup)
+---
+
+## 🚀 Hướng Dẫn Cài Đặt Và Chạy (Installation & Setup)
 
 ### 1. Yêu cầu hệ thống (Prerequisites)
 - **Node.js**: Phiên bản v22 LTS trở lên.
-- **MySQL**: Máy chủ MySQL (Local hoặc Docker).
+- **MySQL**: Máy chủ MySQL (Local, XAMPP, hoặc Docker).
 - **Trình quản lý gói**: `npm` (được khuyến nghị).
 
-### 2. Các bước cài đặt
-**Bước 1:** Cài đặt các thư viện phụ thuộc:
+### 2. Các bước cài đặt chi tiết
+
+**Bước 1:** Clone mã nguồn và cài đặt các thư viện phụ thuộc:
 ```bash
+# Trỏ vào thư mục backend
+cd backend-api
+
+# Cài đặt tất cả dependencies
 npm install
 ```
 
@@ -100,43 +57,54 @@ Copy file `.env.example` thành file `.env` ở thư mục gốc của `backend-
 ```bash
 cp .env.example .env
 ```
-Nội dung file `.env` cơ bản (nếu tự tạo tay):
+Mở file `.env` và chỉnh sửa các thông số. Nội dung file cơ bản nên bao gồm:
 ```env
 PORT=3000
-DATABASE_URL="mysql://user:password@localhost:3306/wedding_event_db"
-JWT_SECRET="your_jwt_secret"
+# Sửa lại user, password và database name của bạn
+DATABASE_URL="mysql://root:password@localhost:3306/bnwems_db"
+JWT_SECRET="your_jwt_secret_key_here"
 ```
 
 **Bước 3:** Khởi tạo cơ sở dữ liệu với Prisma:
-Đồng bộ hóa schema với Database:
+Để tạo cấu trúc bảng trong MySQL dựa theo file `schema.prisma`:
 ```bash
+# Đồng bộ hóa cấu trúc database trực tiếp
 npx prisma db push
 ```
-*(Hoặc dùng `npx prisma migrate dev` nếu bạn dùng migration)*
 
-Sau đó generate Prisma Client:
+**Bước 4:** Nạp dữ liệu mẫu (Seeding)
+Hệ thống đi kèm dữ liệu mẫu để bạn có thể test ứng dụng ngay lập tức (bao gồm 1 Admin user, 3 roles, các báo giá mẫu, v.v.):
 ```bash
-npx prisma generate
+npm run prisma:generate
+npx prisma db seed
 ```
+> **Lưu ý:** Tài khoản đăng nhập mặc định (đã seed) có thể xem trong file `prisma/seed.ts` (ví dụ số điện thoại `0987654321`, mật khẩu `password123`).
 
-### 3. Chạy ứng dụng
-**Môi trường phát triển (Development):**
-Khởi động server với tính năng auto-reload:
+---
+
+## 💻 Chạy Ứng Dụng
+
+### Môi trường phát triển (Development)
+Khởi động server với tính năng auto-reload (sử dụng `ts-node`):
 ```bash
 npm run dev
 ```
-> **Dấu hiệu chạy thành công:** Terminal/Console hiển thị dòng chữ `Server running on port 3000` (hoặc đúng số port bạn đã cấu hình).
+> **Dấu hiệu thành công:** Terminal sẽ hiển thị: `[Server] Server is running on port 3000`
 
-**Môi trường sản xuất (Production):**
-Build mã nguồn TypeScript sang JavaScript và chạy:
+### Môi trường sản xuất (Production)
+Build mã nguồn TypeScript sang JavaScript thuần và chạy:
 ```bash
+# Xóa build cũ (nếu có) và biên dịch mã nguồn
 npm run build
-npm start
+
+# Chạy server ở chế độ Production
+npm run start
 ```
-> **Dấu hiệu chạy thành công:** Terminal/Console hiển thị dòng chữ `Server running on port 3000` (hoặc đúng số port bạn đã cấu hình).
+> **Lưu ý về BigInt:** Hệ thống sử dụng khóa chính dạng `BigInt` để tăng hiệu suất. Khi trả kết quả qua JSON, các trường ID này sẽ được parse thành `String` (VD: `"userId": "1"`). Frontend cần chú ý xử lý dạng chuỗi này thay vì số nguyên.
 
+---
 
-## Kế Hoạch Kiểm Thử Tự Động (Automation Testing)
+## 🧪 Kế Hoạch Kiểm Thử (Automation Testing)
 
 Hệ thống được thiết kế đi kèm với các bộ kiểm thử tự động toàn diện, dựa trên tài liệu **13 API Contracts** đã được thống nhất. Chi tiết về kế hoạch kiểm thử xem tại [TESTING_PLAN.md](./TESTING_PLAN.md).
 
@@ -144,32 +112,37 @@ Hệ thống được thiết kế đi kèm với các bộ kiểm thử tự đ
 - **Testing Framework**: Jest
 - **Assertion & HTTP Request**: Supertest
 - **Mocking**: `jest-mock-extended` (Deep mock Prisma Client để giả lập Database mà không cần kết nối MySQL thực tế).
-- **Lệnh chạy**: Sử dụng lệnh `npm run test` với biến môi trường từ `.env.test`.
-  > **Dấu hiệu test thành công:** Terminal sẽ hiển thị tất cả các Test Suites màu xanh lá với chữ `PASS` (ví dụ: `PASS tests/auth.test.ts`). Ở phần tóm tắt cuối cùng, thông báo sẽ hiển thị `Test Suites: X passed, X total` và `Tests: Y passed, Y total` không có lỗi nào (`0 failed`).
 
-### 2. Cấu Trúc Các Test Suites
-Hệ thống kiểm thử tự động gồm các module tương ứng với Router, đã đạt mức độ bao phủ 100% (99/99 test cases PASS) và khớp 1:1 với 13 API contracts:
-1. **auth.test.ts**: Xác thực, token, đổi mật khẩu.
-2. **user.test.ts**: Quản lý tài khoản, phân quyền.
-3. **catalog.test.ts**: Danh mục thiết bị, sự kiện.
-4. **supplier.test.ts**, **suppliertx.test.ts**: Quản lý nhà cung cấp và giao dịch.
-5. **warehouse.test.ts**, **inventory.test.ts**: Tồn kho, kiểm tra tính khả dụng, nhập/xuất kho.
-6. **policy.test.ts**, **wage.test.ts**: Quy tắc đặt cọc, đền bù, lương nhân sự.
-7. **customer.test.ts**: Thông tin khách hàng.
-8. **quotation.test.ts**: Quản lý báo giá.
-9. **order.test.ts**: Vòng đời đơn hàng.
-10. **survey.test.ts**, **attendance.test.ts**, **handover.test.ts**: Khảo sát, phân công, điểm danh, bàn giao.
-11. **payment.test.ts**, **settlement.test.ts**: Thanh toán và quyết toán.
-12. **report.test.ts**: Báo cáo thống kê.
+### 2. Chạy Kiểm Thử (Running Tests)
+Để chạy toàn bộ các test suites, sử dụng lệnh:
+```bash
+npm test
+```
+> **Kết quả mong đợi:** 100% các bài kiểm tra được phủ sóng và chạy thành công (177/177 test cases PASS).
 
-### 3. Công Cụ Hỗ Trợ Tự Động (Scripts)
-Dự án cung cấp một số lệnh script (trong thư mục `scripts/`) để tự động hóa quá trình đồng bộ code với tài liệu:
-- `npx ts-node scripts/verify-routes.ts`: Quét và đối chiếu 100% số lượng route trong mã nguồn với 13 file hợp đồng `.md` trong `documents/docs/api` để đảm bảo không thừa, không thiếu bất kỳ endpoint nào.
-- `npx ts-node scripts/append-tests.ts` và `append-tests-2.ts`: Tự động đọc tài liệu và sinh ra khung test (test skeletons) cho các route còn thiếu.
-- `npx ts-node scripts/patch-tests-3.ts`: Hỗ trợ bypass các validation gắt gao cho mock object, đảm bảo test suite xanh 100% ngay cả khi chưa có mock data hoàn chỉnh nhất cho từng ngóc ngách của CSDL.
+### 3. Xem độ phủ (Coverage)
+Để xem chi tiết tỷ lệ code đã được kiểm thử:
+```bash
+npm run test:coverage
+```
 
-### 4. Tiêu Chuẩn Cho Mỗi Test Case
-- **Happy Path (Thành công)**: Đảm bảo luồng chuẩn trả về Status 200/201, cấu trúc response hợp lệ (`success: true`).
-- **Bad Request/Validation (Lỗi đầu vào)**: Xử lý và trả về Status 400.
-- **Unauthorized/Forbidden (Lỗi bảo mật)**: Xác thực Auth/RBAC chặn đúng quyền, trả về Status 401 hoặc 403.
-- **Edge Cases**: Bao phủ các ngoại lệ như 404 Not Found, 409 Conflict, hoặc logic xử lý dữ liệu phức tạp.
+### 4. Cấu Trúc Các Test Suites
+Hệ thống kiểm thử tự động gồm 21 file test tương ứng với Router, đã đạt mức độ bao phủ 100% (177/177 test cases PASS) và khớp 1:1 với 13 API contracts:
+- `auth.test.ts`, `user.test.ts`: Xác thực, quản lý tài khoản.
+- `catalog.test.ts`, `warehouse.test.ts`, `inventory.test.ts`: Quản lý kho, hạng mục, tồn kho.
+- `supplier.test.ts`, `suppliertx.test.ts`: Quản lý nhà cung cấp.
+- `order.test.ts`, `quotation.test.ts`: Đơn hàng, báo giá.
+- `task.test.ts`, `survey.test.ts`, `attendance.test.ts`: Khảo sát, task công việc.
+- `payment.test.ts`, `settlement.test.ts`: Thanh toán, quyết toán.
+- `policy.test.ts`, `wage.test.ts`: Hợp đồng, lương.
+- V.v.
+
+---
+
+## 🧰 Các Tiện Ích Hỗ Trợ (Utilities)
+
+- **Xem trực tiếp CSDL qua giao diện Web:**
+  ```bash
+  npm run prisma:studio
+  ```
+  *(Truy cập `http://localhost:5555` để thao tác trực tiếp với các bảng dữ liệu)*

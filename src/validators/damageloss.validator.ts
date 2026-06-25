@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const recordDamageLossSchema = z.object({
   params: z.object({
-    orderId: z.string().uuid('Invalid order ID'),
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     reportDetails: z.object({

@@ -28,11 +28,14 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   "success": true,
   "data": [
     {
-      "id": "uuid",
+      "userId": 1,
       "username": "user1",
       "fullName": "Manager One",
-      "role": "MANAGER",
-      "status": "ACTIVE",
+      "role": {
+        "roleId": 2,
+        "roleName": "Manager"
+      },
+      "status": "active",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -56,7 +59,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   "username": "user1",
   "password": "InitialPassword123!",
   "fullName": "Manager One",
-  "role": "MANAGER"
+  "roleId": 2
 }
 ```
 - **Response (201 Created):**
@@ -65,11 +68,14 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   "success": true,
   "message": "User created successfully",
   "data": {
-    "id": "uuid",
+    "userId": 2,
     "username": "user1",
     "fullName": "Manager One",
-    "role": "MANAGER",
-    "status": "ACTIVE"
+    "role": {
+      "roleId": 2,
+      "roleName": "Manager"
+    },
+    "status": "active"
   }
 }
 ```
@@ -84,7 +90,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 ```json
 {
   "fullName": "Manager Two",
-  "role": "MANAGER"
+  "roleId": 2
 }
 ```
 - **Response (200 OK):**
@@ -101,7 +107,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 - **Request Body:**
 ```json
 {
-  "status": "INACTIVE"
+  "status": "inactive"
 }
 ```
 - **Response (200 OK):**
@@ -144,7 +150,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   "success": true,
   "data": [
     {
-      "id": "uuid-notif",
+      "notificationId": 1,
       "title": "New Assignment",
       "content": "You have been assigned to task T123",
       "isRead": false,

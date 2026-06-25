@@ -19,7 +19,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 - **Request Body:**
 ```json
 {
-  "taskType": "SURVEY",
+  "taskType": "survey",
   "scheduledStart": "2026-08-01T09:00:00Z",
   "scheduledEnd": "2026-08-01T12:00:00Z",
   "location": "123 Event Hall"
@@ -30,7 +30,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 {
   "success": true,
   "message": "Survey task created.",
-  "data": { "id": "task-uuid" }
+  "data": { "workTaskId": 1 }
 }
 ```
 
@@ -42,7 +42,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 {
   "success": true,
   "data": {
-    "taskId": "task-uuid",
+    "workTaskId": 1,
     "notes": "Venue has strict height limits.",
     "evidences": [
       { "fileUrl": "https://storage.example.com/survey1.jpg" }
@@ -69,12 +69,12 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
   "success": true,
   "data": [
     {
-      "id": "task-uuid",
-      "orderId": "order-uuid",
-      "taskType": "INSTALLATION",
+      "workTaskId": 1,
+      "orderId": 1,
+      "taskType": "installation",
       "scheduledStart": "2026-10-14T08:00:00Z",
       "scheduledEnd": "2026-10-15T18:00:00Z",
-      "status": "PENDING"
+      "status": "pending"
     }
   ],
   "meta": { "page": 1, "limit": 20, "totalCount": 50 }
@@ -89,8 +89,8 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 - **Request Body:**
 ```json
 {
-  "orderId": "order-uuid",
-  "taskType": "INSTALLATION",
+  "orderId": 1,
+  "taskType": "installation",
   "scheduledStart": "2026-10-14T08:00:00Z",
   "scheduledEnd": "2026-10-15T18:00:00Z",
   "location": "123 Event Hall"
@@ -101,7 +101,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 {
   "success": true,
   "message": "Task created successfully.",
-  "data": { "id": "task-uuid" }
+  "data": { "workTaskId": 1 }
 }
 ```
 
@@ -116,12 +116,12 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 {
   "assignments": [
     {
-      "userId": "user-uuid-leader",
-      "assignedRole": "LEADER_STAFF"
+      "userId": 1,
+      "assignedRole": "Leader Staff"
     },
     {
-      "userId": "user-uuid-tech",
-      "assignedRole": "TECHNICAL_STAFF"
+      "userId": 2,
+      "assignedRole": "Technical Staff"
     }
   ]
 }
