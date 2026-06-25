@@ -12,7 +12,7 @@ export const getCatalogItemsSchema = z.object({
 
 export const getCatalogItemByIdSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid catalog item ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
 
@@ -27,7 +27,7 @@ export const createCatalogItemSchema = z.object({
 
 export const updateCatalogItemSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid catalog item ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     name: z.string().min(1, 'Name is required'),
@@ -38,7 +38,7 @@ export const updateCatalogItemSchema = z.object({
 
 export const deactivateCatalogItemSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid catalog item ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     isActive: z.boolean(),

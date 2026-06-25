@@ -4,12 +4,13 @@ import { supplierTxService } from '../services/suppliertx.service';
 
 export const createSupplierTransaction = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const newTx = await supplierTxService.createSupplierTransaction(req.body);
+    const userId = req.user!.userId;
+    const newTx = await supplierTxService.createSupplierTransaction(req.body, userId);
 
     res.status(201).json({
       success: true,
       message: 'Supplier transaction created.',
-      data: { id: newTx.id, status: newTx.status },
+      data: { id: newTx.supplierTransactionId, status: newTx.status },
     });
   } catch (error) {
     next(error);

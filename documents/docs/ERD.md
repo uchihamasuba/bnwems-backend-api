@@ -1,40 +1,87 @@
 # Entity Relationship Diagram (ERD)
 
 ## 1. System Overview
-This document outlines the core Entity Relationship Diagram (ERD) based on the updated 23-entity architecture defined in Report 3 (Section 1.5). The system uses these 23 core entities to manage all operations from customer orders to inventory, staff tasks, and final settlements.
+This document outlines the core Entity Relationship Diagram (ERD) based on the comprehensive 60-table architecture defined in the `BNWEMS.sql` schema. The system handles all operations from customer orders, dynamic pricing, advanced inventory management, detailed field operations, supplier interactions, up to complex financial settlements and wage calculations.
 
-## 2. Core Entities
+## 2. Core Domains & Entities
 
-| ID | Entity | Description |
-|---|---|---|
-| 1 | Internal User | Internal personnel who can log in to the system, including Admin, Manager, Leader Staff, and Technical Staff. |
-| 2 | Customer | Customer who books wedding/event services. The Customer is the source of orders but does not log in to or directly use the system. |
-| 3 | Supplier | External partner that supplies, rents, or sells equipment/materials for an order when internal inventory is insufficient or additional items are needed. |
-| 4 | Catalog Item | Catalog of services, equipment, materials, consumables, or packages used in quotations, orders, inventory, or supplier transactions. |
-| 5 | Business Policy | Set of configurable business policies, including deposit, refund, cancellation, date change, additional fee, discount, and compensation policies. |
-| 6 | Order | Core entity of the system, representing a service request/contract from a Customer, from initial request to completion or cancellation. |
-| 7 | Quotation | Quotation version created by the Manager for an Order before the Customer agrees and the Order is confirmed. |
-| 8 | Payment | Financial transaction between the Customer and the business, including deposit, final payment, on-site payment, or customer refund. |
-| 9 | Settlement | Final financial reconciliation of an Order, summarizing order value, additional charges, compensation, received payments, and remaining amount. |
-| 10 | Change Request | On-site change request from the Customer, such as adding, removing, or replacing items in an Order. |
-| 11 | Work Task | Specific operational tasks required to complete an Order, such as survey, preparation, checkout, transportation, installation, collection, or warehouse return. |
-| 12 | Assignment | Allocation of a Work Task to a specific Internal User, identifying which staff member is assigned to which task. |
-| 13 | Warehouse | Main physical warehouse of the business used to store equipment/materials and manage checkout, return, and inventory adjustment activities. |
-| 14 | Inventory | Actual stock data of each Catalog Item in the Warehouse, including available, reserved, checked-out, in-use, maintenance, damaged, and lost quantities. |
-| 15 | Warehouse History | Warehouse transaction history recording checkout, return, receiving, returning, inventory adjustment, or item condition updates. |
-| 16 | Supplier Transaction | Rental or purchase transaction with a Supplier for a specific Order. |
-| 17 | Handover Record | Acceptance and handover record after installation, recording handover status, Customer agreement, and related evidence. |
-| 18 | Damage/Loss Report | Report recording damaged or lost equipment/materials during collection, inspection, or warehouse return. |
-| 19 | Supplier Debt | Debt amount owed to a Supplier from Supplier Transactions, including rental/purchase costs and compensation if any. |
-| 20 | Attendance | Attendance data of Leader Staff or Technical Staff based on Assignment, working date, and working session. |
-| 21 | Wage Summary | Wage summary of each staff member for a wage period, usually monthly, based on confirmed Attendance records. |
-| 22 | Evidence | Evidence uploaded to the system, including photos, receipts, payment proofs, handover images, survey photos, or damage/loss images. |
-| 23 | Notification | Internal notification sent by the system to an Internal User, such as task assignment, confirmation request, pending payment approval, or field report alert. |
+Due to the scale of the system (60 tables), the ERD is organized into logical domains. 
 
-## 3. Key Relationships
+### 1. User & Role Management
+- **Role**: Defines permissions and role levels (Admin, Manager, Leader Staff, Technical Staff).
+- **InternalUser**: Personnel who can log in and act on the system. Linked to Roles.
 
-- **Users & Operations:** `Internal User` handles `Work Task` via `Assignment`. Staff `Attendance` drives `Wage Summary`.
-- **Sales & Customers:** `Customer` places `Order`. `Order` has `Quotation`, `Payment`, `Settlement`, and possible `Change Request`.
-- **Inventory & Suppliers:** `Order` relies on `Catalog Item` managed via `Inventory` in `Warehouse`. Stock movements are logged in `Warehouse History`. Shortages trigger `Supplier Transaction` linking `Supplier` and adding to `Supplier Debt`.
-- **Field Reporting:** `Order` generates `Handover Record`, `Damage/Loss Report`, and `Evidence`.
-- **System:** `Business Policy` affects `Order` lifecycle (e.g. deposit, refund, cancel) and `Internal User` acts upon `Notification`.
+### 2. Customer & Business Configuration
+- **Customer**: Clients who place orders.
+- **Supplier**: Partners who provide rental or purchase equipment.
+- **Warehouse**: Physical locations for inventory storage.
+- **CatalogItem**: Core dictionary of services, equipment, materials, and packages.
+- **BusinessPolicy**: Dynamic configuration for deposits, refunds, cancellations, and wages.
+
+### 3. Catalog Pricing & History
+- **ItemPriceHistory**: Tracks historical rental prices for catalog items.
+- **ItemCostHistory**: Tracks historical costs/replacement values for catalog items.
+
+### 4. Order & Quotation Lifecycle
+- **Order**: The central business transaction with a customer.
+- **Quotation** / **QuotationItem**: The proposed pricing and item lists sent to the customer before order confirmation.
+- **OrderItem**: The finalized list of items for the order, distinguishing between internal and supplier sources.
+- **OrderStatusHistory**: Audit trail of order status transitions.
+- **OrderOutstandingCase**: Tracks unresolved operational issues before an order can be financially closed.
+- **RevenueRecord**: The final recognized snapshot of revenue and costs for an order.
+
+### 5. Payment & Settlement
+- **CompanyBankAccount**: Bank accounts used for receiving transfers.
+- **PaymentRequest**: Requests sent to customers (with VietQR) to pay deposits or final amounts.
+- **Payment**: Actual confirmed receipts of money.
+- **Settlement** / **SettlementLine**: Detailed financial reconciliation of the order (original value, changes, fees, compensations).
+
+### 6. Scheduling & Planning
+- **SchedulePlan**: The overarching plan for an order.
+- **ScheduleActivity**: Specific planned milestones (preparation, transport, execution, collection, return).
+
+### 7. Task Execution & Staff Management
+- **WorkTask**: Specific operational duties linked to schedule activities.
+- **Assignment**: Linking a `WorkTask` to an `InternalUser`.
+- **TaskProgressUpdate**: Real-time status updates from the field.
+- **Attendance**: Check-in/check-out tracking for assigned tasks.
+- **StaffAvailability**: Tracking whether staff are available on specific dates.
+
+### 8. Wage Calculation
+- **WageRule**: Pay rates based on roles.
+- **WageSummary** / **WageSummaryLine**: Aggregated pay for a user over a period or order.
+- **WageDeduction**: Penalties or deductions.
+- **WagePayment**: Records of actual money transferred to staff.
+
+### 9. Inventory & Warehouse Operations
+- **Inventory**: Real-time stock levels per catalog item per warehouse.
+- **InventoryReservation** / **InventoryReservationItem**: Stock reserved for upcoming confirmed orders.
+- **InventoryReport** / **InventoryReportItem**: Checkouts, collections, and returns logged by staff.
+- **WarehouseHistory** / **WarehouseHistoryItem**: The actual stock movement ledger updating `Inventory`.
+- **PickList** / **PickListItem**: Checklists for warehouse staff to pick items.
+- **EquipmentMaintenance**: Tracking items sent for repair.
+
+### 10. Supplier Management
+- **SupplierTransaction** / **SupplierTransactionItem**: Sub-contracts with suppliers for specific orders.
+- **SupplierReceiptReport** / **SupplierReceiptReportItem**: Tracking receipt of supplier goods.
+- **SupplierReturnReport** / **SupplierReturnReportItem**: Tracking return of supplier goods and assessing damage.
+- **SupplierDebt** / **SupplierPayment**: Tracking what we owe suppliers and what we've paid them.
+
+### 11. Field Operations (Mobile)
+- **SurveyReport**: Pre-event site surveys.
+- **ChangeRequest** / **ChangeRequestItem**: On-site adjustments by the customer (add/remove/replace).
+- **HandoverRecord**: Formal customer sign-off on installation.
+- **DamageLossReport** / **DamageLossItem**: Tracking items broken or lost during the event.
+
+### 12. System Audit & Evidence
+- **Notification**: Alerts sent to internal users.
+- **AuditLog**: Immutable ledger of critical actions (login, confirm, delete).
+- **Evidence**: Polymorphic table storing file URLs (photos, PDFs) attached to various entities (payments, reports, handovers).
+
+## 3. Key Relationships & Workflows
+
+- **The Order Hub:** `Order` is strictly 1:1 with `Quotation`, `Settlement`, `SchedulePlan`, `RevenueRecord`. It has 1:N relationships with `PaymentRequest`, `WorkTask`, `ChangeRequest`, `HandoverRecord`, and `InventoryReservation`.
+- **The Physical Flow:** An `Order` creates an `InventoryReservation`. A `ScheduleActivity` spawns a `PickList` and a `WorkTask`. The `WorkTask` triggers an `InventoryReport` (checkout), which in turn creates a `WarehouseHistory` ledger entry, updating the actual `Inventory`.
+- **The Financial Flow:** `Quotation` establishes expected value. `PaymentRequest` drives actual `Payment`. Any `ChangeRequest` or `DamageLossReport` alters the final `Settlement`. `RevenueRecord` is generated only when all `OrderOutstandingCase` items are resolved.
+- **The Subcontracting Flow:** If `Inventory` is short, a `SupplierTransaction` is created, leading to `SupplierReceiptReport` (inbound), `SupplierReturnReport` (outbound), and `SupplierDebt`.
+- **The HR Flow:** An `Assignment` leads to `Attendance`. `Attendance` combined with `WageRule` creates `WageSummaryLine`, ultimately resolving into a `WagePayment`.

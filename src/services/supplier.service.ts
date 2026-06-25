@@ -15,7 +15,7 @@ class SupplierService {
         where: whereClause,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { supplierId: 'desc' },
       }),
       prisma.supplier.count({ where: whereClause }),
     ]);
@@ -24,18 +24,18 @@ class SupplierService {
   }
 
   public async createSupplier(data: any, actionUserId: string) {
-    const { name, contactPerson, phone, email, address } = data;
+    const { name, contactPerson, phone, address } = data;
 
     const newSupplier = await prisma.supplier.create({
-      data: { name, contactPerson, phone, email, address },
+      data: { name, contactPerson, phone, address },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'CREATE_SUPPLIER',
         entityType: 'Supplier',
-        entityId: newSupplier.id,
+        entityId: newSupplier.supplierId,
       },
     });
 

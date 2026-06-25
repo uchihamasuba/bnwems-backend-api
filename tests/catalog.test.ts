@@ -4,8 +4,8 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Catalog API (Module 3)', () => {
-  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
-  const validUUID = '123e4567-e89b-12d3-a456-426614174000';
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const validId = '1';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -14,7 +14,7 @@ describe('Catalog API (Module 3)', () => {
   describe('GET /api/v1/catalog-items', () => {
     it('should return catalog items with pagination', async () => {
       prismaMock.catalogItem.findMany.mockResolvedValue([
-        { id: validUUID, name: 'Speaker', itemType: 'EQUIPMENT' } as any
+        { catalogItemId: 1n, name: 'Speaker', itemType: 'EQUIPMENT' } as any
       ]);
       prismaMock.catalogItem.count.mockResolvedValue(1);
 
@@ -40,7 +40,7 @@ describe('Catalog API (Module 3)', () => {
   describe('GET /api/v1/catalog-items/:id', () => {
     it('should return 400 for invalid ID format', async () => {
       const res = await request(app)
-        .get('/api/v1/catalog-items/invalid-id')
+        .get('/api/v1/catalog-items/abc')
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(400);
     });
@@ -48,15 +48,15 @@ describe('Catalog API (Module 3)', () => {
     it('should return 404 if item not found', async () => {
       prismaMock.catalogItem.findUnique.mockResolvedValue(null);
       const res = await request(app)
-        .get(`/api/v1/catalog-items/${validUUID}`)
+        .get(`/api/v1/catalog-items/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(404);
     });
 
     it('should return 200 and the item', async () => {
-      prismaMock.catalogItem.findUnique.mockResolvedValue({ id: validUUID, name: 'Test Item' } as any);
+      prismaMock.catalogItem.findUnique.mockResolvedValue({ catalogItemId: 1n, name: 'Test Item' } as any);
       const res = await request(app)
-        .get(`/api/v1/catalog-items/${validUUID}`)
+        .get(`/api/v1/catalog-items/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(200);
       expect(res.body.data.name).toBe('Test Item');
@@ -78,7 +78,7 @@ describe('Catalog API (Module 3)', () => {
     });
 
     it('should create new catalog item successfully', async () => {
-      prismaMock.catalogItem.create.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.catalogItem.create.mockResolvedValue({ catalogItemId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
@@ -107,11 +107,11 @@ describe('Catalog API (Module 3)', () => {
     });
 
     it('should update item successfully', async () => {
-      prismaMock.catalogItem.update.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.catalogItem.update.mockResolvedValue({ catalogItemId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/catalog-items/${validUUID}`)
+        .put(`/api/v1/catalog-items/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'Speaker Updated', basePrice: 600 });
       
@@ -122,11 +122,11 @@ describe('Catalog API (Module 3)', () => {
 
   describe('PUT /api/v1/catalog-items/:id/deactivate', () => {
     it('should update isActive status successfully', async () => {
-      prismaMock.catalogItem.update.mockResolvedValue({ id: validUUID } as any);
+      prismaMock.catalogItem.update.mockResolvedValue({ catalogItemId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/catalog-items/${validUUID}/deactivate`)
+        .put(`/api/v1/catalog-items/${validId}/deactivate`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ isActive: false });
         

@@ -43,7 +43,7 @@ export const createQuotation = async (req: AuthRequest, res: Response, next: Nex
     res.status(201).json({
       success: true,
       message: 'Quotation created.',
-      data: { id: newQuote.id, version: newQuote.version },
+      data: { id: newQuote.quotationId, version: 1 },
     });
   } catch (error) {
     next(error);

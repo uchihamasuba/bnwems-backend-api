@@ -5,7 +5,7 @@ class NotificationService {
   public async getNotifications(userId: string, page: number, limit: number, isReadParam?: string) {
     const skip = (page - 1) * limit;
 
-    const whereClause: any = { userId };
+    const whereClause: any = { userId: BigInt(userId) };
     if (isReadParam !== undefined) {
       whereClause.isRead = isReadParam === 'true';
     }
@@ -25,15 +25,15 @@ class NotificationService {
 
   public async markAsRead(id: string, userId: string) {
     const notification = await prisma.notification.findUnique({
-      where: { id },
+      where: { notificationId: BigInt(id) },
     });
 
-    if (!notification || notification.userId !== userId) {
+    if (!notification || notification.userId !== BigInt(userId)) {
       throw new AppError('Notification not found or access denied.', 404, 'MSG-UC03-01');
     }
 
     await prisma.notification.update({
-      where: { id },
+      where: { notificationId: BigInt(id) },
       data: { isRead: true },
     });
   }

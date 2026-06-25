@@ -22,8 +22,9 @@ export const confirmAttendance = async (req: AuthRequest, res: Response, next: N
   try {
     const { id } = req.params;
     const { status, checkOutTime } = req.body;
+    const actionUserId = req.user!.userId;
 
-    await attendanceService.confirmAttendance(id, status, checkOutTime);
+    await attendanceService.confirmAttendance(id, status, actionUserId, checkOutTime);
 
     res.status(200).json({
       success: true,

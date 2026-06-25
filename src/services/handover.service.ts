@@ -4,22 +4,33 @@ class HandoverService {
   public async recordHandover(orderId: string, data: any, userId: string) {
     const { customerAgreed, notes, evidences } = data;
 
+    if (!customerAgreed) {
+      throw new Error('Customer must agree to handover.');
+    }
+
     const newHandover = await prisma.handoverRecord.create({
       data: {
-        orderId,
-        customerAgreed,
-        notes,
-        evidences: {
-          create: evidences.map((e: any) => ({
-            fileUrl: e.fileUrl,
-            evidenceType: 'HANDOVER_PHOTO',
-            uploadedBy: userId,
-          })),
-        },
+        orderId: BigInt(orderId),
+        note: notes,
+        recordedBy: BigInt(userId),
+        status: 'submitted'
       },
     });
 
-    return newHandover;
+    if (evidences && Array.isArray(evidences)) {
+      for (const e of evidences) {
+        await prisma.evidence.create({
+          data: {
+            refType: 'HandoverRecord',
+            refId: newHandover.handoverId,
+            fileUrl: e.fileUrl,
+            uploadedBy: BigInt(userId)
+          }
+        });
+      }
+    }
+
+    return { id: newHandover.handoverId };
   }
 }
 

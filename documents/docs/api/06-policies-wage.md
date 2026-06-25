@@ -24,8 +24,8 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
   "success": true,
   "data": [
     {
-      "id": "policy-uuid",
-      "policyType": "DEPOSIT",
+      "policyId": 1,
+      "policyType": "deposit",
       "name": "Standard Deposit Policy",
       "rules": { "percentage": 50 },
       "isActive": true,
@@ -45,7 +45,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - **Request Body:**
 ```json
 {
-  "policyType": "CANCELLATION",
+  "policyType": "cancellation",
   "name": "7-Day Cancellation",
   "rules": { "refundPercentage": 100, "daysBeforeEvent": 7 }
 }
@@ -88,7 +88,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - **Request Body:**
 ```json
 {
-  "assignmentId": "assignment-uuid",
+  "assignmentId": 1,
   "checkInTime": "2026-06-22T08:00:00Z",
   "locationCoordinates": "10.762622, 106.660172"
 }
@@ -109,7 +109,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - **Request Body:**
 ```json
 {
-  "status": "CONFIRMED",
+  "status": "confirmed",
   "checkOutTime": "2026-06-22T17:00:00Z"
 }
 ```
@@ -136,13 +136,13 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
   "success": true,
   "data": [
     {
-      "id": "wage-uuid",
-      "userId": "user-uuid",
+      "wageSummaryId": 1,
+      "userId": 1,
       "wagePeriod": "2026-06",
       "totalWage": 1500.00,
       "deductions": 50.00,
       "netWage": 1450.00,
-      "status": "DRAFT",
+      "status": "draft",
       "updatedAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -159,7 +159,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - **Request Body:**
 ```json
 {
-  "status": "CONFIRMED",
+  "status": "confirmed",
   "notes": "Reviewed and approved."
 }
 ```

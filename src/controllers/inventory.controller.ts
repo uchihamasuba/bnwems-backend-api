@@ -38,9 +38,10 @@ export const checkAvailability = async (req: Request, res: Response, next: NextF
 
 export const reserveInventory = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { orderId, items } = req.body;
+    const { orderId, items, eventDate } = req.body;
+    const actionUserId = req.user!.userId;
 
-    await inventoryService.reserveInventory(orderId, items);
+    await inventoryService.reserveInventory(orderId, items, eventDate, actionUserId);
 
     res.status(200).json({
       success: true,

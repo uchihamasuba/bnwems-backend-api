@@ -31,12 +31,12 @@ It covers:
   "success": true,
   "data": [
     {
-      "id": "task-uuid",
-      "orderId": "order-uuid",
-      "taskType": "INSTALLATION",
+      "workTaskId": 1,
+      "orderId": 1,
+      "taskType": "installation",
       "scheduledStart": "2026-10-14T08:00:00Z",
       "location": "123 Event Hall",
-      "status": "PENDING"
+      "status": "pending"
     }
   ],
   "meta": { "totalCount": 5 }
@@ -52,7 +52,7 @@ It covers:
   "success": true,
   "data": [
     {
-      "catalogItemId": "item-uuid",
+      "catalogItemId": 1,
       "itemName": "Standard Speaker",
       "quantity": 10
     }
@@ -88,7 +88,7 @@ It covers:
 - **Request Body:**
 ```json
 {
-  "status": "IN_PROGRESS",
+  "status": "in_progress",
   "notes": "Arrived at venue, starting setup."
 }
 ```
@@ -109,9 +109,9 @@ It covers:
   "success": true,
   "data": [
     {
-      "orderId": "order-uuid",
-      "currentTask": "INSTALLATION",
-      "status": "IN_PROGRESS",
+      "orderId": 1,
+      "currentTask": "installation",
+      "status": "in_progress",
       "lastUpdate": "2026-06-22T08:30:00Z"
     }
   ],
@@ -152,11 +152,11 @@ It covers:
   "reportDetails": {
     "items": [
       {
-        "catalogItemId": "item-uuid",
+        "catalogItemId": 1,
         "quantity": 1,
-        "type": "DAMAGED",
-        "responsible": "STAFF",
-        "responsibleUserId": "user-uuid"
+        "type": "damaged",
+        "responsible": "staff",
+        "responsibleUserId": 1
       }
     ]
   },

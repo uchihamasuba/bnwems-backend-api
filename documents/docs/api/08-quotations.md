@@ -24,14 +24,14 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
   "success": true,
   "data": [
     {
-      "id": "quote-uuid",
-      "orderId": "order-uuid",
+      "quotationId": 1,
+      "orderId": 1,
       "version": 1,
       "subtotal": 1500.00,
       "tax": 150.00,
       "discount": 0.00,
       "totalAmount": 1650.00,
-      "status": "DRAFT",
+      "status": "draft",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -47,23 +47,21 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 {
   "success": true,
   "data": {
-    "id": "quote-uuid",
-    "orderId": "order-uuid",
+    "quotationId": 1,
+    "orderId": 1,
     "version": 1,
     "subtotal": 1500.00,
     "tax": 150.00,
     "discount": 0.00,
     "totalAmount": 1650.00,
-    "details": {
-      "items": [
-        {
-          "catalogItemId": "item-uuid",
-          "quantity": 2,
-          "price": 750.00
-        }
-      ]
-    },
-    "status": "DRAFT",
+    "items": [
+      {
+        "catalogItemId": 1,
+        "quantity": 2,
+        "unitPrice": 750.00
+      }
+    ],
+    "status": "draft",
     "createdAt": "2026-06-22T10:00:00Z",
     "updatedAt": "2026-06-22T10:00:00Z"
   }
@@ -84,15 +82,13 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
   "tax": 150.00,
   "discount": 0.00,
   "totalAmount": 1650.00,
-  "details": {
-    "items": [
-      {
-        "catalogItemId": "item-uuid",
-        "quantity": 2,
-        "price": 750.00
-      }
-    ]
-  }
+  "items": [
+    {
+      "catalogItemId": 1,
+      "quantity": 2,
+      "unitPrice": 750.00
+    }
+  ]
 }
 ```
 - **Response (201 Created):**
@@ -100,7 +96,7 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 {
   "success": true,
   "message": "Quotation created.",
-  "data": { "id": "new-quote-uuid", "version": 2 }
+  "data": { "quotationId": 2, "version": 2 }
 }
 ```
 
@@ -116,15 +112,13 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
   "tax": 225.00,
   "discount": 0.00,
   "totalAmount": 2475.00,
-  "details": {
-    "items": [
-      {
-        "catalogItemId": "item-uuid",
-        "quantity": 3,
-        "price": 750.00
-      }
-    ]
-  }
+  "items": [
+    {
+      "catalogItemId": 1,
+      "quantity": 3,
+      "unitPrice": 750.00
+    }
+  ]
 }
 ```
 - **Response (200 OK):**
@@ -159,6 +153,6 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 {
   "success": true,
   "message": "Quotation confirmed.",
-  "data": { "status": "ACCEPTED" }
+  "data": { "status": "accepted" }
 }
 ```

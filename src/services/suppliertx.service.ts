@@ -2,62 +2,78 @@ import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
 
 class SupplierTxService {
-  public async createSupplierTransaction(data: any) {
-    const { supplierId, orderId, transactionType, totalCost, details } = data;
+  public async createSupplierTransaction(data: any, userId: string) {
+    const { supplierId, orderId, transactionType, totalCost, items } = data;
 
     const newTx = await prisma.supplierTransaction.create({
       data: {
-        supplierId,
-        orderId,
-        transactionType,
+        supplierId: BigInt(supplierId),
+        ...(orderId && { orderId: BigInt(orderId) }),
+        type: transactionType,
         totalCost,
-        details,
-        status: 'DRAFT',
+        status: 'pending',
+        createdBy: BigInt(userId)
       },
     });
+
+    for (const item of items) {
+      await prisma.supplierTransactionItem.create({
+        data: {
+          supplierTransactionId: newTx.supplierTransactionId,
+          catalogItemId: BigInt(item.catalogItemId),
+          quantity: item.quantity,
+          unitCost: item.unitPrice,
+        }
+      });
+    }
 
     return newTx;
   }
 
   public async receiveSupplierItems(id: string, evidenceUrls: string[], userId: string) {
-    const tx = await prisma.supplierTransaction.findUnique({ where: { id } });
+    const tx = await prisma.supplierTransaction.findUnique({ where: { supplierTransactionId: BigInt(id) } });
     if (!tx) throw new AppError('Transaction not found', 404);
 
     await prisma.$transaction(async (prismaTx) => {
       await prismaTx.supplierTransaction.update({
-        where: { id },
+        where: { supplierTransactionId: BigInt(id) },
         data: {
-          status: 'RECEIVED',
-          evidences: evidenceUrls && Array.isArray(evidenceUrls) ? {
-            create: evidenceUrls.map(url => ({
-              fileUrl: url,
-              evidenceType: 'OTHER',
-              uploadedBy: userId,
-            })),
-          } : undefined,
+          status: 'completed',
         },
       });
 
+      if (evidenceUrls && Array.isArray(evidenceUrls)) {
+        await Promise.all(evidenceUrls.map(url => prismaTx.evidence.create({
+          data: {
+            refType: 'SupplierTransaction',
+            refId: BigInt(id),
+            fileUrl: url,
+            uploadedBy: BigInt(userId)
+          }
+        })));
+      }
+
       // BR-16-04: Creates or updates SupplierDebt automatically
       const existingDebt = await prismaTx.supplierDebt.findFirst({
-        where: { supplierId: tx.supplierId, status: { in: ['UNPAID', 'PARTIALLY_PAID'] } },
+        where: { supplierId: tx.supplierId, status: { in: ['open', 'partial'] } },
       });
 
       if (existingDebt) {
         await prismaTx.supplierDebt.update({
-          where: { id: existingDebt.id },
+          where: { debtId: existingDebt.debtId },
           data: {
-            amountOwed: existingDebt.amountOwed + tx.totalCost,
-            status: 'UNPAID',
+            amount: Number(existingDebt.amount) + Number(tx.totalCost),
+            status: 'open',
           },
         });
       } else {
         await prismaTx.supplierDebt.create({
           data: {
             supplierId: tx.supplierId,
-            amountOwed: tx.totalCost,
-            amountPaid: 0,
-            status: 'UNPAID',
+            supplierTransactionId: tx.supplierTransactionId,
+            amount: tx.totalCost,
+            paidAmount: 0,
+            status: 'open',
           },
         });
       }
@@ -66,25 +82,29 @@ class SupplierTxService {
 
   public async returnSupplierItems(id: string, evidenceUrls: string[], userId: string) {
     await prisma.supplierTransaction.update({
-      where: { id },
+      where: { supplierTransactionId: BigInt(id) },
       data: {
-        status: 'RETURNED',
-        evidences: evidenceUrls && Array.isArray(evidenceUrls) ? {
-          create: evidenceUrls.map(url => ({
-            fileUrl: url,
-            evidenceType: 'OTHER',
-            uploadedBy: userId,
-          })),
-        } : undefined,
+        status: 'returned',
       },
     });
+
+    if (evidenceUrls && Array.isArray(evidenceUrls)) {
+      await Promise.all(evidenceUrls.map(url => prisma.evidence.create({
+        data: {
+          refType: 'SupplierTransaction',
+          refId: BigInt(id),
+          fileUrl: url,
+          uploadedBy: BigInt(userId)
+        }
+      })));
+    }
   }
 
   public async getSupplierDebts(page: number, limit: number, status?: string, supplierId?: string) {
     const skip = (page - 1) * limit;
     const whereClause: any = {};
     if (status) whereClause.status = status;
-    if (supplierId) whereClause.supplierId = supplierId;
+    if (supplierId) whereClause.supplierId = BigInt(supplierId);
 
     const [debts, totalCount] = await Promise.all([
       prisma.supplierDebt.findMany({
@@ -100,21 +120,21 @@ class SupplierTxService {
   }
 
   public async paySupplierDebt(id: string, amount: number) {
-    const debt = await prisma.supplierDebt.findUnique({ where: { id } });
+    const debt = await prisma.supplierDebt.findUnique({ where: { debtId: BigInt(id) } });
     if (!debt) throw new AppError('Debt not found', 404);
 
-    const remaining = debt.amountOwed - debt.amountPaid;
+    const remaining = Number(debt.amount) - Number(debt.paidAmount);
     if (amount > remaining) {
       throw new AppError('Payment amount exceeds remaining debt.', 400, 'MSG-UC16-05');
     }
 
-    const newPaid = debt.amountPaid + amount;
-    const newStatus = newPaid >= debt.amountOwed ? 'PAID' : 'PARTIALLY_PAID';
+    const newPaid = Number(debt.paidAmount) + amount;
+    const newStatus = newPaid >= Number(debt.amount) ? 'paid' : 'partial';
 
     await prisma.supplierDebt.update({
-      where: { id },
+      where: { debtId: BigInt(id) },
       data: {
-        amountPaid: newPaid,
+        paidAmount: newPaid,
         status: newStatus,
       },
     });

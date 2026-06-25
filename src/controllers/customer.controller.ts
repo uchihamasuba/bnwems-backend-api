@@ -42,7 +42,7 @@ export const createCustomer = async (req: AuthRequest, res: Response, next: Next
     res.status(201).json({
       success: true,
       message: 'Customer registered successfully.',
-      data: { id: newCustomer.id },
+      data: { id: newCustomer.customerId },
     });
   } catch (error) {
     next(error);

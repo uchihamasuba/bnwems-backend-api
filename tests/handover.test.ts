@@ -4,7 +4,7 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Handover Record API', () => {
-  const token = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+  const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
 
   it('GET /api/v1/handovers should return 200', async () => {
     prismaMock.handoverRecord.findMany.mockResolvedValue([]);
@@ -14,7 +14,7 @@ describe('Handover Record API', () => {
 });
 
 describe('Damage/Loss Report API', () => {
-  const token = generateTestToken({ userId: 'admin', role: 'ADMIN' });
+  const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
 
   it('GET /api/v1/damage-loss should return 200', async () => {
     prismaMock.damageLossReport.findMany.mockResolvedValue([]);

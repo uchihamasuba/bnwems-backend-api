@@ -56,7 +56,7 @@
   "code": "MSG-CO-02",
   "message": "Dữ liệu không hợp lệ",
   "errors": [
-    { "field": "customer_id", "message": "Khách hàng không tồn tại" }
+    { "field": "customerId", "message": "Khách hàng không tồn tại" }
   ]
 }
 ```
@@ -76,7 +76,7 @@
 ```
 
 Query chuẩn cho mọi endpoint list:
-`?page=1&limit=20&search=&sort_by=created_at&sort_order=desc`
+`?page=1&limit=20&search=&sortBy=createdAt&sortOrder=desc`
 
 ### A.5 Mã HTTP dùng trong dự án
 
@@ -125,7 +125,7 @@ Copy khối dưới đây cho từng endpoint. Endpoint đơn giản (login, lis
 **Request body**
 
 ```json
-{ "customer_id": 1, "event_date": "2026-07-01" }
+{ "customerId": 1, "eventDate": "2026-07-01" }
 ```
 
 **Response `201`**
@@ -135,7 +135,7 @@ Copy khối dưới đây cho từng endpoint. Endpoint đơn giản (login, lis
   "success": true,
   "code": "MSG-CO-01",
   "message": "Tạo đơn hàng thành công",
-  "data": { "id": 10, "code": "ORD-010", "status": "new" }
+  "data": { "orderId": 10, "orderNumber": "ORD-010", "status": "draft" }
 }
 ```
 
@@ -144,7 +144,7 @@ Copy khối dưới đây cho từng endpoint. Endpoint đơn giản (login, lis
 | HTTP | code | Khi nào |
 |------|------|---------|
 | 400  | MSG-CO-02 | Thiếu field bắt buộc |
-| 404  | MSG-CO-03 | `customer_id` không tồn tại |
+| 404  | MSG-CO-03 | `customerId` không tồn tại |
 
 **Ghi chú:** Ghi audit log khi tạo (BR-CO05).
 

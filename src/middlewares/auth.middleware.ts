@@ -6,7 +6,10 @@ import { AppError } from './error.middleware';
 export interface AuthRequest extends Request {
   user?: {
     userId: string;
-    role: string;
+    role: {
+      roleId: string;
+      roleName: string;
+    };
   };
 }
 
@@ -20,7 +23,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     const token = authHeader.split(' ')[1];
     
     // Verify token
-    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; role: string };
+    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; role: { roleId: string; roleName: string } };
     
     // Attach user to request
     req.user = decoded;
@@ -44,7 +47,7 @@ export const authorizeRoles = (...roles: string[]) => {
       return next(new AppError('Not authenticated.', 401));
     }
 
-    const userRole = req.user.role.toLowerCase().replace(/ /g, '_');
+    const userRole = req.user.role.roleName.toLowerCase().replace(/ /g, '_');
     const allowedRoles = roles.map(r => r.toLowerCase().replace(/ /g, '_'));
 
     if (!allowedRoles.includes(userRole)) {

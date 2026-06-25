@@ -27,9 +27,9 @@ It ensures equipment availability by date and manages checkout operations. Key e
   "success": true,
   "data": [
     {
-      "id": "inv-uuid",
-      "warehouseId": "warehouse-uuid",
-      "catalogItemId": "item-uuid",
+      "inventoryId": 1,
+      "warehouseId": 1,
+      "catalogItemId": 1,
       "availableQuantity": 100,
       "reservedQuantity": 20,
       "checkedOutQuantity": 10,
@@ -47,13 +47,13 @@ It ensures equipment availability by date and manages checkout operations. Key e
 - **Description:** Checks if sufficient inventory is available for a given event date, factoring in existing reservations.
 - **Business Rules:**
   - BR-13-01: Available = Total - (Reserved + CheckedOut + Damaged + Lost).
-- **Query Parameters:** `?eventDate=2026-10-15&itemId=item-uuid`
+- **Query Parameters:** `?eventDate=2026-10-15&catalogItemId=1`
 - **Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "catalogItemId": "item-uuid",
+    "catalogItemId": 1,
     "isAvailable": true,
     "availableQuantityOnDate": 80
   }
@@ -69,10 +69,10 @@ It ensures equipment availability by date and manages checkout operations. Key e
 - **Request Body:**
 ```json
 {
-  "orderId": "order-uuid",
+  "orderId": 1,
   "items": [
     {
-      "catalogItemId": "item-uuid",
+      "catalogItemId": 1,
       "quantity": 5
     }
   ]
@@ -92,7 +92,7 @@ It ensures equipment availability by date and manages checkout operations. Key e
 - **Use Case:** UC 2.23 - View Warehouse Transactions
 - **Description:** Retrieves a history of warehouse transactions (checkout, return, adjustments).
 - **Query Parameters:**
-  - `transactionType` (enum, optional) - CHECKOUT, RETURN, ADJUSTMENT
+  - `transactionType` (enum, optional) - checkout, return, adjustment
   - `page` (number, default 1)
   - `limit` (number, default 20)
 - **Response (200 OK):**
@@ -101,10 +101,10 @@ It ensures equipment availability by date and manages checkout operations. Key e
   "success": true,
   "data": [
     {
-      "id": "tx-uuid",
-      "warehouseId": "warehouse-uuid",
-      "transactionType": "CHECKOUT",
-      "performedBy": "user-uuid",
+      "warehouseHistoryId": 1,
+      "warehouseId": 1,
+      "transactionType": "checkout",
+      "performedByUserId": 1,
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -121,11 +121,11 @@ It ensures equipment availability by date and manages checkout operations. Key e
 - **Request Body:**
 ```json
 {
-  "warehouseId": "warehouse-uuid",
-  "orderId": "order-uuid",
+  "warehouseId": 1,
+  "orderId": 1,
   "items": [
     {
-      "catalogItemId": "item-uuid",
+      "catalogItemId": 1,
       "quantity": 10
     }
   ]
@@ -148,13 +148,13 @@ It ensures equipment availability by date and manages checkout operations. Key e
 - **Request Body:**
 ```json
 {
-  "warehouseId": "warehouse-uuid",
-  "orderId": "order-uuid",
+  "warehouseId": 1,
+  "orderId": 1,
   "items": [
     {
-      "catalogItemId": "item-uuid",
+      "catalogItemId": 1,
       "quantity": 10,
-      "condition": "GOOD"
+      "condition": "good"
     }
   ]
 }

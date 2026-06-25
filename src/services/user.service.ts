@@ -13,7 +13,11 @@ class UserService {
         { fullName: { contains: search } },
       ];
     }
-    if (role) whereClause.role = role;
+    // role here could be roleName, but API doc specifies role is enum ADMIN, MANAGER, etc.
+    // In our schema, role is stored as Role relation. We need to filter by roleName.
+    if (role) {
+      whereClause.role = { roleName: role };
+    }
     if (status) whereClause.status = status;
 
     const [users, totalCount] = await Promise.all([
@@ -22,10 +26,15 @@ class UserService {
         skip,
         take: limit,
         select: {
-          id: true,
+          userId: true,
           username: true,
           fullName: true,
-          role: true,
+          role: {
+            select: {
+              roleId: true,
+              roleName: true
+            }
+          },
           status: true,
           createdAt: true,
           updatedAt: true,
@@ -39,7 +48,7 @@ class UserService {
   }
 
   public async createUser(data: any, actionUserId: string) {
-    const { username, password, fullName, role } = data;
+    const { username, password, fullName, roleId } = data;
 
     const existingUser = await prisma.internalUser.findUnique({ where: { username } });
     if (existingUser) {
@@ -53,42 +62,51 @@ class UserService {
         username,
         passwordHash,
         fullName,
-        role,
+        roleId: BigInt(roleId),
       },
+      include: {
+        role: true
+      }
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'CREATE_USER',
         entityType: 'InternalUser',
-        entityId: newUser.id,
+        entityId: newUser.userId,
       },
     });
 
     return {
-      id: newUser.id,
+      userId: newUser.userId,
       username: newUser.username,
       fullName: newUser.fullName,
-      role: newUser.role,
+      role: {
+        roleId: newUser.role.roleId,
+        roleName: newUser.role.roleName
+      },
       status: newUser.status,
     };
   }
 
   public async updateUser(id: string, data: any, actionUserId: string) {
-    const { fullName, role } = data;
+    const { fullName, roleId } = data;
 
     const updatedUser = await prisma.internalUser.update({
-      where: { id },
-      data: { fullName, role },
+      where: { userId: BigInt(id) },
+      data: { 
+        ...(fullName && { fullName }), 
+        ...(roleId && { roleId: BigInt(roleId) }) 
+      },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'UPDATE_USER',
         entityType: 'InternalUser',
-        entityId: updatedUser.id,
+        entityId: updatedUser.userId,
       },
     });
 
@@ -97,17 +115,16 @@ class UserService {
 
   public async updateStatus(id: string, status: string, actionUserId: string) {
     await prisma.internalUser.update({
-      where: { id },
-      data: { status: status as any },
+      where: { userId: BigInt(id) },
+      data: { status },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'UPDATE_USER_STATUS',
         entityType: 'InternalUser',
-        entityId: id,
-        details: { status } as any,
+        entityId: BigInt(id),
       },
     });
   }
@@ -116,16 +133,16 @@ class UserService {
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     await prisma.internalUser.update({
-      where: { id },
+      where: { userId: BigInt(id) },
       data: { passwordHash },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: actionUserId,
+        userId: BigInt(actionUserId),
         action: 'RESET_PASSWORD',
         entityType: 'InternalUser',
-        entityId: id,
+        entityId: BigInt(id),
       },
     });
   }

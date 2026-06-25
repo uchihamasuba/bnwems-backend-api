@@ -10,7 +10,7 @@ export const getCustomersSchema = z.object({
 
 export const getCustomerByIdSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid customer ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
 
@@ -25,7 +25,7 @@ export const createCustomerSchema = z.object({
 
 export const updateCustomerSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid customer ID format'),
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
     fullName: z.string().min(1, 'Full name is required'),

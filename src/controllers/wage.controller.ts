@@ -26,8 +26,9 @@ export const confirmWage = async (req: AuthRequest, res: Response, next: NextFun
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const actionUserId = req.user!.userId;
 
-    await wageService.confirmWage(id, status);
+    await wageService.confirmWage(id, status, actionUserId);
 
     res.status(200).json({
       success: true,

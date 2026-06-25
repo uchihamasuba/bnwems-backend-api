@@ -4,10 +4,10 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Warehouse API (Module 5)', () => {
-  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
-  const validUUID1 = '123e4567-e89b-12d3-a456-426614174000';
-  const validUUID2 = '123e4567-e89b-12d3-a456-426614174001';
-  const validUUID3 = '123e4567-e89b-12d3-a456-426614174002';
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const validId1 = '1';
+  const validId2 = '2';
+  const validId3 = '3';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -41,8 +41,8 @@ describe('Warehouse API (Module 5)', () => {
         .post('/api/v1/warehouse/checkout')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          warehouseId: validUUID1,
-          orderId: validUUID2,
+          warehouseId: validId1,
+          orderId: validId2,
         });
 
       expect(res.status).toBe(400);
@@ -54,9 +54,9 @@ describe('Warehouse API (Module 5)', () => {
         .post('/api/v1/warehouse/checkout')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          warehouseId: validUUID1,
-          orderId: validUUID2,
-          items: [{ catalogItemId: validUUID3, quantity: -1 }]
+          warehouseId: validId1,
+          orderId: validId2,
+          items: [{ catalogItemId: validId3, quantity: -1 }]
         });
 
       expect(res.status).toBe(400);
@@ -65,8 +65,13 @@ describe('Warehouse API (Module 5)', () => {
 
     it('should checkout items successfully', async () => {
       prismaMock.inventory.findFirst.mockResolvedValue({
-        id: 'inv1', catalogItemId: validUUID3, reservedQuantity: 5, checkedOutQuantity: 0
+        id: 'inv1', catalogItemId: validId3, reservedQuantity: 5, checkedOutQuantity: 0, availableQuantity: 10
       } as any);
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.inventoryReport.create.mockResolvedValue({ inventoryReportId: 1n } as any);
+      prismaMock.inventoryReportItem.create.mockResolvedValue({} as any);
       prismaMock.inventory.update.mockResolvedValue({} as any);
       prismaMock.warehouseHistory.create.mockResolvedValue({} as any);
 
@@ -74,9 +79,9 @@ describe('Warehouse API (Module 5)', () => {
         .post('/api/v1/warehouse/checkout')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          warehouseId: validUUID1,
-          orderId: validUUID2,
-          items: [{ catalogItemId: validUUID3, quantity: 2 }]
+          warehouseId: validId1,
+          orderId: validId2,
+          items: [{ catalogItemId: validId3, quantity: 2 }]
         });
 
       expect(res.status).toBe(200);
@@ -92,7 +97,7 @@ describe('Warehouse API (Module 5)', () => {
         .post('/api/v1/warehouse/return')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          warehouseId: validUUID1,
+          warehouseId: validId1,
         });
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
@@ -100,8 +105,13 @@ describe('Warehouse API (Module 5)', () => {
 
     it('should return items successfully', async () => {
       prismaMock.inventory.findFirst.mockResolvedValue({
-        id: 'inv1', catalogItemId: validUUID3, checkedOutQuantity: 2, damagedQuantity: 0
+        id: 'inv1', catalogItemId: validId3, checkedOutQuantity: 2, damagedQuantity: 0, availableQuantity: 10
       } as any);
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.inventoryReport.create.mockResolvedValue({ inventoryReportId: 1n } as any);
+      prismaMock.inventoryReportItem.create.mockResolvedValue({} as any);
       prismaMock.inventory.update.mockResolvedValue({} as any);
       prismaMock.warehouseHistory.create.mockResolvedValue({} as any);
 
@@ -109,9 +119,9 @@ describe('Warehouse API (Module 5)', () => {
         .post('/api/v1/warehouse/return')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          warehouseId: validUUID1,
-          orderId: validUUID2,
-          items: [{ catalogItemId: validUUID3, quantity: 1, condition: 'GOOD' }]
+          warehouseId: validId1,
+          orderId: validId2,
+          items: [{ catalogItemId: validId3, quantity: 1, condition: 'GOOD' }]
         });
 
       expect(res.status).toBe(200);
@@ -121,8 +131,13 @@ describe('Warehouse API (Module 5)', () => {
 
     it('should record damaged condition', async () => {
       prismaMock.inventory.findFirst.mockResolvedValue({
-        id: 'inv1', catalogItemId: validUUID3, checkedOutQuantity: 2, damagedQuantity: 0
+        id: 'inv1', catalogItemId: validId3, checkedOutQuantity: 2, damagedQuantity: 0, availableQuantity: 10
       } as any);
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.inventoryReport.create.mockResolvedValue({ inventoryReportId: 1n } as any);
+      prismaMock.inventoryReportItem.create.mockResolvedValue({} as any);
       prismaMock.inventory.update.mockResolvedValue({} as any);
       prismaMock.warehouseHistory.create.mockResolvedValue({} as any);
 
@@ -130,9 +145,9 @@ describe('Warehouse API (Module 5)', () => {
         .post('/api/v1/warehouse/return')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          warehouseId: validUUID1,
-          orderId: validUUID2,
-          items: [{ catalogItemId: validUUID3, quantity: 1, condition: 'DAMAGED' }]
+          warehouseId: validId1,
+          orderId: validId2,
+          items: [{ catalogItemId: validId3, quantity: 1, condition: 'DAMAGED' }]
         });
 
       expect(res.status).toBe(200);

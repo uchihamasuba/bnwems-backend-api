@@ -6,22 +6,23 @@ class AttendanceService {
     
     const newAttendance = await prisma.attendance.create({
       data: {
-        assignmentId,
-        userId,
-        checkInTime: new Date(checkInTime),
-        status: 'PENDING',
+        assignmentId: BigInt(assignmentId),
+        checkIn: new Date(checkInTime),
+        completionStatus: 'pending',
       },
     });
 
     return newAttendance;
   }
 
-  public async confirmAttendance(id: string, status: string, checkOutTime?: string) {
+  public async confirmAttendance(id: string, status: string, actionUserId: string, checkOutTime?: string) {
     await prisma.attendance.update({
-      where: { id },
+      where: { attendanceId: BigInt(id) },
       data: {
-        status: status as any,
-        checkOutTime: checkOutTime ? new Date(checkOutTime) : undefined,
+        completionStatus: status.toLowerCase(),
+        checkOut: checkOutTime ? new Date(checkOutTime) : undefined,
+        confirmedBy: BigInt(actionUserId),
+        confirmedAt: new Date()
       },
     });
   }

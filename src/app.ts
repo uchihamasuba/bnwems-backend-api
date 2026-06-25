@@ -3,6 +3,13 @@ import path from 'path';
 import routes from './routes';
 
 const app = express();
+
+Object.defineProperty(BigInt.prototype, 'toJSON', {
+  get() {
+    return () => String(this);
+  }
+});
+
 app.use(express.json());
 
 // Serve static files from public/uploads

@@ -4,9 +4,9 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Report API (Module 13)', () => {
-  const adminToken = generateTestToken({ userId: 'admin', role: 'ADMIN' });
-  const managerToken = generateTestToken({ userId: 'manager', role: 'MANAGER' });
-  const validUUID1 = '123e4567-e89b-12d3-a456-426614174000';
+  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const managerToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'MANAGER' } });
+  const validId1 = '1';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -55,7 +55,7 @@ describe('Report API (Module 13)', () => {
 
       const res = await request(app)
         .get('/api/v1/reports/verification')
-        .query({ orderId: validUUID1 })
+        .query({ orderId: validId1 })
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect([200, 404]).toContain(res.status); // 200 if valid
@@ -79,8 +79,8 @@ describe('Report API (Module 13)', () => {
     it('GET /api/v1/dashboard/manager should return 200', async () => {
       prismaMock.order.count.mockResolvedValue(5);
       prismaMock.changeRequest.count.mockResolvedValue(2);
+      prismaMock.scheduleActivity.findMany.mockResolvedValue([]);
       prismaMock.workTask.count.mockResolvedValue(1);
-      
       const res = await request(app)
         .get('/api/v1/dashboard/manager')
         .set('Authorization', `Bearer ${managerToken}`);
