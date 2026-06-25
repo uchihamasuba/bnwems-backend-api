@@ -1,5 +1,7 @@
 import express from 'express';
 import path from 'path';
+import cors from 'cors';
+import { env } from './config/env';
 import routes from './routes';
 
 const app = express();
@@ -11,6 +13,14 @@ Object.defineProperty(BigInt.prototype, 'toJSON', {
 });
 
 app.use(express.json());
+
+// Enable CORS
+app.use(
+  cors({
+    origin: env.CORS_ORIGIN,
+    credentials: true, // Allow cookies if needed
+  })
+);
 
 // Serve static files from public/uploads
 app.use('/uploads', express.static(path.join(__dirname, '../../public/uploads')));
