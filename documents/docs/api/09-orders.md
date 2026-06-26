@@ -139,19 +139,50 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 
 ## 2. Field Change Request Management (UC 2.27)
 
+### `GET /api/v1/change-requests`
+- **Use Case:** UC 2.27 - View Change Request List
+- **Description:** Retrieves a paginated list of field change requests, primarily used to build the Manager's pending-approval queue (UC 2.8 Operational Dashboard).
+- **Query Parameters:**
+  - `orderId` (string, optional)
+  - `status` (enum, optional) - pending, approved, rejected
+  - `page` (number, default 1)
+  - `limit` (number, default 20)
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "changeRequestId": 1,
+      "orderId": 1,
+      "type": "add",
+      "items": [
+        { "catalogItemId": 1, "quantity": 1, "action": "add" }
+      ],
+      "status": "pending",
+      "createdAt": "2026-06-24T09:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "totalCount": 2 }
+}
+```
+
 ### `POST /api/v1/orders/:id/change-requests`
 - **Use Case:** UC 2.27 - Record Change Request
 - **Description:** Submits an on-site change request (add/remove items).
 - **Request Body:**
 ```json
 {
-  "requestDetails": {
-    "addedItems": [{ "catalogItemId": 1, "quantity": 1 }],
-    "removedItems": []
-  },
-  "additionalCost": 150.00
+  "type": "add",
+  "items": [
+    { "catalogItemId": 1, "quantity": 1, "action": "add" }
+  ]
 }
 ```
+- **Payload Rules:**
+  - `type`: Overall request type (`add`, `remove`, `replace`).
+  - `action`: Specific item action. For `type="replace"`, the `items` array must contain both the removed items (`action="remove"`) and the new items (`action="add"`).
+  - *Note: Pricing adjustments are calculated automatically upon approval and added to the final settlement.*
 - **Response (201 Created):**
 ```json
 {

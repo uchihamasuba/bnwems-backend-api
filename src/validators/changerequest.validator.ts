@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+export const getChangeRequestsSchema = z.object({
+  query: z.object({
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),
+    status: z.enum(['pending', 'approved', 'rejected']).optional(),
+    page: z.string().regex(/^\d+$/, 'Invalid page format').optional(),
+    limit: z.string().regex(/^\d+$/, 'Invalid limit format').optional(),
+  }),
+});
+
 export const createChangeRequestSchema = z.object({
   params: z.object({
     orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),

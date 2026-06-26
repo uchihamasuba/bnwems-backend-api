@@ -11,6 +11,32 @@ describe('Change Request API (Module 9)', () => {
     jest.clearAllMocks();
   });
 
+  describe('GET /api/v1/change-requests', () => {
+    it('should return 401 if unauthorized', async () => {
+      const res = await request(app).get('/api/v1/change-requests');
+      expect(res.status).toBe(401);
+    });
+
+    it('should return 200 and a list of change requests', async () => {
+      prismaMock.changeRequest.findMany.mockResolvedValue([
+        { changeRequestId: 1n, orderId: 1n, status: 'pending', requestedBy: 1n, createdAt: new Date(), updatedAt: new Date(), type: 'add' } as any
+      ]);
+      prismaMock.changeRequest.count.mockResolvedValue(1);
+      prismaMock.changeRequestItem.findMany.mockResolvedValue([
+        { id: 1n, changeRequestId: 1n, catalogItemId: 1n, quantity: 1, action: 'add' } as any
+      ]);
+
+      const res = await request(app)
+        .get('/api/v1/change-requests')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data[0].changeRequestId).toBe('1');
+    });
+  });
+
   describe('POST /api/v1/orders/:id/change-requests', () => {
     it('should return 401 if unauthorized', async () => {
       const res = await request(app).post(`/api/v1/orders/${validId1}/change-requests`);
