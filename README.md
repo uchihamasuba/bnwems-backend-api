@@ -68,8 +68,8 @@ JWT_SECRET="your_jwt_secret_key_here"
 **Bước 3:** Khởi tạo cơ sở dữ liệu với Prisma:
 Để tạo cấu trúc bảng trong MySQL dựa theo file `schema.prisma`:
 ```bash
-# Đồng bộ hóa cấu trúc database trực tiếp
-npx prisma db push
+# Chạy migration để đồng bộ database và cập nhật Prisma Client
+npx prisma migrate dev
 ```
 
 **Bước 4:** Nạp dữ liệu mẫu (Seeding)
