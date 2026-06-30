@@ -96,3 +96,21 @@ export const confirmQuotation = async (req: AuthRequest, res: Response, next: Ne
     next(error);
   }
 };
+
+export const updateQuotationStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const actionUserId = req.user!.userId;
+
+    await quotationService.updateQuotationStatus(id, status, actionUserId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Quotation status updated.',
+      data: { status },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

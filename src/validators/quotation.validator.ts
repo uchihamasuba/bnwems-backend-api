@@ -53,3 +53,12 @@ export const confirmQuotationSchema = z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
+
+export const updateQuotationStatusSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+  body: z.object({
+    status: z.string().min(1, 'Status is required'),
+  }),
+});

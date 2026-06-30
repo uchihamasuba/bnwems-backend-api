@@ -86,6 +86,10 @@ describe('User API (Module 2)', () => {
           password: 'Password123!',
           fullName: 'New User',
           roleId: '3',
+          email: 'newuser@example.com',
+          phone: '0123456789',
+          bio: 'Some bio',
+          avatarUrl: 'http://example.com/avatar.png'
         });
 
       expect(res.status).toBe(201);
@@ -99,7 +103,7 @@ describe('User API (Module 2)', () => {
       const res = await request(app)
         .put('/api/v1/users/abc')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ fullName: 'Updated Name', role: 'MANAGER' });
+        .send({ fullName: 'Updated Name', roleId: '2' });
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
     });
@@ -111,7 +115,12 @@ describe('User API (Module 2)', () => {
       const res = await request(app)
         .put(`/api/v1/users/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ fullName: 'Updated Name', role: 'MANAGER' });
+        .send({ 
+          fullName: 'Updated Name', 
+          roleId: '2', 
+          avatarUrl: 'http://example.com/new-avatar.png',
+          bio: 'New bio'
+        });
       
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -119,10 +128,10 @@ describe('User API (Module 2)', () => {
     });
   });
 
-  describe('PUT /api/v1/users/:id/status', () => {
+  describe('PATCH /api/v1/users/:id/status', () => {
     it('should return 400 for invalid status', async () => {
       const res = await request(app)
-        .put(`/api/v1/users/${validId}/status`)
+        .patch(`/api/v1/users/${validId}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'DELETED' }); // invalid enum
       expect(res.status).toBe(400);
@@ -134,9 +143,9 @@ describe('User API (Module 2)', () => {
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/users/${validId}/status`)
+        .patch(`/api/v1/users/${validId}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'INACTIVE' });
+        .send({ status: 'inactive' });
         
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);

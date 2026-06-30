@@ -46,3 +46,11 @@ test_output.log
 results.json
 results2.json
 test-results.json
+
+# Temporary helper scripts
+check_apis.js
+check_tests.js
+diff_apis.js
+fix_tests.js
+list_routes.ts
+scaffold.ps1

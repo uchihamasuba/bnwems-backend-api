@@ -6,7 +6,7 @@ import { AppError } from '../middlewares/error.middleware';
 
 class AuthService {
   public async login(username: string, password: string, ipAddress?: string) {
-    const user = await prisma.internalUser.findUnique({ 
+    const user = await prisma.internalUser.findUnique({
       where: { username },
       include: { role: true }
     });
@@ -20,10 +20,10 @@ class AuthService {
     }
 
     const expiresIn = 86400; // 24 hours
-    const token = jwt.sign({ 
-        userId: user.userId.toString(), 
-        role: { roleId: user.role.roleId.toString(), roleName: user.role.roleName } 
-      }, env.JWT_SECRET, {
+    const token = jwt.sign({
+      userId: user.userId.toString(),
+      role: { roleId: user.role.roleId.toString(), roleName: user.role.roleName }
+    }, env.JWT_SECRET, {
       expiresIn,
     });
 
@@ -43,6 +43,8 @@ class AuthService {
         userId: user.userId,
         username: user.username,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
         role: {
           roleId: user.role.roleId,
           roleName: user.role.roleName
@@ -96,6 +98,10 @@ class AuthService {
         userId: true,
         username: true,
         fullName: true,
+        email: true,
+        phone: true,
+        avatarUrl: true,
+        bio: true,
         role: {
           select: {
             roleId: true,
@@ -113,6 +119,66 @@ class AuthService {
     }
 
     return user;
+  }
+
+  public async updateProfile(userId: string, data: any) {
+    const user = await prisma.internalUser.update({
+      where: { userId: BigInt(userId) },
+      data: {
+        fullName: data.fullName,
+        phone: data.phone,
+        bio: data.bio,
+        avatarUrl: data.avatarUrl,
+      },
+      select: {
+        userId: true,
+        username: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        avatarUrl: true,
+        bio: true,
+        role: {
+          select: {
+            roleId: true,
+            roleName: true
+          }
+        },
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
+
+    return user;
+  }
+
+  public async registerDeviceToken(userId: string, fcmToken: string, platform: string) {
+    const existing = await prisma.deviceToken.findUnique({
+      where: { fcmToken }
+    });
+
+    if (existing) {
+      await prisma.deviceToken.update({
+        where: { deviceTokenId: existing.deviceTokenId },
+        data: {
+          userId: BigInt(userId),
+          platform,
+          isActive: true,
+          lastUsedAt: new Date(),
+        }
+      });
+    } else {
+      await prisma.deviceToken.create({
+        data: {
+          userId: BigInt(userId),
+          fcmToken,
+          platform,
+          isActive: true,
+          lastUsedAt: new Date(),
+        }
+      });
+    }
   }
 }
 

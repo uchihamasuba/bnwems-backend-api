@@ -70,7 +70,7 @@ class QuotationService {
         await prismaTx.quotationItem.createMany({
           data: items.map((item: any) => ({
             quotationId: quote!.quotationId,
-            catalogItemId: BigInt(item.catalogItemId),
+            equipmentItemId: BigInt(item.equipmentItemId),
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             lineTotal: item.quantity * item.unitPrice
@@ -112,7 +112,7 @@ class QuotationService {
         await prismaTx.quotationItem.createMany({
           data: items.map((item: any) => ({
             quotationId: BigInt(id),
-            catalogItemId: BigInt(item.catalogItemId),
+            equipmentItemId: BigInt(item.equipmentItemId),
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             lineTotal: item.quantity * item.unitPrice
@@ -149,6 +149,22 @@ class QuotationService {
       data: {
         userId: BigInt(actionUserId),
         action: 'CONFIRM_QUOTATION',
+        entityType: 'Quotation',
+        entityId: BigInt(id),
+      },
+    });
+  }
+
+  public async updateQuotationStatus(id: string, status: string, actionUserId: string) {
+    const quote = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
+    if (!quote) throw new AppError('Quotation not found.', 404);
+
+    await prisma.quotation.update({ where: { quotationId: BigInt(id) }, data: { status } });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: BigInt(actionUserId),
+        action: 'UPDATE_QUOTATION_STATUS',
         entityType: 'Quotation',
         entityId: BigInt(id),
       },

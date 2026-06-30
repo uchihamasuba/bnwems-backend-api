@@ -1,8 +1,8 @@
-# Operations & Field Work: Survey & Assignment
+﻿# Operations & Field Work: Survey & Assignment
 
 ## Overview
 This module handles **UC 2.12 (Survey Management)** and **UC 2.14 - 2.15 (Staff Assignment & Operation Planning)**.
-It manages `WorkTask` entities and assigns `InternalUser` personnel to them through the `Assignment` entity.
+It manages `Schedule` entities and their associated `WorkTask` entities, assigning `InternalUser` personnel to them through the `Assignment` entity.
 
 ## Standard Error Codes (SRS Mapping)
 - `MSG-UC53-01`: Required information is missing or invalid.
@@ -19,6 +19,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 - **Request Body:**
 ```json
 {
+  "scheduleId": 1,
   "taskType": "survey",
   "scheduledStart": "2026-08-01T09:00:00Z",
   "scheduledEnd": "2026-08-01T12:00:00Z",
@@ -29,6 +30,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 ```json
 {
   "success": true,
+  "code": "MSG-SV-00",
   "message": "Survey task created.",
   "data": { "workTaskId": 1 }
 }
@@ -41,6 +43,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 ```json
 {
   "success": true,
+  "code": "MSG-SV-00",
   "data": {
     "workTaskId": 1,
     "notes": "Venue has strict height limits.",
@@ -52,14 +55,32 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 }
 ```
 
+### `PUT /api/v1/tasks/:id/survey-report/review`
+- **Use Case:** UC 2.12 - Survey Report Approval
+- **Description:** Manager duyệt hoặc yêu cầu bổ sung báo cáo khảo sát.
+- **Request Body:**
+```json
+{
+  "status": "approved",
+  "reviewNotes": "All good to proceed."
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SV-00",
+  "message": "Survey report review submitted."
+}
+```
+
 ## 2. Staff Assignment (UC 2.14, 2.15)
 
-### `GET /api/v1/tasks`
-- **Use Case:** UC 2.14 - View Schedule Plan List
-- **Description:** Manager views scheduled tasks.
+### `GET /api/v1/schedules`
+- **Use Case:** UC 2.14 - View Schedule List
+- **Description:** Manager views scheduled operations for orders.
 - **Query Parameters:**
   - `orderId` (string, optional)
-  - `taskType` (enum, optional)
   - `status` (enum, optional)
   - `page` (number, default 1)
   - `limit` (number, default 20)
@@ -67,14 +88,13 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 ```json
 {
   "success": true,
+  "code": "MSG-SV-00",
   "data": [
     {
-      "workTaskId": 1,
+      "scheduleId": 1,
       "orderId": 1,
-      "taskType": "installation",
-      "scheduledStart": "2026-10-14T08:00:00Z",
-      "scheduledEnd": "2026-10-15T18:00:00Z",
-      "status": "pending"
+      "status": "draft",
+      "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
   "meta": { "page": 1, "limit": 20, "totalCount": 50 }
@@ -83,13 +103,13 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 
 ### `POST /api/v1/tasks`
 - **Use Case:** UC 2.15.1 - Create Work Task for Staff
-- **Description:** Creates an operational task (e.g. preparation, transport, installation).
+- **Description:** Creates an operational task (e.g. preparation, transport, installation) and links it to a `Schedule`.
 - **Business Rules:**
-  - BR-52-05: Must be linked to a related order.
+  - BR-52-05: Must be linked to a related `scheduleId`.
 - **Request Body:**
 ```json
 {
-  "orderId": 1,
+  "scheduleId": 1,
   "taskType": "installation",
   "scheduledStart": "2026-10-14T08:00:00Z",
   "scheduledEnd": "2026-10-15T18:00:00Z",
@@ -100,6 +120,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 ```json
 {
   "success": true,
+  "code": "MSG-SV-00",
   "message": "Task created successfully.",
   "data": { "workTaskId": 1 }
 }
@@ -130,6 +151,7 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 ```json
 {
   "success": true,
+  "code": "MSG-SV-00",
   "message": "Staff assigned and notified."
 }
 ```
@@ -146,15 +168,16 @@ It manages `WorkTask` entities and assigns `InternalUser` personnel to them thro
 }
 ```
 
-### `DELETE /api/v1/tasks/:id`
-- **Use Case:** UC 2.15.4 - Delete Work Task for Staff
-- **Description:** Deletes an unscheduled or draft task.
+### `PATCH /api/v1/tasks/:id/status`
+- **Use Case:** UC 2.15.4 - Soft Delete / Cancel Task
+- **Description:** Soft-deletes or cancels an unscheduled or draft task.
 - **Business Rules:**
-  - BR-55-07: Cannot delete if `status` is not `PENDING`. Returns `MSG-UC55-06`.
+  - BR-55-07: Cannot delete if `status` is not `pending`. Returns `MSG-UC55-06`.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-SV-00",
   "message": "Task deleted."
 }
 ```

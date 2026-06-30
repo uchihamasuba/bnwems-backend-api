@@ -2,11 +2,10 @@ import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
 
 class InventoryService {
-  public async getInventory(warehouseId?: string, catalogItemId?: string, page: number = 1, limit: number = 20) {
+  public async getInventory(equipmentItemId?: string, page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
     const whereClause: any = {};
-    if (warehouseId) whereClause.warehouseId = BigInt(warehouseId);
-    if (catalogItemId) whereClause.catalogItemId = BigInt(catalogItemId);
+    if (equipmentItemId) whereClause.equipmentItemId = BigInt(equipmentItemId);
 
     const [inventory, totalCount] = await Promise.all([
       prisma.inventory.findMany({
@@ -20,12 +19,12 @@ class InventoryService {
     // Map to API contract
     const data = inventory.map(inv => ({
       inventoryId: inv.inventoryId,
-      warehouseId: inv.warehouseId,
-      catalogItemId: inv.catalogItemId,
+      equipmentItemId: inv.equipmentItemId,
+      totalQuantity: inv.totalQuantity,
       availableQuantity: inv.availableQuantity,
-      reservedQuantity: 0, // In new schema, this requires aggregation from InventoryReservation
-      checkedOutQuantity: inv.totalQuantity - inv.availableQuantity,
-      damagedQuantity: 0,
+      reservedQuantity: inv.reservedQuantity, 
+      checkedOutQuantity: inv.totalQuantity - inv.availableQuantity - inv.reservedQuantity,
+      damagedQuantity: inv.damagedQuantity,
       lostQuantity: 0
     }));
 
@@ -34,7 +33,7 @@ class InventoryService {
 
   public async checkAvailability(eventDate: string, itemId: string) {
     const inventories = await prisma.inventory.findMany({
-      where: { catalogItemId: BigInt(itemId) },
+      where: { equipmentItemId: BigInt(itemId) },
     });
 
     let totalAvailable = 0;
@@ -54,7 +53,7 @@ class InventoryService {
 
     const reservations = await prisma.inventoryReservationItem.findMany({
       where: {
-        catalogItemId: BigInt(itemId),
+        equipmentItemId: BigInt(itemId),
         reservationId: { in: reservationIds }
       }
     });
@@ -63,7 +62,7 @@ class InventoryService {
     const availableOnDate = totalAvailable - totalReserved;
 
     return {
-      catalogItemId: itemId,
+      equipmentItemId: itemId,
       isAvailable: availableOnDate > 0,
       availableQuantityOnDate: availableOnDate > 0 ? availableOnDate : 0,
     };
@@ -72,13 +71,13 @@ class InventoryService {
   public async reserveInventory(orderId: string, items: any[], eventDate: string, actionUserId: string) {
     for (const item of items) {
       const inv = await prisma.inventory.findFirst({
-        where: { catalogItemId: BigInt(item.catalogItemId) },
+        where: { equipmentItemId: BigInt(item.equipmentItemId) },
       });
       if (!inv) {
         throw new AppError('Item not found in inventory', 404);
       }
       
-      const availability = await this.checkAvailability(eventDate, item.catalogItemId);
+      const availability = await this.checkAvailability(eventDate, item.equipmentItemId);
       if (item.quantity > availability.availableQuantityOnDate) {
         throw new AppError('Insufficient inventory available for the requested date.', 400, 'MSG-UC13-04');
       }
@@ -99,10 +98,115 @@ class InventoryService {
         await prismaTx.inventoryReservationItem.create({
           data: {
             reservationId: reservation.reservationId,
-            catalogItemId: BigInt(item.catalogItemId),
+            equipmentItemId: BigInt(item.equipmentItemId),
             reservedQuantity: item.quantity
           }
         });
+      }
+    });
+  }
+  public async getInventoryReports(reportType?: string, page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
+    const whereClause: any = {};
+    if (reportType) whereClause.reportType = reportType;
+
+    const [reports, totalCount] = await Promise.all([
+      prisma.inventoryReport.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.inventoryReport.count({ where: whereClause })
+    ]);
+    
+    return {
+      reports: reports.map(r => ({
+        ...r,
+        inventoryReportId: r.inventoryReportId.toString(),
+        orderId: r.orderId.toString(),
+        recordedBy: r.recordedBy.toString(),
+        confirmedBy: r.confirmedBy?.toString()
+      })),
+      totalCount
+    };
+  }
+
+  public async checkoutInventory(data: any, actionUserId: string) {
+    const { orderId, items } = data;
+    
+    await prisma.$transaction(async (prismaTx) => {
+      const report = await prismaTx.inventoryReport.create({
+        data: {
+          orderId: BigInt(orderId),
+          reportType: 'checkout',
+          recordedBy: BigInt(actionUserId),
+        }
+      });
+
+      for (const item of items) {
+        await prismaTx.inventoryReportItem.create({
+          data: {
+            inventoryReportId: report.inventoryReportId,
+            equipmentItemId: BigInt(item.equipmentItemId),
+            quantity: item.quantity,
+          }
+        });
+
+        // Checkout decreases reservedQuantity
+        const inv = await prismaTx.inventory.findUnique({ where: { equipmentItemId: BigInt(item.equipmentItemId) } });
+        if (inv) {
+          await prismaTx.inventory.update({
+            where: { equipmentItemId: BigInt(item.equipmentItemId) },
+            data: {
+              reservedQuantity: Math.max(0, inv.reservedQuantity - item.quantity)
+            }
+          });
+        }
+      }
+    });
+  }
+
+  public async returnInventory(data: any, actionUserId: string) {
+    const { orderId, items } = data;
+    
+    await prisma.$transaction(async (prismaTx) => {
+      const report = await prismaTx.inventoryReport.create({
+        data: {
+          orderId: BigInt(orderId),
+          reportType: 'return',
+          recordedBy: BigInt(actionUserId),
+        }
+      });
+
+      for (const item of items) {
+        await prismaTx.inventoryReportItem.create({
+          data: {
+            inventoryReportId: report.inventoryReportId,
+            equipmentItemId: BigInt(item.equipmentItemId),
+            quantity: item.quantity,
+            conditionStatus: item.condition || 'good'
+          }
+        });
+
+        const inv = await prismaTx.inventory.findUnique({ where: { equipmentItemId: BigInt(item.equipmentItemId) } });
+        if (inv) {
+          if (item.condition === 'damaged' || item.condition === 'lost') {
+            await prismaTx.inventory.update({
+              where: { equipmentItemId: BigInt(item.equipmentItemId) },
+              data: {
+                damagedQuantity: inv.damagedQuantity + item.quantity
+              }
+            });
+          } else {
+            await prismaTx.inventory.update({
+              where: { equipmentItemId: BigInt(item.equipmentItemId) },
+              data: {
+                availableQuantity: inv.availableQuantity + item.quantity
+              }
+            });
+          }
+        }
       }
     });
   }

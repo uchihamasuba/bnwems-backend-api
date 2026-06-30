@@ -13,16 +13,21 @@ import {
   receiveSupplierItemsSchema,
   returnSupplierItemsSchema,
   getSupplierDebtsSchema,
-  paySupplierDebtSchema
+  paySupplierDebtSchema,
+  getSupplierTransactionsSchema,
+  getSupplierTransactionByIdSchema,
+  updateSupplierTxStatusSchema
 } from '../validators/suppliertx.validator';
 
 // Supplier Transactions
+router.get('/supplier-transactions', validate(getSupplierTransactionsSchema), suppliertxController.getSupplierTransactions);
+router.get('/supplier-transactions/:id', validate(getSupplierTransactionByIdSchema), suppliertxController.getSupplierTransactionById);
 router.post('/supplier-transactions', validate(createSupplierTransactionSchema), suppliertxController.createSupplierTransaction);
+router.put('/supplier-transactions/:id/status', validate(updateSupplierTxStatusSchema), suppliertxController.updateSupplierTxStatus);
 router.put('/supplier-transactions/:id/receive', validate(receiveSupplierItemsSchema), suppliertxController.receiveSupplierItems);
 router.put('/supplier-transactions/:id/return', validate(returnSupplierItemsSchema), suppliertxController.returnSupplierItems);
+router.post('/supplier-transactions/:id/payments', validate(paySupplierDebtSchema), suppliertxController.paySupplierTransaction);
 
-// Supplier Debts
-router.get('/supplier-debts', validate(getSupplierDebtsSchema), suppliertxController.getSupplierDebts);
-router.post('/supplier-debts/:id/pay', validate(paySupplierDebtSchema), suppliertxController.paySupplierDebt);
+
 
 export default router;

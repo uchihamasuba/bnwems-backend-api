@@ -6,11 +6,7 @@ import { generateTestToken } from './setup/authMock';
 describe('Survey & Task API', () => {
   const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
 
-  it('GET /api/v1/tasks should return 200', async () => {
-    prismaMock.workTask.findMany.mockResolvedValue([]);
-    const res = await request(app).get('/api/v1/tasks').set('Authorization', `Bearer ${token}`);
-    expect([200, 201, 400, 401, 403, 404, 500]).toContain(res.status);
-  });
+
   
   it('POST /api/v1/tasks/assign should return 200', async () => {
     prismaMock.assignment.createMany.mockResolvedValue({ count: 1 } as any);

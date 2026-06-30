@@ -116,3 +116,29 @@ export const getFieldProgress = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const getOrderEvidences = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const evidences = await orderService.getOrderEvidences(id);
+    res.status(200).json({
+      success: true,
+      data: evidences,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMobileSummary = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const summary = await orderService.getMobileSummary(id);
+    res.status(200).json({
+      success: true,
+      data: summary,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

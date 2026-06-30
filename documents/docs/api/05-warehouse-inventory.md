@@ -1,40 +1,38 @@
-# Inventory & Warehouse Management
+﻿# Inventory Management
 
 ## Overview
-This module handles **UC 2.13 (Date-based Inventory Management)** and **UC 2.23 (Warehouse Check-out Supervision)**.
-It ensures equipment availability by date and manages checkout operations. Key entities involved are `Warehouse`, `Inventory`, and `WarehouseHistory`.
+This module handles **UC 2.13 (Date-based Inventory Management)** and **UC 2.23 (Inventory Check-out Supervision)**.
+It ensures equipment availability by date and manages checkout/return operations. Key entities involved are `Inventory` and `InventoryReport`.
 
 ## Standard Error Codes (SRS Mapping)
 - `MSG-UC13-01`: Required information is missing or invalid.
 - `MSG-UC13-02`: System cannot complete the request.
 - `MSG-UC13-04`: Insufficient inventory available for the requested date.
 - `MSG-UC23-01`: Scanned items do not match the assigned pick-list.
-- `MSG-UC23-02`: Items must be returned before confirming warehouse return.
+- `MSG-UC23-02`: Items must be returned before confirming inventory return.
 
 ## 1. Inventory Management (UC 2.13)
 
 ### `GET /api/v1/inventory`
 - **Use Case:** UC 2.13 - View Inventory
-- **Description:** Retrieves the current stock levels in the warehouse.
+- **Description:** Retrieves the current stock levels.
 - **Query Parameters:**
-  - `warehouseId` (string, optional)
-  - `catalogItemId` (string, optional)
+  - `equipmentItemId` (string, optional)
   - `page` (number, default 1)
   - `limit` (number, default 20)
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-WH-00",
   "data": [
     {
       "inventoryId": 1,
-      "warehouseId": 1,
-      "catalogItemId": 1,
-      "availableQuantity": 100,
-      "reservedQuantity": 20,
-      "checkedOutQuantity": 10,
+      "equipmentItemId": 1,
+      "totalQuantity": 100,
+      "availableQuantity": 80,
+      "reservedQuantity": 18,
       "damagedQuantity": 2,
-      "lostQuantity": 0,
       "updatedAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -46,14 +44,15 @@ It ensures equipment availability by date and manages checkout operations. Key e
 - **Use Case:** UC 2.13 - Check Inventory Availability
 - **Description:** Checks if sufficient inventory is available for a given event date, factoring in existing reservations.
 - **Business Rules:**
-  - BR-13-01: Available = Total - (Reserved + CheckedOut + Damaged + Lost).
-- **Query Parameters:** `?eventDate=2026-10-15&catalogItemId=1`
+  - BR-13-01: Available = Total - (Reserved + Damaged).
+- **Query Parameters:** `?eventDate=2026-10-15&equipmentItemId=1`
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-WH-00",
   "data": {
-    "catalogItemId": 1,
+    "equipmentItemId": 1,
     "isAvailable": true,
     "availableQuantityOnDate": 80
   }
@@ -65,14 +64,14 @@ It ensures equipment availability by date and manages checkout operations. Key e
 - **Description:** Reserves inventory for an order once it is confirmed.
 - **Business Rules:**
   - BR-13-02: If quantity > available on the date, throw `MSG-UC13-04`.
-  - BR-13-03: Successfully reserved items increase the `reservedQuantity`.
+  - BR-13-03: Successfully reserved items increase the `reservedQuantity` and decrease `availableQuantity`.
 - **Request Body:**
 ```json
 {
   "orderId": 1,
   "items": [
     {
-      "catalogItemId": 1,
+      "equipmentItemId": 1,
       "quantity": 5
     }
   ]
@@ -82,29 +81,31 @@ It ensures equipment availability by date and manages checkout operations. Key e
 ```json
 {
   "success": true,
+  "code": "MSG-WH-00",
   "message": "Inventory successfully reserved."
 }
 ```
 
-## 2. Warehouse Operations (UC 2.23)
+## 2. Check-out and Return Operations (UC 2.23)
 
-### `GET /api/v1/warehouse-histories`
-- **Use Case:** UC 2.23 - View Warehouse Transactions
-- **Description:** Retrieves a history of warehouse transactions (checkout, return, adjustments).
+### `GET /api/v1/inventory-reports`
+- **Use Case:** UC 2.23 - View Inventory Reports
+- **Description:** Retrieves a history of inventory operations (checkout, return, adjustments).
 - **Query Parameters:**
-  - `transactionType` (enum, optional) - checkout, return, adjustment
+  - `reportType` (enum, optional) - checkout, return, adjustment, damage_loss
   - `page` (number, default 1)
   - `limit` (number, default 20)
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-WH-00",
   "data": [
     {
-      "warehouseHistoryId": 1,
-      "warehouseId": 1,
-      "transactionType": "checkout",
-      "performedByUserId": 1,
+      "inventoryReportId": 1,
+      "orderId": 1,
+      "reportType": "checkout",
+      "reportedBy": 1,
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -112,20 +113,18 @@ It ensures equipment availability by date and manages checkout operations. Key e
 }
 ```
 
-### `POST /api/v1/warehouse/checkout`
+### `POST /api/v1/inventory/checkout`
 - **Use Case:** UC 2.23 - Confirm Inventory Check-out
-- **Description:** Records an inventory checkout operation, reducing available quantity and logging to `WarehouseHistory`.
+- **Description:** Records an inventory checkout operation, decreasing `reservedQuantity`, but `totalQuantity` remains the same until items are lost. Generates an `InventoryReport`.
 - **Business Rules:**
   - BR-23-01: The items checked out must exactly match the confirmed `Order` items or valid pick-list. If mismatch, return `MSG-UC23-01`.
-  - BR-23-02: Decreases `reservedQuantity` and increases `checkedOutQuantity`.
 - **Request Body:**
 ```json
 {
-  "warehouseId": 1,
   "orderId": 1,
   "items": [
     {
-      "catalogItemId": 1,
+      "equipmentItemId": 1,
       "quantity": 10
     }
   ]
@@ -135,24 +134,24 @@ It ensures equipment availability by date and manages checkout operations. Key e
 ```json
 {
   "success": true,
+  "code": "MSG-WH-00",
   "message": "Items checked out successfully."
 }
 ```
 
-### `POST /api/v1/warehouse/return`
+### `POST /api/v1/inventory/return`
 - **Use Case:** UC 2.23 - Confirm Inventory Return Report
-- **Description:** Records the return of inventory back to the warehouse after an event.
+- **Description:** Records the return of inventory back to the warehouse after an event. Generates an `InventoryReport`.
 - **Business Rules:**
-  - BR-23-03: Decreases `checkedOutQuantity` and increases `availableQuantity`.
-  - BR-23-04: If condition is DAMAGED, the quantity is added to `damagedQuantity` instead, triggering a Damage/Loss Report (UC 2.28).
+  - BR-23-03: Increases `availableQuantity`.
+  - BR-23-04: If condition is DAMAGED, the quantity is added to `damagedQuantity` instead.
 - **Request Body:**
 ```json
 {
-  "warehouseId": 1,
   "orderId": 1,
   "items": [
     {
-      "catalogItemId": 1,
+      "equipmentItemId": 1,
       "quantity": 10,
       "condition": "good"
     }
@@ -163,6 +162,7 @@ It ensures equipment availability by date and manages checkout operations. Key e
 ```json
 {
   "success": true,
-  "message": "Items returned to warehouse."
+  "code": "MSG-WH-00",
+  "message": "Items returned to inventory."
 }
 ```

@@ -9,14 +9,24 @@ export const getChangeRequestsSchema = z.object({
   }),
 });
 
+export const getChangeRequestByIdSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});
+
 export const createChangeRequestSchema = z.object({
   params: z.object({
     orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),
   }),
   body: z.object({
     orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),
-    requestDetails: z.string().min(1, 'Request details are required'),
-    additionalCost: z.number().min(0, 'Additional cost must be non-negative').optional(),
+    type: z.enum(['add', 'remove', 'replace']),
+    items: z.array(z.object({
+      equipmentItemId: z.number().int().positive(),
+      quantity: z.number().int().positive(),
+      action: z.enum(['add', 'remove']),
+    })).min(1, 'At least one item is required'),
   }),
 });
 

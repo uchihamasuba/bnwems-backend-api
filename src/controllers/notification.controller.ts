@@ -40,3 +40,18 @@ export const markAsRead = async (req: AuthRequest, res: Response, next: NextFunc
     next(error);
   }
 };
+
+export const markAllAsRead = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    await notificationService.markAllAsRead(userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'All notifications marked as read.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

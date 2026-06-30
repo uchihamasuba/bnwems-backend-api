@@ -7,7 +7,7 @@ nestedQuotationRouter.use(authenticate);
 nestedQuotationRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
 
 import { validate } from '../middlewares/validate.middleware';
-import { getQuotationsByOrderSchema, getQuotationByIdSchema, createQuotationSchema, updateQuotationSchema, deleteQuotationSchema, confirmQuotationSchema } from '../validators/quotation.validator';
+import { getQuotationsByOrderSchema, getQuotationByIdSchema, createQuotationSchema, updateQuotationSchema, deleteQuotationSchema, confirmQuotationSchema, updateQuotationStatusSchema } from '../validators/quotation.validator';
 
 nestedQuotationRouter.get('/', validate(getQuotationsByOrderSchema), quotationController.getQuotationsByOrder);
 nestedQuotationRouter.post('/', validate(createQuotationSchema), quotationController.createQuotation);
@@ -17,5 +17,5 @@ quotationRouter.use(authenticate);
 quotationRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
 quotationRouter.get('/:id', validate(getQuotationByIdSchema), quotationController.getQuotationById);
 quotationRouter.put('/:id', validate(updateQuotationSchema), quotationController.updateQuotation);
-quotationRouter.delete('/:id', validate(deleteQuotationSchema), quotationController.deleteQuotation);
 quotationRouter.put('/:id/confirm', validate(confirmQuotationSchema), quotationController.confirmQuotation);
+quotationRouter.patch('/:id/status', validate(updateQuotationStatusSchema), quotationController.updateQuotationStatus);

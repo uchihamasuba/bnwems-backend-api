@@ -6,7 +6,7 @@ export const nestedPaymentRouter = Router({ mergeParams: true });
 nestedPaymentRouter.use(authenticate);
 
 import { validate } from '../middlewares/validate.middleware';
-import { getPaymentsByOrderSchema, requestPaymentSchema, confirmPaymentSchema } from '../validators/payment.validator';
+import { getPaymentsByOrderSchema, requestPaymentSchema, confirmPaymentSchema, getPaymentRequestByIdSchema } from '../validators/payment.validator';
 
 nestedPaymentRouter.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getPaymentsByOrderSchema), paymentController.getPaymentsByOrder);
 nestedPaymentRouter.post('/request', authorizeRoles('ADMIN', 'MANAGER'), validate(requestPaymentSchema), paymentController.requestPayment);
@@ -14,3 +14,7 @@ nestedPaymentRouter.post('/request', authorizeRoles('ADMIN', 'MANAGER'), validat
 export const paymentRouter = Router();
 paymentRouter.use(authenticate);
 paymentRouter.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmPaymentSchema), paymentController.confirmPayment);
+
+export const paymentRequestRouter = Router();
+paymentRequestRouter.use(authenticate);
+paymentRequestRouter.get('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(getPaymentRequestByIdSchema), paymentController.getPaymentRequestById);

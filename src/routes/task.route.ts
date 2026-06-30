@@ -9,8 +9,9 @@ nestedTaskRouter.use(authenticate);
 import { validate } from '../middlewares/validate.middleware';
 import {
   getTasksSchema, getAssignedTasksSchema, createTaskSchema,
-  updateTaskSchema, deleteTaskSchema, updateTaskProgressSchema,
-  recordSurveyReportSchema, viewSurveyReportSchema, viewPickListSchema
+  updateTaskSchema, cancelTaskSchema, updateTaskProgressSchema,
+  recordSurveyReportSchema, viewSurveyReportSchema, viewPickListSchema,
+  reviewSurveyReportSchema
 } from '../validators/task.validator';
 import { assignStaffSchema } from '../validators/assignment.validator';
 
@@ -24,7 +25,8 @@ taskRouter.get('/assigned', validate(getAssignedTasksSchema), taskController.get
 taskRouter.get('/:id/pick-list', validate(viewPickListSchema), taskController.viewPickList);
 taskRouter.get('/:id/survey-report', authorizeRoles('ADMIN', 'MANAGER'), validate(viewSurveyReportSchema), taskController.viewSurveyReport);
 taskRouter.post('/:id/survey-report', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(recordSurveyReportSchema), taskController.recordSurveyReport);
+taskRouter.put('/:id/survey-report/review', authorizeRoles('ADMIN', 'MANAGER'), validate(reviewSurveyReportSchema), taskController.reviewSurveyReport);
 taskRouter.put('/:id/progress', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(updateTaskProgressSchema), taskController.updateTaskProgress);
 taskRouter.post('/:id/assignments', authorizeRoles('ADMIN', 'MANAGER'), validate(assignStaffSchema), assignmentController.assignStaff);
 taskRouter.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(updateTaskSchema), taskController.updateTask);
-taskRouter.delete('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(deleteTaskSchema), taskController.deleteTask);
+taskRouter.patch('/:id/status', authorizeRoles('ADMIN', 'MANAGER'), validate(cancelTaskSchema), taskController.cancelTask);

@@ -1,7 +1,7 @@
-# Master Data & Policies: Catalog Management
+﻿# Master Data & Policies: Equipment (Catalog) Management
 
 ## Overview
-This module handles **UC 2.5 (Master & Reference Data Management)** specifically for `CatalogItem` entity.
+This module handles **UC 2.5 (Master & Reference Data Management)** specifically for the `Equipment` entity (formerly `CatalogItem`).
 It manages services, equipment, materials, and packages used in orders.
 
 ## Standard Error Codes (SRS Mapping)
@@ -12,27 +12,31 @@ It manages services, equipment, materials, and packages used in orders.
 
 ## Endpoints
 
-### `GET /api/v1/catalog-items`
+### `GET /api/v1/equipment`
 - **Use Case:** UC 2.5 - View Equipment Catalog
-- **Description:** Retrieves a paginated list of catalog items.
+- **Description:** Retrieves a paginated list of equipment items.
 - **Query Parameters:** 
   - `page` (number, default 1)
   - `limit` (number, default 20)
-  - `search` (string, optional) - searches by name
-  - `itemType` (enum, optional) - SERVICE, EQUIPMENT, MATERIAL, PACKAGE
-  - `isActive` (boolean, optional)
+  - `search` (string, optional) - searches by name or code
+  - `category` (string, optional)
+  - `status` (enum, optional) - active, inactive
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-CT-00",
   "data": [
     {
-      "catalogItemId": 1,
+      "equipmentItemId": 1,
+      "code": "SPK-001",
       "name": "Standard Speaker Set",
-      "description": "High quality speakers",
-      "itemType": "equipment",
-      "basePrice": 150.00,
-      "isActive": true,
+      "category": "Âm thanh",
+      "unit": "bộ",
+      "rentalPrice": 150000.00,
+      "costPrice": 100000.00,
+      "replacementValue": 2500000.00,
+      "status": "active",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -44,60 +48,68 @@ It manages services, equipment, materials, and packages used in orders.
 }
 ```
 
-### `GET /api/v1/catalog-items/:id`
+### `GET /api/v1/equipment/:id`
 - **Use Case:** UC 2.5 - View Equipment Details
-- **Description:** Retrieves details for a specific catalog item.
+- **Description:** Retrieves details for a specific equipment item.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-CT-00",
   "data": {
-    "catalogItemId": 1,
+    "equipmentItemId": 1,
+    "code": "SPK-001",
     "name": "Standard Speaker Set",
-    "description": "High quality speakers",
-    "itemType": "equipment",
-    "basePrice": 150.00,
-    "isActive": true,
+    "category": "Âm thanh",
+    "unit": "bộ",
+    "rentalPrice": 150000.00,
+    "costPrice": 100000.00,
+    "replacementValue": 2500000.00,
+    "status": "active",
     "createdAt": "2026-06-22T10:00:00Z",
     "updatedAt": "2026-06-22T10:00:00Z"
   }
 }
 ```
 
-### `POST /api/v1/catalog-items`
+### `POST /api/v1/equipment`
 - **Use Case:** UC 2.5 - Create Equipment
-- **Description:** Creates a new catalog item. Admin access required.
+- **Description:** Creates a new equipment item. Admin/Manager access required.
 - **Business Rules:**
-  - BR-05-01: Base price must be a positive number.
-  - BR-05-02: Item type must be selected from standard enums.
+  - BR-05-01: Rental price and replacement value must be positive numbers.
+  - BR-05-02: Code must be unique.
   - BR-05-03: Log to `AuditLog`.
 - **Request Body:**
 ```json
 {
+  "code": "LIGHT-001",
   "name": "Premium Lighting Setup",
-  "description": "Full LED lighting for large events",
-  "itemType": "equipment",
-  "basePrice": 300.00
+  "category": "Ánh sáng",
+  "unit": "bộ",
+  "rentalPrice": 300000.00,
+  "costPrice": 200000.00,
+  "replacementValue": 5000000.00
 }
 ```
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "message": "Catalog item created successfully.",
+  "code": "MSG-CT-00",
+  "message": "Equipment created successfully.",
   "data": {
-    "catalogItemId": 2,
+    "equipmentItemId": 2,
+    "code": "LIGHT-001",
     "name": "Premium Lighting Setup",
-    "itemType": "equipment",
-    "basePrice": 300.00,
-    "isActive": true
+    "rentalPrice": 300000.00,
+    "status": "active"
   }
 }
 ```
 
-### `PUT /api/v1/catalog-items/:id`
+### `PUT /api/v1/equipment/:id`
 - **Use Case:** UC 2.5 - Update Equipment
-- **Description:** Updates information for an existing catalog item. Admin access required.
+- **Description:** Updates information for an existing equipment item. Admin/Manager access required.
 - **Business Rules:**
   - BR-05-04: Changing the price does not affect historical quotations or confirmed orders.
   - BR-05-05: Log to `AuditLog`.
@@ -105,33 +117,35 @@ It manages services, equipment, materials, and packages used in orders.
 ```json
 {
   "name": "Premium Lighting Setup v2",
-  "description": "Updated lighting specs",
-  "basePrice": 350.00
+  "rentalPrice": 350000.00,
+  "replacementValue": 5500000.00
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Catalog item updated successfully."
+  "code": "MSG-CT-00",
+  "message": "Equipment updated successfully."
 }
 ```
 
-### `PUT /api/v1/catalog-items/:id/deactivate`
-- **Use Case:** UC 2.5 - Deactivate Equipment
-- **Description:** Deactivates a catalog item without deleting it, keeping historical integrity for orders.
+### `PATCH /api/v1/equipment/:id/status`
+- **Use Case:** UC 2.4 - Disable Equipment
+- **Description:** Deactivates an equipment item without deleting it, keeping historical integrity for orders.
 - **Business Rules:**
   - BR-05-06: An item cannot be deactivated if it is part of an active order not yet completed. Return `MSG-UC05-04`.
 - **Request Body:**
 ```json
 {
-  "isActive": false
+  "status": "inactive"
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Catalog item status changed successfully."
+  "code": "MSG-CT-00",
+  "message": "Equipment status changed successfully."
 }
 ```

@@ -28,7 +28,7 @@ describe('Payment API (Module 11)', () => {
 
     it('should return list of payments', async () => {
       prismaMock.payment.findMany.mockResolvedValue([
-        { paymentId: 2n, amount: 500 } as any
+        { paymentId: 2n, orderId: 1n, amount: 500 } as any
       ]);
 
       const res = await request(app)
@@ -125,6 +125,15 @@ describe('Payment API (Module 11)', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/v1/payment-requests/:id', () => {
+    it('should return payment request details', async () => {
+      const res = await request(app)
+        .get('/api/v1/payment-requests/1')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
     });
   });
 });

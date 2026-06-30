@@ -66,7 +66,7 @@ describe('Report API (Module 13)', () => {
     it('GET /api/v1/dashboard/admin should return 200', async () => {
       prismaMock.order.count.mockResolvedValue(10);
       prismaMock.order.findMany.mockResolvedValue([]);
-      prismaMock.supplierDebt.findMany.mockResolvedValue([]);
+      prismaMock.supplierTransaction.findMany.mockResolvedValue([]);
       
       const res = await request(app)
         .get('/api/v1/dashboard/admin')
@@ -79,7 +79,7 @@ describe('Report API (Module 13)', () => {
     it('GET /api/v1/dashboard/manager should return 200', async () => {
       prismaMock.order.count.mockResolvedValue(5);
       prismaMock.changeRequest.count.mockResolvedValue(2);
-      prismaMock.scheduleActivity.findMany.mockResolvedValue([]);
+      prismaMock.schedule.findMany.mockResolvedValue([]);
       prismaMock.workTask.count.mockResolvedValue(1);
       const res = await request(app)
         .get('/api/v1/dashboard/manager')

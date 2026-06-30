@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const getCatalogItemsSchema = z.object({
+export const getEquipmentsSchema = z.object({
   query: z.object({
     page: z.string().regex(/^\d+$/, 'Page must be a number').optional(),
     limit: z.string().regex(/^\d+$/, 'Limit must be a number').optional(),
@@ -10,13 +10,13 @@ export const getCatalogItemsSchema = z.object({
   }),
 });
 
-export const getCatalogItemByIdSchema = z.object({
+export const getEquipmentByIdSchema = z.object({
   params: z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
 
-export const createCatalogItemSchema = z.object({
+export const createEquipmentSchema = z.object({
   body: z.object({
     name: z.string().min(1, 'Name is required'),
     description: z.string().optional(),
@@ -25,7 +25,7 @@ export const createCatalogItemSchema = z.object({
   }),
 });
 
-export const updateCatalogItemSchema = z.object({
+export const updateEquipmentSchema = z.object({
   params: z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
@@ -36,7 +36,7 @@ export const updateCatalogItemSchema = z.object({
   }),
 });
 
-export const deactivateCatalogItemSchema = z.object({
+export const deactivateEquipmentSchema = z.object({
   params: z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),

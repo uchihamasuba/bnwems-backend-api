@@ -2,6 +2,42 @@ import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
 
 class SupplierTxService {
+  public async getSupplierTransactions(page: number, limit: number, supplierId?: string, orderId?: string, status?: string) {
+    const skip = (page - 1) * limit;
+    const whereClause: any = {};
+    if (supplierId) whereClause.supplierId = BigInt(supplierId);
+    if (orderId) whereClause.orderId = BigInt(orderId);
+    if (status) whereClause.status = status;
+
+    const [transactions, totalCount] = await Promise.all([
+      prisma.supplierTransaction.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.supplierTransaction.count({ where: whereClause }),
+    ]);
+
+    return { transactions, totalCount };
+  }
+
+  public async getSupplierTransactionById(id: string) {
+    const tx = await prisma.supplierTransaction.findUnique({
+      where: { supplierTransactionId: BigInt(id) }
+    });
+    if (!tx) throw new AppError('Transaction not found', 404);
+
+    const items = await prisma.supplierTransactionItem.findMany({
+      where: { supplierTransactionId: BigInt(id) }
+    });
+
+    return {
+      ...tx,
+      items
+    };
+  }
+
   public async createSupplierTransaction(data: any, userId: string) {
     const { supplierId, orderId, transactionType, totalCost, items } = data;
 
@@ -20,7 +56,7 @@ class SupplierTxService {
       await prisma.supplierTransactionItem.create({
         data: {
           supplierTransactionId: newTx.supplierTransactionId,
-          catalogItemId: BigInt(item.catalogItemId),
+          equipmentItemId: BigInt(item.equipmentItemId),
           quantity: item.quantity,
           unitCost: item.unitPrice,
         }
@@ -53,30 +89,7 @@ class SupplierTxService {
         })));
       }
 
-      // BR-16-04: Creates or updates SupplierDebt automatically
-      const existingDebt = await prismaTx.supplierDebt.findFirst({
-        where: { supplierId: tx.supplierId, status: { in: ['open', 'partial'] } },
-      });
-
-      if (existingDebt) {
-        await prismaTx.supplierDebt.update({
-          where: { debtId: existingDebt.debtId },
-          data: {
-            amount: Number(existingDebt.amount) + Number(tx.totalCost),
-            status: 'open',
-          },
-        });
-      } else {
-        await prismaTx.supplierDebt.create({
-          data: {
-            supplierId: tx.supplierId,
-            supplierTransactionId: tx.supplierTransactionId,
-            amount: tx.totalCost,
-            paidAmount: 0,
-            status: 'open',
-          },
-        });
-      }
+      // BR-16-04: Creates or updates SupplierDebt automatically - REMOVED in new schema
     });
   }
 
@@ -100,43 +113,53 @@ class SupplierTxService {
     }
   }
 
-  public async getSupplierDebts(page: number, limit: number, status?: string, supplierId?: string) {
-    const skip = (page - 1) * limit;
-    const whereClause: any = {};
-    if (status) whereClause.status = status;
-    if (supplierId) whereClause.supplierId = BigInt(supplierId);
+  public async updateSupplierTxStatus(id: string, status: string, evidenceUrls: string[], userId: string) {
+    await prisma.supplierTransaction.update({
+      where: { supplierTransactionId: BigInt(id) },
+      data: { status },
+    });
 
-    const [debts, totalCount] = await Promise.all([
-      prisma.supplierDebt.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: { updatedAt: 'desc' },
-      }),
-      prisma.supplierDebt.count({ where: whereClause }),
-    ]);
-
-    return { debts, totalCount };
+    if (evidenceUrls && Array.isArray(evidenceUrls)) {
+      await Promise.all(evidenceUrls.map(url => prisma.evidence.create({
+        data: {
+          refType: 'SupplierTransaction',
+          refId: BigInt(id),
+          fileUrl: url,
+          uploadedBy: BigInt(userId)
+        }
+      })));
+    }
   }
 
-  public async paySupplierDebt(id: string, amount: number) {
-    const debt = await prisma.supplierDebt.findUnique({ where: { debtId: BigInt(id) } });
-    if (!debt) throw new AppError('Debt not found', 404);
+  public async paySupplierTransaction(id: string, amount: number, paymentRef: string, userId: string) {
+    await prisma.$transaction(async (prismaTx) => {
+      const tx = await prismaTx.supplierTransaction.findUnique({
+        where: { supplierTransactionId: BigInt(id) }
+      });
+      if (!tx) throw new AppError('Supplier transaction not found', 404);
 
-    const remaining = Number(debt.amount) - Number(debt.paidAmount);
-    if (amount > remaining) {
-      throw new AppError('Payment amount exceeds remaining debt.', 400, 'MSG-UC16-05');
-    }
+      await prismaTx.supplierPayment.create({
+        data: {
+          supplierTransactionId: BigInt(id),
+          amount,
+          paidAt: new Date(),
+          recordedBy: BigInt(userId),
+          note: paymentRef
+        }
+      });
 
-    const newPaid = Number(debt.paidAmount) + amount;
-    const newStatus = newPaid >= Number(debt.amount) ? 'paid' : 'partial';
+      const newPaidAmount = tx.paidAmount.toNumber() + amount;
+      const totalCost = tx.totalCost.toNumber();
+      let paymentStatus = 'partial';
+      if (newPaidAmount >= totalCost) paymentStatus = 'paid';
 
-    await prisma.supplierDebt.update({
-      where: { debtId: BigInt(id) },
-      data: {
-        paidAmount: newPaid,
-        status: newStatus,
-      },
+      await prismaTx.supplierTransaction.update({
+        where: { supplierTransactionId: BigInt(id) },
+        data: {
+          paidAmount: newPaidAmount,
+          paymentStatus
+        }
+      });
     });
   }
 }

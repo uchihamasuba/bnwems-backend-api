@@ -10,7 +10,39 @@ class PaymentService {
     });
     
     // Manual mapping for evidences if needed, or just return payments
-    return payments;
+    return payments.map(p => ({
+      ...p,
+      paymentId: p.paymentId.toString(),
+      paymentRequestId: p.paymentRequestId?.toString(),
+      orderId: p.orderId.toString(),
+      confirmedBy: p.confirmedBy?.toString()
+    }));
+  }
+
+  public async getPaymentRequestById(id: string) {
+    const pr = await prisma.paymentRequest.findUnique({
+      where: { paymentRequestId: BigInt(id) }
+    });
+    
+    if (!pr) throw new AppError('Payment request not found', 404);
+    
+    const payments = await prisma.payment.findMany({
+      where: { paymentRequestId: BigInt(id) }
+    });
+    
+    return {
+      ...pr,
+      paymentRequestId: pr.paymentRequestId.toString(),
+      orderId: pr.orderId.toString(),
+      createdBy: pr.createdBy?.toString(),
+      payments: payments.map(p => ({
+        ...p,
+        paymentId: p.paymentId.toString(),
+        paymentRequestId: p.paymentRequestId?.toString(),
+        orderId: p.orderId.toString(),
+        confirmedBy: p.confirmedBy?.toString()
+      }))
+    };
   }
 
   public async requestPayment(finalOrderId: string, amount: number, paymentType: string, paymentMethod: string, userId: string) {

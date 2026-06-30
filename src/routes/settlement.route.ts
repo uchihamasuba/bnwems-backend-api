@@ -6,8 +6,9 @@ export const nestedSettlementRouter = Router({ mergeParams: true });
 nestedSettlementRouter.use(authenticate);
 
 import { validate } from '../middlewares/validate.middleware';
-import { recordSettlementSchema, confirmSettlementSchema } from '../validators/settlement.validator';
+import { recordSettlementSchema, confirmSettlementSchema, getSettlementByOrderSchema } from '../validators/settlement.validator';
 
+nestedSettlementRouter.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getSettlementByOrderSchema), settlementController.getSettlementByOrder);
 nestedSettlementRouter.post('/', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(recordSettlementSchema), settlementController.recordSettlement);
 
 export const settlementRouter = Router();

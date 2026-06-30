@@ -41,9 +41,12 @@ export const updateTaskSchema = z.object({
   }),
 });
 
-export const deleteTaskSchema = z.object({
+export const cancelTaskSchema = z.object({
   params: z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+  body: z.object({
+    status: z.enum(['cancelled', 'deleted']),
   }),
 });
 
@@ -78,5 +81,14 @@ export const viewSurveyReportSchema = z.object({
 export const viewPickListSchema = z.object({
   params: z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});
+
+export const reviewSurveyReportSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+  body: z.object({
+    status: z.enum(['approved', 'rejected']),
   }),
 });

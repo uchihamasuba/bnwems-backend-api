@@ -45,3 +45,15 @@ export const closeOrderSchema = z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
+
+export const getOrderEvidencesSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});
+
+export const getMobileSummarySchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});

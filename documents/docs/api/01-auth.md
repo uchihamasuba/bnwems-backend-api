@@ -17,7 +17,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 - **Description:** Authenticates an internal user and issues a JWT token.
 - **Business Rules:**
   - BR-01-01: Must validate username and password against `InternalUser` table.
-  - BR-01-02: User `status` must be `ACTIVE`. If `LOCKED` or `INACTIVE`, return error `MSG-UC01-03`.
+  - BR-01-02: User `status` must be `active`. If inactive, return error `MSG-UC01-03`.
   - BR-01-03: On success, log activity in `AuditLog`.
 - **Request Body:**
 ```json
@@ -30,6 +30,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
+  "code": "MSG-AU-00",
   "message": "Login successful",
   "data": {
     "token": "eyJhbGciOiJIUzI1...",
@@ -38,6 +39,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
       "userId": 1,
       "username": "adminUser",
       "fullName": "System Admin",
+      "avatarUrl": "https://example.com/avatar.jpg",
+      "bio": "System Administrator",
       "role": {
         "roleId": 1,
         "roleName": "Admin"
@@ -56,6 +59,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
+  "code": "MSG-AU-00",
   "message": "Logged out successfully."
 }
 ```
@@ -73,6 +77,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
+  "code": "MSG-AU-00",
   "message": "If the account exists, a recovery email has been sent."
 }
 ```
@@ -96,6 +101,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
+  "code": "MSG-AU-00",
   "message": "Password changed successfully."
 }
 ```
@@ -108,10 +114,15 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
+  "code": "MSG-AU-00",
   "data": {
     "userId": 1,
     "username": "adminUser",
     "fullName": "System Admin",
+    "email": "admin@example.com",
+    "phone": "+123456789",
+    "avatarUrl": "https://example.com/avatar.jpg",
+    "bio": "System Administrator",
     "role": {
       "roleId": 1,
       "roleName": "Admin"
@@ -120,5 +131,119 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
     "createdAt": "2026-06-22T10:00:00Z",
     "updatedAt": "2026-06-22T10:00:00Z"
   }
+}
+```
+
+### 6. `PUT /api/v1/auth/profile`
+- **Use Case:** UC 2.2 - Update Profile
+- **Description:** Allows the authenticated user to update their personal profile information, including their avatar.
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "fullName": "System Admin Updated",
+  "phone": "+1234567890",
+  "bio": "Updated System Administrator",
+  "avatarUrl": "https://example.com/new-avatar.jpg"
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-00",
+  "message": "Profile updated successfully.",
+  "data": {
+    "userId": 1,
+    "username": "adminUser",
+    "fullName": "System Admin Updated",
+    "email": "admin@example.com",
+    "phone": "+1234567890",
+    "avatarUrl": "https://example.com/new-avatar.jpg",
+    "bio": "Updated System Administrator",
+    "role": {
+      "roleId": 1,
+      "roleName": "Admin"
+    },
+    "status": "active",
+    "createdAt": "2026-06-22T10:00:00Z",
+    "updatedAt": "2026-06-22T10:00:00Z"
+  }
+}
+```
+
+### 7. `POST /api/v1/auth/device-token`
+- **Use Case:** UC 7 - Register Device Token
+- **Description:** Registers or updates a device token (e.g., FCM token) for the authenticated user to receive push notifications.
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "deviceToken": "fcm_token_string_here",
+  "deviceType": "android" 
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-00",
+  "message": "Device token registered successfully."
+}
+```
+
+### 8. `GET /api/v1/notifications`
+- **Use Case:** UC 7 - View Notifications
+- **Description:** Retrieves a paginated list of notifications for the authenticated user.
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Params:** `?page=1&limit=20`
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-00",
+  "data": [
+    {
+      "notificationId": 1,
+      "title": "New Order Assigned",
+      "body": "You have been assigned to Order #ORD-010.",
+      "type": "ORDER_ASSIGNMENT",
+      "referenceId": 10,
+      "isRead": false,
+      "createdAt": "2026-06-22T10:05:00Z"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "total_pages": 1
+  }
+}
+```
+
+### 9. `PUT /api/v1/notifications/:id/read`
+- **Use Case:** UC 7 - Mark Notification as Read
+- **Description:** Marks a specific notification as read.
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-00",
+  "message": "Notification marked as read."
+}
+```
+
+### 10. `PUT /api/v1/notifications/read-all`
+- **Use Case:** UC 7 - Mark All Notifications as Read
+- **Description:** Marks all unread notifications for the user as read.
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-00",
+  "message": "All notifications marked as read."
 }
 ```

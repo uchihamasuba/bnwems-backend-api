@@ -6,6 +6,12 @@ export const getPaymentsByOrderSchema = z.object({
   }),
 });
 
+export const getPaymentRequestByIdSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});
+
 export const requestPaymentSchema = z.object({
   params: z.object({
     orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),

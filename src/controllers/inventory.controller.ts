@@ -4,12 +4,11 @@ import { inventoryService } from '../services/inventory.service';
 
 export const getInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const warehouseId = req.query.warehouseId as string;
-    const catalogItemId = req.query.catalogItemId as string;
+    const equipmentItemId = req.query.equipmentItemId as string;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
-    const { inventory, totalCount } = await inventoryService.getInventory(warehouseId, catalogItemId, page, limit);
+    const { inventory, totalCount } = await inventoryService.getInventory(equipmentItemId, page, limit);
 
     res.status(200).json({
       success: true,
@@ -46,6 +45,52 @@ export const reserveInventory = async (req: AuthRequest, res: Response, next: Ne
     res.status(200).json({
       success: true,
       message: 'Inventory successfully reserved.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInventoryReports = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const reportType = req.query.reportType as string;
+
+    const { reports, totalCount } = await inventoryService.getInventoryReports(reportType, page, limit);
+
+    res.status(200).json({
+      success: true,
+      data: reports,
+      meta: { page, limit, totalCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const checkoutInventory = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const actionUserId = req.user!.userId;
+    await inventoryService.checkoutInventory(req.body, actionUserId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Items checked out successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const returnInventory = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const actionUserId = req.user!.userId;
+    await inventoryService.returnInventory(req.body, actionUserId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Items returned to inventory.',
     });
   } catch (error) {
     next(error);

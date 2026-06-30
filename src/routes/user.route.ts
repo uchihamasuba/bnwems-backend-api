@@ -13,7 +13,7 @@ router.use(authorizeRoles('ADMIN'));
 router.get('/', validate(getUsersSchema), userController.getUsers);
 router.post('/', validate(createUserSchema), userController.createUser);
 router.put('/:id', validate(updateUserSchema), userController.updateUser);
-router.put('/:id/status', validate(updateStatusSchema), userController.updateStatus);
+router.patch('/:id/status', validate(updateStatusSchema), userController.updateStatus);
 router.post('/:id/reset-password', validate(resetPasswordSchema), userController.resetPassword);
 
 export default router;

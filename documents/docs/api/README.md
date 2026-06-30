@@ -47,6 +47,7 @@
 > - `MSG-PM`: Payment & Settlement
 > - `MSG-MO`: Mobile (Tiến độ hiện trường)
 > - `MSG-RP`: Report
+> - `MSG-UF`: Upload File
 
 ### A.3 Envelope lỗi
 
@@ -156,9 +157,9 @@ Copy khối dưới đây cho từng endpoint. Endpoint đơn giản (login, lis
 |---|------|-----------|----|----------|-----------|
 | 01 | [01-auth.md](./01-auth.md) | Xác thực, hồ sơ, thông báo | 1–5, 7 | Web + Mobile | _(chưa phân)_ |
 | 02 | [02-users-roles.md](./02-users-roles.md) | Người dùng, vai trò, quyền | 8–18 | Web | _(chưa phân)_ |
-| 03 | [03-catalog.md](./03-catalog.md) | Danh mục thiết bị/dịch vụ + giá | 19–27 | Web | _(chưa phân)_ |
-| 04 | [04-suppliers.md](./04-suppliers.md) | Nhà cung cấp + giao dịch/công nợ NCC | 28–31, 71–74 | Web | _(chưa phân)_ |
-| 05 | [05-warehouse-inventory.md](./05-warehouse-inventory.md) | Kho + tồn kho + xuất/hoàn trả | 32–33, 66–70 | Web | _(chưa phân)_ |
+| 03 | [03-catalog.md](./03-catalog.md) | Danh mục thiết bị (Equipment) + giá | 19–27 | Web | _(chưa phân)_ |
+| 04 | [04-suppliers.md](./04-suppliers.md) | Nhà cung cấp + giao dịch/thanh toán NCC | 28–31, 71–74 | Web | _(chưa phân)_ |
+| 05 | [05-warehouse-inventory.md](./05-warehouse-inventory.md) | Tồn kho + kiểm soát xuất/hoàn trả | 32–33, 66–70 | Web | _(chưa phân)_ |
 | 06 | [06-policies-wage.md](./06-policies-wage.md) | Chính sách + quy tắc lương | 34–38 | Web | _(chưa phân)_ |
 | 07 | [07-customers.md](./07-customers.md) | Khách hàng | 47–49 | Web | _(chưa phân)_ |
 | 08 | [08-quotations.md](./08-quotations.md) | Báo giá | 50–52 | Web | _(chưa phân)_ |
@@ -167,5 +168,6 @@ Copy khối dưới đây cho từng endpoint. Endpoint đơn giản (login, lis
 | 11 | [11-payments-settlement.md](./11-payments-settlement.md) | Thanh toán + quyết toán | 83–87 | Web | _(chưa phân)_ |
 | 12 | [12-mobile-field-ops.md](./12-mobile-field-ops.md) | App mobile (Leader/Tech) | 88–107 | Mobile | _(chưa phân)_ |
 | 13 | [13-reports.md](./13-reports.md) | Báo cáo + dashboard quản trị | 39A, 40–46 | Web | _(chưa phân)_ |
+| 14 | [14-file-upload.md](./14-file-upload.md) | Tiện ích hệ thống (Upload file/ảnh) | All | Web + Mobile | _(chưa phân)_ |
 
 > **Quy ước trạng thái** trong từng file: ⬜ chưa viết · 🟡 đang viết · ✅ xong.

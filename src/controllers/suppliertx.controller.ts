@@ -2,6 +2,40 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { supplierTxService } from '../services/suppliertx.service';
 
+export const getSupplierTransactions = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const supplierId = req.query.supplierId as string;
+    const orderId = req.query.orderId as string;
+    const status = req.query.status as string;
+
+    const { transactions, totalCount } = await supplierTxService.getSupplierTransactions(page, limit, supplierId, orderId, status);
+
+    res.status(200).json({
+      success: true,
+      data: transactions,
+      meta: { page, limit, totalCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSupplierTransactionById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const transaction = await supplierTxService.getSupplierTransactionById(id);
+
+    res.status(200).json({
+      success: true,
+      data: transaction,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createSupplierTransaction = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
@@ -51,34 +85,34 @@ export const returnSupplierItems = async (req: AuthRequest, res: Response, next:
   }
 };
 
-export const getSupplierDebts = async (req: Request, res: Response, next: NextFunction) => {
+export const updateSupplierTxStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const { status, supplierId } = req.query;
+    const { id } = req.params;
+    const { status, evidenceUrls } = req.body;
+    const userId = req.user!.userId;
 
-    const { debts, totalCount } = await supplierTxService.getSupplierDebts(page, limit, status as string, supplierId as string);
+    await supplierTxService.updateSupplierTxStatus(id, status, evidenceUrls, userId);
 
     res.status(200).json({
       success: true,
-      data: debts,
-      meta: { page, limit, totalCount },
+      message: 'Supplier transaction status updated.',
     });
   } catch (error) {
     next(error);
   }
 };
 
-export const paySupplierDebt = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const paySupplierTransaction = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { amount } = req.body;
+    const { amount, paymentRef } = req.body;
+    const userId = req.user!.userId;
 
-    await supplierTxService.paySupplierDebt(id, amount);
+    await supplierTxService.paySupplierTransaction(id, amount, paymentRef, userId);
 
     res.status(200).json({
       success: true,
-      message: 'Payment recorded successfully.',
+      message: 'Supplier payment recorded successfully.',
     });
   } catch (error) {
     next(error);

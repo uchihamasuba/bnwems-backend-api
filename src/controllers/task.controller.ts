@@ -71,14 +71,16 @@ export const updateTask = async (req: AuthRequest, res: Response, next: NextFunc
   }
 };
 
-export const deleteTask = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const cancelTask = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const { status } = req.body;
 
-    await taskService.deleteTask(id);
+    await taskService.cancelTask(id, status);
 
     res.status(200).json({
       success: true,
+      code: 'MSG-SV-00',
       message: 'Task deleted.',
     });
   } catch (error) {
@@ -143,6 +145,23 @@ export const viewPickList = async (req: AuthRequest, res: Response, next: NextFu
     res.status(200).json({
       success: true,
       data: items,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reviewSurveyReport = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const userId = req.user!.userId;
+
+    await taskService.reviewSurveyReport(id, status, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Survey report reviewed successfully.',
     });
   } catch (error) {
     next(error);

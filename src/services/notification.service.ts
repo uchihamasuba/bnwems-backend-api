@@ -37,6 +37,13 @@ class NotificationService {
       data: { isRead: true },
     });
   }
+
+  public async markAllAsRead(userId: string) {
+    await prisma.notification.updateMany({
+      where: { userId: BigInt(userId), isRead: false },
+      data: { isRead: true },
+    });
+  }
 }
 
 export const notificationService = new NotificationService();

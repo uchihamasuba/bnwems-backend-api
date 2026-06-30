@@ -1,8 +1,8 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
 
-class CatalogService {
-  public async getCatalogItems(page: number, limit: number, search?: string, category?: string, status?: string) {
+class EquipmentService {
+  public async getEquipments(page: number, limit: number, search?: string, category?: string, status?: string) {
     const skip = (page - 1) * limit;
 
     const whereClause: any = {};
@@ -13,37 +13,37 @@ class CatalogService {
     if (status) whereClause.status = status;
 
     const [items, totalCount] = await Promise.all([
-      prisma.catalogItem.findMany({
+      prisma.equipment.findMany({
         where: whereClause,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.catalogItem.count({ where: whereClause }),
+      prisma.equipment.count({ where: whereClause }),
     ]);
 
     return { items, totalCount };
   }
 
-  public async getCatalogItemById(id: string) {
-    const item = await prisma.catalogItem.findUnique({ where: { catalogItemId: BigInt(id) } });
+  public async getEquipmentById(id: string) {
+    const item = await prisma.equipment.findUnique({ where: { equipmentItemId: BigInt(id) } });
     if (!item) {
-      throw new AppError('Catalog item not found.', 404);
+      throw new AppError('Equipment item not found.', 404);
     }
     return item;
   }
 
-  public async createCatalogItem(data: any, actionUserId: string) {
-    const { code, name, category, unit, currentRentalPrice, currentCost, replacementValue } = data;
+  public async createEquipment(data: any, actionUserId: string) {
+    const { code, name, category, unit, rentalPrice, costPrice, replacementValue } = data;
 
-    const newItem = await prisma.catalogItem.create({
+    const newItem = await prisma.equipment.create({
       data: { 
         code: code || `ITM-${Date.now()}`,
         name, 
         category, 
         unit, 
-        currentRentalPrice, 
-        currentCost, 
+        rentalPrice, 
+        costPrice, 
         replacementValue,
         status: 'active'
       },
@@ -53,26 +53,26 @@ class CatalogService {
       data: {
         userId: BigInt(actionUserId),
         action: 'CREATE_CATALOG_ITEM',
-        entityType: 'CatalogItem',
-        entityId: newItem.catalogItemId,
+        entityType: 'Equipment',
+        entityId: newItem.equipmentItemId,
       },
     });
 
     return newItem;
   }
 
-  public async updateCatalogItem(id: string, data: any, actionUserId: string) {
-    const { code, name, category, unit, currentRentalPrice, currentCost, replacementValue } = data;
+  public async updateEquipment(id: string, data: any, actionUserId: string) {
+    const { code, name, category, unit, rentalPrice, costPrice, replacementValue } = data;
 
-    const item = await prisma.catalogItem.update({
-      where: { catalogItemId: BigInt(id) },
+    const item = await prisma.equipment.update({
+      where: { equipmentItemId: BigInt(id) },
       data: { 
         ...(code && { code }),
         ...(name && { name }), 
         ...(category && { category }),
         ...(unit && { unit }),
-        ...(currentRentalPrice !== undefined && { currentRentalPrice }),
-        ...(currentCost !== undefined && { currentCost }),
+        ...(rentalPrice !== undefined && { rentalPrice }),
+        ...(costPrice !== undefined && { costPrice }),
         ...(replacementValue !== undefined && { replacementValue })
       },
     });
@@ -81,7 +81,7 @@ class CatalogService {
       data: {
         userId: BigInt(actionUserId),
         action: 'UPDATE_CATALOG_ITEM',
-        entityType: 'CatalogItem',
+        entityType: 'Equipment',
         entityId: BigInt(id),
       },
     });
@@ -89,9 +89,9 @@ class CatalogService {
     return item;
   }
 
-  public async deactivateCatalogItem(id: string, status: string, actionUserId: string) {
-    await prisma.catalogItem.update({
-      where: { catalogItemId: BigInt(id) },
+  public async deactivateEquipment(id: string, status: string, actionUserId: string) {
+    await prisma.equipment.update({
+      where: { equipmentItemId: BigInt(id) },
       data: { status },
     });
 
@@ -99,11 +99,11 @@ class CatalogService {
       data: {
         userId: BigInt(actionUserId),
         action: 'DEACTIVATE_CATALOG_ITEM',
-        entityType: 'CatalogItem',
+        entityType: 'Equipment',
         entityId: BigInt(id),
       },
     });
   }
 }
 
-export const catalogService = new CatalogService();
+export const equipmentService = new EquipmentService();

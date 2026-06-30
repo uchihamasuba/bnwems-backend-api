@@ -20,12 +20,13 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   - `page` (number, default 1)
   - `limit` (number, default 20)
   - `search` (string, optional) - searches username or fullName
-  - `role` (enum, optional) - ADMIN, MANAGER, LEADER_STAFF, TECHNICAL_STAFF
-  - `status` (enum, optional) - ACTIVE, INACTIVE, LOCKED
+  - `role` (enum, optional) - Admin, Manager, Leader Staff, Technical Staff
+  - `status` (enum, optional) - active, inactive
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-US-00",
   "data": [
     {
       "userId": 1,
@@ -59,13 +60,18 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   "username": "user1",
   "password": "InitialPassword123!",
   "fullName": "Manager One",
-  "roleId": 2
+  "roleId": 2,
+  "email": "user1@company.vn",
+  "phone": "0900000000",
+  "bio": "Events Manager",
+  "avatarUrl": "https://example.com/avatar.jpg"
 }
 ```
 - **Response (201 Created):**
 ```json
 {
   "success": true,
+  "code": "MSG-US-00",
   "message": "User created successfully",
   "data": {
     "userId": 2,
@@ -90,18 +96,23 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 ```json
 {
   "fullName": "Manager Two",
-  "roleId": 2
+  "roleId": 2,
+  "email": "user2@company.vn",
+  "phone": "0900000002",
+  "bio": "Senior Events Manager",
+  "avatarUrl": "https://example.com/avatar-updated.jpg"
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-US-00",
   "message": "User updated successfully"
 }
 ```
 
-### `PUT /api/v1/users/:id/status`
+### `PATCH /api/v1/users/:id/status`
 - **Use Case:** UC 2.4 - Deactivate/Reactivate User
 - **Description:** Changes the status of a user. Admin access required.
 - **Request Body:**
@@ -114,6 +125,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 ```json
 {
   "success": true,
+  "code": "MSG-US-00",
   "message": "User status updated successfully"
 }
 ```
@@ -131,6 +143,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 ```json
 {
   "success": true,
+  "code": "MSG-US-00",
   "message": "User password reset successfully"
 }
 ```
@@ -142,18 +155,26 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 - **Description:** Retrieves paginated notifications for the currently authenticated user.
 - **Query Parameters:** 
   - `isRead` (boolean, optional)
+  - `scope` (enum, optional) - manager (để lấy thông báo chuyên biệt/chuẩn cho Manager)
   - `page` (number, default 1)
   - `limit` (number, default 20)
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-US-00",
   "data": [
     {
       "notificationId": 1,
+      "type": "task",
       "title": "New Assignment",
       "content": "You have been assigned to task T123",
+      "priority": "normal",
+      "targetScreen": "task_detail",
+      "targetRefType": "work_task",
+      "targetRefId": 1,
       "isRead": false,
+      "pushStatus": "sent",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -174,6 +195,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 ```json
 {
   "success": true,
+  "code": "MSG-US-00",
   "message": "Notification marked as read."
 }
 ```

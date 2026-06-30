@@ -23,3 +23,21 @@ export const changePasswordSchema = z.object({
     path: ['confirmNewPassword'],
   }),
 });
+
+export const updateProfileSchema = z.object({
+  body: z.object({
+    fullName: z.string().min(1, 'Full name is required').optional(),
+    phone: z.string().optional(),
+    bio: z.string().optional(),
+    avatarUrl: z.string().optional(),
+  }),
+});
+
+export const registerDeviceTokenSchema = z.object({
+  body: z.object({
+    deviceToken: z.string().min(1, 'Device token is required'),
+    deviceType: z.enum(['android', 'ios', 'web'], {
+      message: 'Device type must be android, ios, or web',
+    }),
+  }),
+});

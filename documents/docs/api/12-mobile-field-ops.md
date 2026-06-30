@@ -1,4 +1,4 @@
-# Operations & Field Work: Mobile Field Operations
+﻿# Operations & Field Work: Mobile Field Operations
 
 ## Overview
 This module aggregates endpoints primarily consumed by the Mobile App for field operations.
@@ -24,11 +24,12 @@ It covers:
 - **Description:** Mobile staff views their assigned tasks.
 - **Query Parameters:**
   - `date` (string, format YYYY-MM-DD, optional)
-  - `status` (enum, optional) - PENDING, IN_PROGRESS
+  - `status` (enum, optional) - pending, in_progress
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-MO-00",
   "data": [
     {
       "workTaskId": 1,
@@ -50,9 +51,10 @@ It covers:
 ```json
 {
   "success": true,
+  "code": "MSG-MO-00",
   "data": [
     {
-      "catalogItemId": 1,
+      "equipmentItemId": 1,
       "itemName": "Standard Speaker",
       "quantity": 10
     }
@@ -76,6 +78,7 @@ It covers:
 ```json
 {
   "success": true,
+  "code": "MSG-MO-00",
   "message": "Survey report submitted."
 }
 ```
@@ -84,7 +87,7 @@ It covers:
 - **Use Case:** UC 2.25 - Update Field Progress
 - **Description:** Leader staff updates the progress status of a task.
 - **Business Rules:**
-  - BR-25-01: Updating to `IN_PROGRESS` sets `actualStart`. Updating to `COMPLETED` sets `actualEnd`.
+  - BR-25-01: Updating to `in_progress` sets `actualStart`. Updating to `completed` sets `actualEnd`.
 - **Request Body:**
 ```json
 {
@@ -96,26 +99,50 @@ It covers:
 ```json
 {
   "success": true,
+  "code": "MSG-MO-00",
   "message": "Task progress updated."
 }
 ```
 
-### `GET /api/v1/orders/field-progress`
-- **Use Case:** UC 2.18 - Monitor Field Operation Progress
-- **Description:** Manager view to monitor real-time updates from field staff.
+### `GET /api/v1/orders/:id/field-progress`
+- **Use Case:** Field Task Progress Tracking
+- **Description:** Xem timeline tiến độ xuất kho, vận chuyển, lắp đặt, bàn giao, thu hồi, hoàn kho theo đơn hàng.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-MO-00",
   "data": [
     {
-      "orderId": 1,
-      "currentTask": "installation",
+      "taskType": "preparation",
+      "status": "completed",
+      "updatedAt": "2026-10-14T10:00:00Z"
+    },
+    {
+      "taskType": "delivery",
       "status": "in_progress",
-      "lastUpdate": "2026-06-22T08:30:00Z"
+      "updatedAt": "2026-10-14T11:30:00Z"
     }
-  ],
-  "meta": { "totalCount": 12 }
+  ]
+}
+```
+
+### `GET /api/v1/orders/:id/mobile-summary`
+- **Use Case:** Order Status Checking
+- **Description:** Gom trạng thái đơn hàng, thanh toán, và vận hành phục vụ cho màn hình tổng quan đơn của mobile.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-MO-00",
+  "data": {
+    "orderId": 1,
+    "orderNumber": "ORD-2026-0001",
+    "status": "in_progress",
+    "paymentStatus": "deposit_paid",
+    "fieldOperationStatus": "delivery_in_progress",
+    "nextAction": "Confirm Delivery"
+  }
 }
 ```
 
@@ -136,6 +163,7 @@ It covers:
 ```json
 {
   "success": true,
+  "code": "MSG-MO-00",
   "message": "Handover record created."
 }
 ```
@@ -144,7 +172,7 @@ It covers:
 - **Use Case:** UC 2.28 - Record Damage/Loss Report
 - **Description:** Leader staff records any damaged or lost items during collection/return.
 - **Business Rules:**
-  - BR-28-01: Must specify responsible party (CUSTOMER or STAFF).
+  - BR-28-01: Must specify responsible party (customer or staff).
   - BR-28-02: Requires evidence.
 - **Request Body:**
 ```json
@@ -152,10 +180,10 @@ It covers:
   "reportDetails": {
     "items": [
       {
-        "catalogItemId": 1,
+        "equipmentItemId": 1,
         "quantity": 1,
         "type": "damaged",
-        "responsible": "staff",
+        "responsibleParty": "staff",
         "responsibleUserId": 1
       }
     ]
@@ -167,6 +195,7 @@ It covers:
 ```json
 {
   "success": true,
+  "code": "MSG-MO-00",
   "message": "Damage/Loss report submitted successfully."
 }
 ```

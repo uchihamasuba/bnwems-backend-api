@@ -46,10 +46,10 @@ class ReportService {
       select: { orderId: true, status: true },
     });
 
-    const debts = await prisma.supplierDebt.findMany({
-      where: { status: { in: ['unpaid', 'partially_paid'] } },
+    const debts = await prisma.supplierTransaction.findMany({
+      where: { paymentStatus: { in: ['unpaid', 'partial'] } },
     });
-    const unpaidSupplierDebt = debts.reduce((sum, d) => sum + (Number(d.amount) - Number(d.paidAmount)), 0);
+    const unpaidSupplierDebt = debts.reduce((sum: number, d: any) => sum + (Number(d.totalCost) - Number(d.paidAmount)), 0);
 
     return {
       activeOrders: activeOrdersCount,
@@ -72,20 +72,20 @@ class ReportService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const activitiesToday = await prisma.scheduleActivity.findMany({
+    const activitiesToday = await prisma.schedule.findMany({
       where: {
-        plannedStart: {
+        plannedDate: {
           gte: new Date(today.setHours(0,0,0,0)),
           lt: new Date(tomorrow.setHours(0,0,0,0)),
         },
       },
     });
     
-    const activityIds = activitiesToday.map(a => a.activityId);
+    const activityIds = activitiesToday.map((a: any) => a.scheduleId);
 
     const tasksToday = await prisma.workTask.count({
       where: {
-        scheduleActivityId: { in: activityIds }
+        scheduleId: { in: activityIds }
       }
     });
 

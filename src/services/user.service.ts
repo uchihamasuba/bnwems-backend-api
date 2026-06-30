@@ -48,7 +48,7 @@ class UserService {
   }
 
   public async createUser(data: any, actionUserId: string) {
-    const { username, password, fullName, roleId } = data;
+    const { username, password, fullName, roleId, email, phone, bio, avatarUrl } = data;
 
     const existingUser = await prisma.internalUser.findUnique({ where: { username } });
     if (existingUser) {
@@ -63,6 +63,10 @@ class UserService {
         passwordHash,
         fullName,
         roleId: BigInt(roleId),
+        email,
+        phone,
+        bio,
+        avatarUrl,
       },
       include: {
         role: true
@@ -91,13 +95,17 @@ class UserService {
   }
 
   public async updateUser(id: string, data: any, actionUserId: string) {
-    const { fullName, roleId } = data;
+    const { fullName, roleId, email, phone, bio, avatarUrl } = data;
 
     const updatedUser = await prisma.internalUser.update({
       where: { userId: BigInt(id) },
       data: { 
         ...(fullName && { fullName }), 
-        ...(roleId && { roleId: BigInt(roleId) }) 
+        ...(roleId && { roleId: BigInt(roleId) }),
+        ...(email !== undefined && { email }),
+        ...(phone !== undefined && { phone }),
+        ...(bio !== undefined && { bio }),
+        ...(avatarUrl !== undefined && { avatarUrl }),
       },
     });
 

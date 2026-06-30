@@ -17,6 +17,21 @@ export const getPaymentsByOrder = async (req: Request, res: Response, next: Next
   }
 };
 
+export const getPaymentRequestById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    
+    const request = await paymentService.getPaymentRequestById(id);
+
+    res.status(200).json({
+      success: true,
+      data: request,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const requestPayment = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const finalOrderId = req.params.orderId || req.body.orderId;

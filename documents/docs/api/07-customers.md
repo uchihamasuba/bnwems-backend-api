@@ -1,4 +1,4 @@
-# Sales & Customer Lifecycle: Customer Management
+﻿# Sales & Customer Lifecycle: Customer Management
 
 ## Overview
 This module handles **UC 2.9 (Customer Management)**.
@@ -23,6 +23,7 @@ It deals with the registration, retrieval, and updating of `Customer` records. C
 ```json
 {
   "success": true,
+  "code": "MSG-CU-00",
   "data": [
     {
       "customerId": 1,
@@ -44,6 +45,7 @@ It deals with the registration, retrieval, and updating of `Customer` records. C
 ```json
 {
   "success": true,
+  "code": "MSG-CU-00",
   "data": {
     "customerId": 1,
     "fullName": "Jane Doe",
@@ -75,6 +77,7 @@ It deals with the registration, retrieval, and updating of `Customer` records. C
 ```json
 {
   "success": true,
+  "code": "MSG-CU-00",
   "message": "Customer registered successfully.",
   "data": { "customerId": 1 }
 }
@@ -95,6 +98,7 @@ It deals with the registration, retrieval, and updating of `Customer` records. C
 ```json
 {
   "success": true,
+  "code": "MSG-CU-00",
   "message": "Customer updated successfully."
 }
 ```

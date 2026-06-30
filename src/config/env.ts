@@ -19,6 +19,11 @@ const envSchema = z.object({
   LOCK_DURATION_MINUTES: z.string().transform(Number).default(15),
   
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
+
+  FIREBASE_PROJECT_ID: z.string().min(1, 'FIREBASE_PROJECT_ID is required').optional(),
+  FIREBASE_CLIENT_EMAIL: z.string().min(1, 'FIREBASE_CLIENT_EMAIL is required').optional(),
+  FIREBASE_PRIVATE_KEY: z.string().min(1, 'FIREBASE_PRIVATE_KEY is required').optional(),
+  FIREBASE_STORAGE_BUCKET: z.string().min(1, 'FIREBASE_STORAGE_BUCKET is required').optional(),
 });
 
 // Validate the environment variables

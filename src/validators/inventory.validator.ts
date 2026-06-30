@@ -20,8 +20,37 @@ export const reserveInventorySchema = z.object({
   body: z.object({
     orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
     items: z.array(z.object({
-      catalogItemId: z.string().regex(/^\d+$/, 'Invalid ID format'),
+      equipmentItemId: z.string().regex(/^\d+$/, 'Invalid ID format'),
       quantity: z.number().int().positive('Quantity must be positive'),
     })).min(1, 'Items cannot be empty'),
+  }),
+});
+
+export const getInventoryReportsSchema = z.object({
+  query: z.object({
+    reportType: z.enum(['checkout', 'return', 'adjustment', 'damage_loss']).optional(),
+    page: z.string().regex(/^\d+$/).optional(),
+    limit: z.string().regex(/^\d+$/).optional(),
+  }),
+});
+
+export const checkoutInventorySchema = z.object({
+  body: z.object({
+    orderId: z.number().int().positive(),
+    items: z.array(z.object({
+      equipmentItemId: z.number().int().positive(),
+      quantity: z.number().int().positive(),
+    })).min(1),
+  }),
+});
+
+export const returnInventorySchema = z.object({
+  body: z.object({
+    orderId: z.number().int().positive(),
+    items: z.array(z.object({
+      equipmentItemId: z.number().int().positive(),
+      quantity: z.number().int().positive(),
+      condition: z.enum(['good', 'damaged', 'lost']).optional(),
+    })).min(1),
   }),
 });

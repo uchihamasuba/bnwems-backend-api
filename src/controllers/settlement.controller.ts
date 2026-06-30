@@ -35,3 +35,17 @@ export const confirmSettlement = async (req: AuthRequest, res: Response, next: N
     next(error);
   }
 };
+
+export const getSettlementByOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orderId } = req.params;
+    const settlement = await settlementService.getSettlementByOrder(orderId);
+
+    res.status(200).json({
+      success: true,
+      data: settlement,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

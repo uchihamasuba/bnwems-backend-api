@@ -75,3 +75,36 @@ export const profile = async (req: AuthRequest, res: Response, next: NextFunctio
     next(error);
   }
 };
+
+export const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const updateData = req.body;
+    
+    const updatedUser = await authService.updateProfile(userId, updateData);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully.',
+      data: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const registerDeviceToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { deviceToken, deviceType } = req.body;
+    
+    await authService.registerDeviceToken(userId, deviceToken, deviceType);
+
+    res.status(200).json({
+      success: true,
+      message: 'Device token registered successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

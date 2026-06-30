@@ -23,7 +23,7 @@ class DamageLossService {
       await prisma.damageLossItem.create({
         data: {
           damageLossId: newReport.damageLossId,
-          catalogItemId: BigInt(item.catalogItemId),
+          equipmentItemId: BigInt(item.equipmentItemId),
           quantity: item.quantity,
           damageType: item.type,
           source: item.responsible === 'supplier' ? 'supplier' : 'internal'

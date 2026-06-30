@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 
 class ChangeRequestService {
   public async getChangeRequests(page: number, limit: number, orderId?: string, status?: string) {
@@ -36,7 +37,7 @@ class ChangeRequestService {
         ...item,
         id: item.id.toString(),
         changeRequestId: item.changeRequestId.toString(),
-        catalogItemId: item.catalogItemId.toString(),
+        equipmentItemId: item.equipmentItemId.toString(),
       }));
       
       return {
@@ -51,6 +52,32 @@ class ChangeRequestService {
     });
 
     return { requests: formattedRequests, totalCount };
+  }
+
+  public async getChangeRequestById(id: string) {
+    const req = await prisma.changeRequest.findUnique({
+      where: { changeRequestId: BigInt(id) }
+    });
+    if (!req) throw new AppError('Change request not found', 404);
+
+    const items = await prisma.changeRequestItem.findMany({
+      where: { changeRequestId: BigInt(id) }
+    });
+
+    return {
+      ...req,
+      changeRequestId: req.changeRequestId.toString(),
+      orderId: req.orderId.toString(),
+      requestedBy: req.requestedBy.toString(),
+      approvedBy: req.approvedBy?.toString(),
+      reconciledBy: req.reconciledBy?.toString(),
+      items: items.map(item => ({
+        ...item,
+        id: item.id.toString(),
+        changeRequestId: item.changeRequestId.toString(),
+        equipmentItemId: item.equipmentItemId.toString(),
+      }))
+    };
   }
 
   public async createChangeRequest(orderId: string, data: any, userId: string) {
@@ -70,7 +97,7 @@ class ChangeRequestService {
         await prisma.changeRequestItem.create({
           data: {
             changeRequestId: newRequest.changeRequestId,
-            catalogItemId: BigInt(item.catalogItemId),
+            equipmentItemId: BigInt(item.equipmentItemId),
             quantity: item.quantity,
             action: item.action || 'add'
           }

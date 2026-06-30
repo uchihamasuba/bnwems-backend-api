@@ -124,6 +124,35 @@ class OrderService {
 
     return data;
   }
+
+  public async getOrderEvidences(id: string) {
+    const evidences = await prisma.evidence.findMany({
+      where: { orderId: BigInt(id) },
+      orderBy: { uploadedAt: 'desc' },
+    });
+    return evidences;
+  }
+
+  public async getMobileSummary(id: string) {
+    const order = await prisma.order.findUnique({
+      where: { orderId: BigInt(id) },
+    });
+    if (!order) throw new AppError('Order not found', 404);
+
+    const customer = await prisma.customer.findUnique({
+      where: { customerId: order.customerId },
+    });
+
+    const tasks = await prisma.workTask.findMany({
+      where: { orderId: BigInt(id) },
+    });
+
+    return {
+      order,
+      customer,
+      tasks,
+    };
+  }
 }
 
 export const orderService = new OrderService();

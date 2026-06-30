@@ -1,4 +1,4 @@
-# Finance & Analytics: Reporting & Dashboards
+﻿# Finance & Analytics: Reporting & Dashboards
 
 ## Overview
 This module handles **UC 2.7 (Reporting Management)**, **UC 2.8 (Operational Dashboard)**, and **UC 2.15 (Operational Result Verification)**.
@@ -23,6 +23,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 ```json
 {
   "success": true,
+  "code": "MSG-RP-00",
   "data": {
     "totalRevenue": 150000.00,
     "breakdownByMonth": [
@@ -45,11 +46,12 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 ```json
 {
   "success": true,
+  "code": "MSG-RP-00",
   "data": {
     "totalDamaged": 10,
     "totalLost": 2,
     "mostUsedItems": [ 
-      { "catalogItemId": 1, "itemName": "Standard Speaker", "usageCount": 50 } 
+      { "equipmentItemId": 1, "itemName": "Standard Speaker", "usageCount": 50 } 
     ]
   }
 }
@@ -64,10 +66,11 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 ```json
 {
   "success": true,
+  "code": "MSG-RP-00",
   "data": {
     "activeOrders": 15,
-    "totalRevenueMonth": 25000.00,
-    "unpaidSupplierDebt": 2000.00,
+    "totalRevenueMonth": 25000000.00,
+    "unpaidSupplierDebt": 2000000.00,
     "recentOrders": [
       { "orderId": 1, "status": "confirmed" }
     ]
@@ -82,6 +85,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 ```json
 {
   "success": true,
+  "code": "MSG-RP-00",
   "data": {
     "ordersInProgress": 5,
     "pendingChangeRequests": 2,
@@ -99,12 +103,13 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 - **Use Case:** UC 2.15 - Operational Result Verification
 - **Description:** Manager pulls a compiled report of an order's operational results (survey, field progress, handover, damage) to verify before final settlement.
 - **Business Rules:**
-  - BR-15-01: Verifies all task statuses for the order are `COMPLETED`. If not, raises `MSG-UC15-01`.
+  - BR-15-01: Verifies all task statuses for the order are `completed`. If not, raises `MSG-UC15-01`.
 - **Query Parameters:** `?orderId=order-uuid`
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-RP-00",
   "data": {
     "orderId": 1,
     "tasksCompleted": 5,

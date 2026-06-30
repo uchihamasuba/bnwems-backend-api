@@ -6,7 +6,7 @@ export const getChangeRequests = async (req: Request, res: Response, next: NextF
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const orderId = req.query.orderId as string;
+    const orderId = req.params.orderId || req.query.orderId as string;
     const status = req.query.status as string;
 
     const { requests, totalCount } = await changeRequestService.getChangeRequests(page, limit, orderId, status);
@@ -15,6 +15,20 @@ export const getChangeRequests = async (req: Request, res: Response, next: NextF
       success: true,
       data: requests,
       meta: { page, limit, totalCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getChangeRequestById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const request = await changeRequestService.getChangeRequestById(id);
+
+    res.status(200).json({
+      success: true,
+      data: request,
     });
   } catch (error) {
     next(error);

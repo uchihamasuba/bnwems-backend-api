@@ -1,4 +1,4 @@
-# Master Data & Policies: Policy, Attendance, and Wage Management
+﻿# Master Data & Policies: Policy, Attendance, and Wage Management
 
 ## Overview
 This module handles **UC 2.6 (Policy Configuration)**, **UC 2.29 (Attendance & Task Completion)**, and **UC 2.17 (Staff Wage Confirmation)**.
@@ -10,7 +10,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - `MSG-UC29-01`: Location out of bounds for check-in.
 - `MSG-UC17-01`: Unresolved attendance issues prevent wage confirmation.
 
-## 1. Policy Configuration (UC 2.6)
+## 1. Policy & Wage Rule Configuration (UC 2.6)
 
 ### `GET /api/v1/policies`
 - **Use Case:** UC 2.6 - View Policy List
@@ -22,6 +22,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 ```json
 {
   "success": true,
+  "code": "MSG-PO-00",
   "data": [
     {
       "policyId": 1,
@@ -54,6 +55,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 ```json
 {
   "success": true,
+  "code": "MSG-PO-00",
   "message": "Policy created successfully."
 }
 ```
@@ -73,6 +75,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 ```json
 {
   "success": true,
+  "code": "MSG-PO-00",
   "message": "Policy updated successfully."
 }
 ```
@@ -97,6 +100,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 ```json
 {
   "success": true,
+  "code": "MSG-PO-00",
   "message": "Check-in successful."
 }
 ```
@@ -105,7 +109,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - **Use Case:** UC 2.29 - Confirm Technical Staff Attendance & Work Completion
 - **Description:** Leader staff confirms the attendance and task completion of technical staff.
 - **Business Rules:**
-  - BR-29-03: Changes attendance status to `CONFIRMED` or `REJECTED`.
+  - BR-29-03: Changes attendance status to `confirmed` or `rejected`.
 - **Request Body:**
 ```json
 {
@@ -117,6 +121,7 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 ```json
 {
   "success": true,
+  "code": "MSG-PO-00",
   "message": "Attendance confirmed."
 }
 ```
@@ -124,24 +129,26 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 ## 3. Staff Wage Confirmation (UC 2.17)
 
 ### `GET /api/v1/wages/summary`
-- **Use Case:** UC 2.17 - Monitor Staff Wage Data (implied)
+- **Use Case:** UC 2.17 - Monitor Staff Wage Data
 - **Description:** Retrieves wage summaries for staff by period. Manager access required.
 - **Query Parameters:**
   - `period` (string, format YYYY-MM)
   - `userId` (string, optional)
-  - `status` (enum, optional) - DRAFT, CONFIRMED, PAID
+  - `status` (enum, optional) - draft, confirmed, paid
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-PO-00",
   "data": [
     {
       "wageSummaryId": 1,
       "userId": 1,
       "wagePeriod": "2026-06",
-      "totalWage": 1500.00,
-      "deductions": 50.00,
-      "netWage": 1450.00,
+      "totalSessions": 5,
+      "grossAmount": 1500000.00,
+      "totalDeduction": 50000.00,
+      "totalWage": 1450000.00,
       "status": "draft",
       "updatedAt": "2026-06-22T10:00:00Z"
     }
@@ -154,19 +161,19 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - **Use Case:** UC 2.17 - Confirm Staff Work and Wage
 - **Description:** Confirms the wage summary for a staff member after verifying attendance and deductions.
 - **Business Rules:**
-  - BR-17-01: Manager confirms the system-calculated `netWage`.
-  - BR-17-02: Wage cannot be confirmed if there are `PENDING` attendances for the period.
+  - BR-17-01: Manager confirms the system-calculated `totalWage`.
+  - BR-17-02: Wage cannot be confirmed if there are pending attendances for the period.
 - **Request Body:**
 ```json
 {
-  "status": "confirmed",
-  "notes": "Reviewed and approved."
+  "status": "confirmed"
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-PO-00",
   "message": "Wage summary confirmed."
 }
 ```

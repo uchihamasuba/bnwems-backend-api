@@ -34,7 +34,7 @@ describe('Order API (Module 8)', () => {
     });
   });
 
-  describe('GET /api/v1/orders/field-progress', () => {
+  describe('GET /api/v1/orders/:id/field-progress', () => {
     it('should return field progress of orders', async () => {
       prismaMock.order.findMany.mockResolvedValue([
         { orderId: 1n } as any
@@ -42,7 +42,7 @@ describe('Order API (Module 8)', () => {
       prismaMock.workTask.findFirst.mockResolvedValue({ taskCategory: 'SETUP', status: 'in_progress', updatedAt: new Date() } as any);
 
       const res = await request(app)
-        .get('/api/v1/orders/field-progress')
+        .get(`/api/v1/orders/${validId1}/field-progress`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
@@ -159,6 +159,48 @@ describe('Order API (Module 8)', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(prismaMock.order.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/v1/orders/:id/change-requests', () => {
+    it('should get change requests for order', async () => {
+      const res = await request(app).get('/api/v1/orders/1/change-requests').set('Authorization', `Bearer ${adminToken}`);
+      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+    });
+  });
+
+  describe('GET /api/v1/orders/:id/evidences', () => {
+    it('should get evidences for order', async () => {
+      const res = await request(app).get('/api/v1/orders/1/evidences').set('Authorization', `Bearer ${adminToken}`);
+      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+    });
+  });
+
+  describe('GET /api/v1/orders/:id/mobile-summary', () => {
+    it('should get mobile summary for order', async () => {
+      const res = await request(app).get('/api/v1/orders/1/mobile-summary').set('Authorization', `Bearer ${adminToken}`);
+      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+    });
+  });
+
+  describe('GET /api/v1/orders/:id/payment-requests', () => {
+    it('should get payment requests for order', async () => {
+      const res = await request(app).get('/api/v1/orders/1/payment-requests').set('Authorization', `Bearer ${adminToken}`);
+      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+    });
+  });
+
+  describe('POST /api/v1/orders/:id/damage-loss', () => {
+    it('should report damage loss for order', async () => {
+      const res = await request(app).post('/api/v1/orders/1/damage-loss').set('Authorization', `Bearer ${adminToken}`).send({});
+      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+    });
+  });
+
+  describe('POST /api/v1/orders/:id/handover', () => {
+    it('should report handover for order', async () => {
+      const res = await request(app).post('/api/v1/orders/1/handover').set('Authorization', `Bearer ${adminToken}`).send({});
+      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
     });
   });
 

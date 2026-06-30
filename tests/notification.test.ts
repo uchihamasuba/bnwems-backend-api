@@ -52,4 +52,23 @@ describe('Notification API', () => {
       expect(res.body.success).toBe(true);
     });
   });
+
+  describe('PUT /api/v1/notifications/read-all', () => {
+    it('should mark all unread notifications as read', async () => {
+      prismaMock.notification.updateMany.mockResolvedValue({ count: 2 } as any);
+
+      const res = await request(app)
+        .put('/api/v1/notifications/read-all')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(prismaMock.notification.updateMany).toHaveBeenCalled();
+    });
+
+    it('should return 401 if unauthorized', async () => {
+      const res = await request(app).put('/api/v1/notifications/read-all');
+      expect(res.status).toBe(401);
+    });
+  });
 });

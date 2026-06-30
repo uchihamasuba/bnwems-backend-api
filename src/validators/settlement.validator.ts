@@ -24,3 +24,9 @@ export const confirmSettlementSchema = z.object({
     status: z.string().min(1, 'Status is required'),
   }),
 });
+
+export const getSettlementByOrderSchema = z.object({
+  params: z.object({
+    orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});

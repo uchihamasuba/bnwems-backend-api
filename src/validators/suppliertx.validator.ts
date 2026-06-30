@@ -1,5 +1,21 @@
 import { z } from 'zod';
 
+export const getSupplierTransactionsSchema = z.object({
+  query: z.object({
+    page: z.string().regex(/^\d+$/).optional(),
+    limit: z.string().regex(/^\d+$/).optional(),
+    supplierId: z.string().regex(/^\d+$/).optional(),
+    orderId: z.string().regex(/^\d+$/).optional(),
+    status: z.string().optional(),
+  }),
+});
+
+export const getSupplierTransactionByIdSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});
+
 export const createSupplierTransactionSchema = z.object({
   body: z.object({
     supplierId: z.string().regex(/^\d+$/, 'Invalid ID format'),
@@ -28,6 +44,16 @@ export const returnSupplierItemsSchema = z.object({
   body: z.object({
     returnedItems: z.any().optional(),
     condition: z.string().optional(),
+    evidenceUrls: z.array(z.string().url('Invalid URL format')).optional(),
+  }),
+});
+
+export const updateSupplierTxStatusSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+  body: z.object({
+    status: z.string().min(1, 'Status is required'),
     evidenceUrls: z.array(z.string().url('Invalid URL format')).optional(),
   }),
 });

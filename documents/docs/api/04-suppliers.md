@@ -1,8 +1,8 @@
-# Master Data & Policies: Supplier & Transaction Management
+﻿# Master Data & Policies: Supplier & Transaction Management
 
 ## Overview
 This module handles **UC 2.16 (Supplier Transaction & Debt Management)** and **UC 2.24 (Supplier Item Receiving & Return Support)**.
-It manages external partners, their transactions (`SupplierTransaction`), receiving/returns, and financial debt (`SupplierDebt`).
+It manages external partners, their transactions (`SupplierTransaction`), receiving/returns, and financial payments (`SupplierPayment`).
 
 ## Standard Error Codes (SRS Mapping)
 - `MSG-UC16-01`: Required information is missing or invalid.
@@ -20,20 +20,20 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
   - `page` (number, default 1)
   - `limit` (number, default 20)
   - `search` (string, optional) - searches by name
-  - `status` (enum, optional) - ACTIVE, INACTIVE
+  - `status` (enum, optional) - active, inactive
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-SP-00",
   "data": [
     {
       "supplierId": 1,
       "name": "AudioVisual Pro Inc.",
       "contactPerson": "John Doe",
       "phone": "+123456789",
-      "email": "contact@audiovisual.com",
-      "status": "active",
-      "createdAt": "2026-06-22T10:00:00Z"
+      "address": "123 Supplier St",
+      "status": "active"
     }
   ],
   "meta": { "page": 1, "limit": 20, "totalCount": 15 }
@@ -51,7 +51,6 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
   "name": "AudioVisual Pro Inc.",
   "contactPerson": "John Doe",
   "phone": "+123456789",
-  "email": "contact@audiovisual.com",
   "address": "123 Supplier St"
 }
 ```
@@ -59,6 +58,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
+  "code": "MSG-SP-00",
   "message": "Supplier created successfully."
 }
 ```
@@ -70,19 +70,20 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Description:** Creates a transaction to rent or purchase items from a supplier for an order.
 - **Business Rules:**
   - BR-16-03: `totalCost` must equal the sum of item costs.
-  - BR-16-04: Creates or updates `SupplierDebt` automatically upon confirmation.
 - **Request Body:**
 ```json
 {
   "supplierId": 1,
   "orderId": 1,
-  "transactionType": "rental",
-  "totalCost": 500.00,
+  "type": "rental",
+  "totalCost": 500000.00,
+  "expectedDelivery": "2026-06-25",
   "items": [
     {
-      "catalogItemId": 1,
-      "quantity": 2,
-      "unitPrice": 250.00
+      "equipmentItemId": 46,
+      "description": "Thuê phông cưới cao cấp",
+      "quantity": 1,
+      "unitCost": 500000.00
     }
   ]
 }
@@ -91,6 +92,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
+  "code": "MSG-SP-00",
   "message": "Supplier transaction created.",
   "data": { "supplierTransactionId": 1, "status": "draft" }
 }
@@ -100,19 +102,19 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Use Case:** UC 2.24 - Supplier Item Receiving Support
 - **Description:** Records the receipt of equipment/materials from a supplier.
 - **Business Rules:**
-  - BR-24-01: Validates `receivedItems` against original transaction details.
-  - BR-24-02: Changes transaction status to `RECEIVED`. Adds items to `Inventory` if applicable.
+  - BR-24-01: Validates received quantities against original transaction details.
+  - BR-24-02: Changes transaction status to `received`.
 - **Request Body:**
 ```json
 {
-  "items": [{ "catalogItemId": 1, "quantityReceived": 2 }],
-  "evidenceUrls": ["https://storage.example.com/receipt.jpg"]
+  "items": [{ "equipmentItemId": 46, "quantityReceived": 1 }]
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-SP-00",
   "message": "Items received and logged."
 }
 ```
@@ -122,42 +124,44 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Description:** Records the return of rented equipment to a supplier.
 - **Business Rules:**
   - BR-24-03: Validates return quantities against received quantities.
-  - BR-24-04: Changes status to `RETURNED`. Reduces `Inventory` if applicable.
+  - BR-24-04: Changes status to `returned`.
 - **Request Body:**
 ```json
 {
-  "items": [{ "catalogItemId": 1, "quantityReturned": 2 }],
-  "condition": "good",
-  "evidenceUrls": ["https://storage.example.com/return_receipt.jpg"]
+  "items": [{ "equipmentItemId": 46, "quantityReturned": 1 }]
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-SP-00",
   "message": "Items returned to supplier successfully."
 }
 ```
 
-## 3. Supplier Debt Management (UC 2.16)
+## 3. Supplier Payment Management (UC 2.16)
 
-### `GET /api/v1/supplier-debts`
+### `GET /api/v1/supplier-transactions`
 - **Use Case:** UC 2.16 - Monitor Supplier Debt
-- **Description:** Retrieves the outstanding debts owed to suppliers.
+- **Description:** Retrieves supplier transactions to monitor payments and debts.
 - **Query Parameters:**
-  - `status` (enum, optional) - UNPAID, PARTIALLY_PAID, PAID
+  - `paymentStatus` (enum, optional) - unpaid, partial, paid
   - `supplierId` (string, optional)
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-SP-00",
   "data": [
     {
-      "supplierDebtId": 1,
+      "supplierTransactionId": 1,
       "supplierId": 1,
-      "amountOwed": 500.00,
-      "amountPaid": 0.00,
-      "status": "unpaid",
+      "orderId": 1,
+      "totalCost": 500000.00,
+      "paidAmount": 0.00,
+      "paymentStatus": "unpaid",
+      "status": "received",
       "updatedAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -165,23 +169,25 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 }
 ```
 
-### `POST /api/v1/supplier-debts/:id/pay`
+### `POST /api/v1/supplier-transactions/:id/payments`
 - **Use Case:** UC 2.16 - Record Supplier Payment
-- **Description:** Records a payment made to a supplier, reducing the debt amount.
+- **Description:** Records a payment made to a supplier, increasing the `paidAmount`.
 - **Business Rules:**
-  - BR-16-05: Payment amount cannot exceed the remaining `amountOwed` - `amountPaid`.
-  - BR-16-06: Automatically updates debt status to `PARTIALLY_PAID` or `PAID`.
+  - BR-16-05: Payment amount cannot exceed the remaining `totalCost` - `paidAmount`.
+  - BR-16-06: Automatically updates `paymentStatus` to `partial` or `paid`.
 - **Request Body:**
 ```json
 {
-  "amount": 500.00,
-  "paymentRef": "BankTx-12345"
+  "amount": 500000.00,
+  "paidAt": "2026-06-25T10:00:00Z",
+  "note": "BankTx-12345"
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-SP-00",
   "message": "Payment recorded successfully."
 }
 ```

@@ -71,6 +71,19 @@ class SettlementService {
       },
     });
   }
+
+  public async getSettlementByOrder(orderId: string) {
+    const settlement = await prisma.settlement.findFirst({
+      where: { orderId: BigInt(orderId) },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!settlement) {
+      throw new AppError('Settlement not found', 404);
+    }
+
+    return settlement;
+  }
 }
 
 export const settlementService = new SettlementService();

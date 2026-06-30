@@ -78,15 +78,22 @@ class TaskService {
     });
   }
 
-  public async deleteTask(id: string) {
+  public async cancelTask(id: string, status: string) {
     const existing = await prisma.workTask.findUnique({ where: { workTaskId: BigInt(id) } });
     if (!existing) throw new AppError('Task not found', 404);
 
-    if (existing.status !== 'draft') {
+    if (existing.status !== 'draft' && existing.status !== 'pending') {
       throw new AppError('Task cannot be deleted because it has already started or been executed.', 400, 'MSG-UC55-06');
     }
 
-    await prisma.workTask.delete({ where: { workTaskId: BigInt(id) } });
+    if (status === 'cancelled' || status === 'deleted') {
+      await prisma.workTask.update({ 
+        where: { workTaskId: BigInt(id) },
+        data: { status: 'cancelled' }
+      });
+    } else {
+      throw new AppError('Invalid status for cancellation.', 400);
+    }
   }
 
   public async updateTaskProgress(id: string, status: string, notes?: string) {
@@ -195,7 +202,28 @@ class TaskService {
       where: { quotationId: quotation.quotationId }
     });
 
-    return items;
+    return items.map(i => ({
+      ...i,
+      quotationItemId: i.id.toString(),
+      quotationId: i.quotationId.toString(),
+      equipmentItemId: i.equipmentItemId.toString()
+    }));
+  }
+
+  public async reviewSurveyReport(id: string, status: string, userId: string) {
+    const report = await prisma.surveyReport.findFirst({
+      where: { workTaskId: BigInt(id) }
+    });
+
+    if (!report) throw new AppError('Survey report not found', 404);
+    if (report.status === 'approved') throw new AppError('Report already approved', 400);
+
+    await prisma.surveyReport.update({
+      where: { surveyReportId: report.surveyReportId },
+      data: {
+        status: status,
+      }
+    });
   }
 }
 
