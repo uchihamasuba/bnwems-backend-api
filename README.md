@@ -97,6 +97,22 @@ npx prisma db seed
 > - `db push`: Đồng bộ sơ đồ từ `schema.prisma` sang Database Local.
 > - `db seed`: Tự động chèn dữ liệu mẫu vào (bao gồm tài khoản Admin, đơn hàng, v.v.).
 
+**Bước 4: Cấu Hình Firebase (Dịch vụ Lưu Trữ Ảnh)**
+Dự án sử dụng Firebase Storage để lưu trữ và quản lý hình ảnh. Bạn cần cập nhật các biến môi trường Firebase trong file `.env`:
+```env
+FIREBASE_PROJECT_ID="your-project-id"
+FIREBASE_CLIENT_EMAIL="your-client-email@..."
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
+FIREBASE_STORAGE_BUCKET="your-project-id.firebasestorage.app"
+```
+> **Cách lấy thông tin Firebase (nếu bạn tự setup Project riêng):**
+> 1. Truy cập [Firebase Console](https://console.firebase.google.com/), tạo một Project mới.
+> 2. Vào **Project settings** (Cài đặt dự án) > tab **Service accounts** > Chọn nút **Generate new private key**.
+> 3. Tải file JSON về máy. Mở file JSON đó ra để lấy các giá trị `project_id`, `client_email` và `private_key` điền tương ứng vào file `.env`.
+> 4. Vào mục **Storage** trên Firebase Console để lấy tên bucket (ví dụ: `your-project.firebasestorage.app` hoặc `your-project.appspot.com`).
+> 
+> *(Lưu ý: Nếu team đã cung cấp sẵn file `.env` chứa thông tin Firebase dùng chung thì bạn có thể bỏ qua bước setup thủ công này).*
+
 ---
 
 ## 💻 Hướng Dẫn Chạy Ứng Dụng
