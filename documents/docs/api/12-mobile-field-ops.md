@@ -108,7 +108,7 @@ It covers:
 }
 ```
 
-### `GET /api/v1/orders/:id/field-progress`
+### `GET /api/v1/orders/field-progress`
 - **Use Case:** Field Task Progress Tracking
 - **Description:** Xem timeline tiến độ xuất kho, vận chuyển, lắp đặt, bàn giao, thu hồi, hoàn kho theo đơn hàng.
 - **Response (200 OK):**

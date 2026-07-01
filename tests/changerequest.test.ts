@@ -108,7 +108,7 @@ describe('Change Request API (Module 9)', () => {
       const res = await request(app)
         .put(`/api/v1/change-requests/${validId1}/approve`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'APPROVED' });
+        .send({ status: 'approved' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);

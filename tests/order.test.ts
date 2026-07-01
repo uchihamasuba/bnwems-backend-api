@@ -34,7 +34,7 @@ describe('Order API (Module 8)', () => {
     });
   });
 
-  describe('GET /api/v1/orders/:id/field-progress', () => {
+  describe('GET /api/v1/orders/field-progress', () => {
     it('should return field progress of orders', async () => {
       prismaMock.order.findMany.mockResolvedValue([
         { orderId: 1n } as any
@@ -42,7 +42,7 @@ describe('Order API (Module 8)', () => {
       prismaMock.workTask.findFirst.mockResolvedValue({ taskCategory: 'SETUP', status: 'in_progress', updatedAt: new Date() } as any);
 
       const res = await request(app)
-        .get(`/api/v1/orders/${validId1}/field-progress`)
+        .get(`/api/v1/orders/field-progress`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);

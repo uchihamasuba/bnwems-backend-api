@@ -16,7 +16,7 @@ import { validate } from '../middlewares/validate.middleware';
 import { getOrdersSchema, getOrderByIdSchema, createOrderSchema, confirmOrderSchema, changeEventDateSchema, closeOrderSchema, getOrderEvidencesSchema, getMobileSummarySchema, getWorkflowTimelineSchema } from '../validators/order.validator';
 
 router.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getOrdersSchema), orderController.getOrders);
-router.get('/:id/field-progress', authorizeRoles('ADMIN', 'MANAGER'), orderController.getFieldProgress);
+router.get('/field-progress', authorizeRoles('ADMIN', 'MANAGER'), orderController.getFieldProgress);
 router.get('/:id/evidences', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF', 'TECHNICAL_STAFF'), validate(getOrderEvidencesSchema), orderController.getOrderEvidences);
 router.get('/:id/mobile-summary', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF', 'TECHNICAL_STAFF'), validate(getMobileSummarySchema), orderController.getMobileSummary);
 router.get('/:id/workflow-timeline', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF', 'TECHNICAL_STAFF'), validate(getWorkflowTimelineSchema), orderController.getWorkflowTimeline);

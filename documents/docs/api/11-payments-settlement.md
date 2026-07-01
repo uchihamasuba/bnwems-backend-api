@@ -109,7 +109,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 - **Request Body:**
 ```json
 {
-  "status": "completed",
+  "status": "completed", // or "failed"
   "evidenceUrl": "https://storage.example.com/receipt.jpg"
 }
 ```

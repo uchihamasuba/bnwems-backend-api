@@ -35,6 +35,6 @@ export const approveChangeRequestSchema = z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
-    status: z.enum(['APPROVED', 'REJECTED']),
+    status: z.enum(['approved', 'rejected']),
   }),
 });

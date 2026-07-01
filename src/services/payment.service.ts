@@ -83,18 +83,23 @@ class PaymentService {
   }
 
   public async confirmPayment(id: string, status: string, evidenceUrl?: string, userId?: string) {
-    if (status !== 'completed' && status !== 'COMPLETED') {
-      throw new AppError('Status must be completed', 400);
+    const isCompleted = status.toLowerCase() === 'completed';
+    const isFailed = status.toLowerCase() === 'failed';
+
+    if (!isCompleted && !isFailed) {
+      throw new AppError('Status must be completed or failed', 400);
     }
 
     const pr = await prisma.paymentRequest.findUnique({ where: { paymentRequestId: BigInt(id) } });
     if (!pr) throw new AppError('Payment request not found', 404);
 
     await prisma.$transaction(async (tx) => {
-      await tx.paymentRequest.update({
-        where: { paymentRequestId: BigInt(id) },
-        data: { status: 'paid' },
-      });
+      if (isCompleted) {
+        await tx.paymentRequest.update({
+          where: { paymentRequestId: BigInt(id) },
+          data: { status: 'paid' },
+        });
+      }
 
       const payment = await tx.payment.create({
         data: {
@@ -102,8 +107,8 @@ class PaymentService {
           orderId: pr.orderId,
           amount: pr.amount,
           method: pr.methodHint || 'cash',
-          status: 'success',
-          paidAt: new Date(),
+          status: isCompleted ? 'success' : 'failed',
+          paidAt: isCompleted ? new Date() : null,
           confirmedBy: BigInt(userId || 1),
           confirmedAt: new Date()
         }
@@ -114,13 +119,14 @@ class PaymentService {
           data: {
             refType: 'Payment',
             refId: payment.paymentId,
+            orderId: pr.orderId,
             fileUrl: evidenceUrl,
             uploadedBy: BigInt(userId || 1)
           }
         });
       }
 
-      if (pr.paymentType === 'deposit' || pr.paymentType === 'DEPOSIT') {
+      if (isCompleted && (pr.paymentType === 'deposit' || pr.paymentType === 'DEPOSIT')) {
         await tx.order.update({
           where: { orderId: pr.orderId },
           data: { status: 'deposit_paid' },

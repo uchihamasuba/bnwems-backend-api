@@ -164,6 +164,7 @@ class TaskService {
         data: {
           refType: 'SurveyReport',
           refId: report.surveyReportId,
+          orderId: report.orderId,
           fileUrl: e.fileUrl,
           uploadedBy: BigInt(userId)
         }
