@@ -79,6 +79,11 @@ Do cơ sở dữ liệu online đã được khởi tạo sẵn cấu trúc và 
 ```bash
 npm run prisma:generate
 ```
+> **Mẹo bên lề (Reset Dữ Liệu):** Nếu trong quá trình test bạn muốn xóa sạch dữ liệu hiện tại trên Cloud DB và khôi phục lại dữ liệu mẫu ban đầu (seed), hãy chạy các lệnh sau:
+> ```bash
+> npx prisma db push --force-reset
+> npx prisma db seed
+> ```
 
 **Trường hợp 2: Sử dụng MySQL Local**
 Nếu dùng DB local, dự án đã tích hợp file `documents/BNWEMS.sql` chứa sẵn toàn bộ cấu trúc bảng và dữ liệu mẫu. Hãy chạy các lệnh sau để tự động áp dụng:
