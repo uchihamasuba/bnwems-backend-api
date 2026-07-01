@@ -34,7 +34,7 @@ backend-api/
 
 ### 1. Yêu cầu hệ thống
 - **Node.js**: Phiên bản v22 LTS trở lên.
-- **MySQL**: Máy chủ MySQL đang chạy (Local, XAMPP, hoặc Docker).
+- **MySQL**: Máy chủ MySQL đang chạy (Local, XAMPP, Docker, hoặc dịch vụ Cloud như **Aiven.io**).
 - Trình quản lý gói: `npm`.
 
 ### 2. Các bước cài đặt chi tiết
@@ -52,16 +52,36 @@ Tạo file `.env` từ file mẫu:
 cp .env.example .env
 ```
 Mở file `.env` và cập nhật thông số kết nối Database:
+
+**Tùy chọn 1: Dùng MySQL Local (XAMPP, Docker, v.v.)**
 ```env
 PORT=3000
 # Thay thế 'root' và 'password' bằng tài khoản MySQL của máy bạn.
 DATABASE_URL="mysql://root:password@localhost:3306/bnwems_db"
 JWT_SECRET="your_jwt_secret_key_here"
 ```
-*(Lưu ý: Cơ sở dữ liệu `bnwems_db` không cần phải tạo sẵn hoặc tạo bảng thủ công, công cụ ở bước sau sẽ làm giúp bạn).*
+
+**Tùy chọn 2: Dùng Aiven.io MySQL (Cloud)**
+Nếu bạn sử dụng Aiven.io, hãy copy "Service URI" trong giao diện Overview của Aiven. Vì Aiven yêu cầu kết nối bảo mật, chuỗi kết nối nên có `?ssl-mode=REQUIRED`:
+```env
+PORT=3000
+# URI mẫu từ Aiven.io:
+DATABASE_URL="mysql://avnadmin:your_password@your-project.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED"
+JWT_SECRET="your_jwt_secret_key_here"
+```
+
+*(Lưu ý: Nếu dùng MySQL Local, công cụ ở bước 3 sẽ tự động tạo bảng và nạp dữ liệu mẫu giúp bạn).*
 
 **Bước 3: Khởi Tạo Database và Nạp Dữ Liệu (Seeding)**
-Dự án đã tích hợp file `documents/BNWEMS.sql` chứa sẵn toàn bộ cấu trúc bảng và dữ liệu mẫu. Bạn chỉ cần chạy lệnh sau để tự động áp dụng cấu trúc vào DB và nạp dữ liệu:
+
+**Trường hợp 1: Sử dụng Aiven.io MySQL (Cloud)**
+Do cơ sở dữ liệu online đã được khởi tạo sẵn cấu trúc và dữ liệu cho dự án, bạn **chỉ cần** tạo thư viện Prisma Client:
+```bash
+npm run prisma:generate
+```
+
+**Trường hợp 2: Sử dụng MySQL Local**
+Nếu dùng DB local, dự án đã tích hợp file `documents/BNWEMS.sql` chứa sẵn toàn bộ cấu trúc bảng và dữ liệu mẫu. Hãy chạy các lệnh sau để tự động áp dụng:
 ```bash
 npm run prisma:generate
 npx prisma db push
@@ -69,8 +89,8 @@ npx prisma db seed
 ```
 > **Giải thích:**
 > - `prisma:generate`: Tạo bộ thư viện client để code Node.js giao tiếp với Database.
-> - `db push`: Đồng bộ sơ đồ từ `schema.prisma` sang Database.
-> - `db seed`: Tự động đọc file `BNWEMS.sql` và chèn dữ liệu mẫu vào (bao gồm tài khoản Admin, dữ liệu đơn hàng, nhân viên, v.v.).
+> - `db push`: Đồng bộ sơ đồ từ `schema.prisma` sang Database Local.
+> - `db seed`: Tự động chèn dữ liệu mẫu vào (bao gồm tài khoản Admin, đơn hàng, v.v.).
 
 ---
 
