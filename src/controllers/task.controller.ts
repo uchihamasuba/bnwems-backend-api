@@ -91,9 +91,9 @@ export const cancelTask = async (req: AuthRequest, res: Response, next: NextFunc
 export const updateTaskProgress = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { status, notes } = req.body;
+    const { status, notes, progressPercent } = req.body;
 
-    await taskService.updateTaskProgress(id, status, notes);
+    await taskService.updateTaskProgress(id, status, notes, progressPercent);
 
     res.status(200).json({
       success: true,

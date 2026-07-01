@@ -49,32 +49,13 @@ describe('Task API (Module 8)', () => {
     });
   });
 
-  describe('POST /api/v1/tasks', () => {
-    it('should create task successfully via root task endpoint', async () => {
-      prismaMock.workTask.create.mockResolvedValue({ workTaskId: 2n } as any);
-
-      const res = await request(app)
-        .post(`/api/v1/tasks`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          orderId: validId1,
-          taskType: 'SETUP',
-          scheduledStart: new Date().toISOString(),
-          scheduledEnd: new Date().toISOString(),
-          location: 'Main Hall'
-        });
-
-      expect(res.status).toBe(201);
-      expect(res.body.success).toBe(true);
-      expect(prismaMock.workTask.create).toHaveBeenCalled();
-    });
-  });
-
-
   describe('GET /api/v1/tasks/assigned', () => {
     it('should return list of assigned tasks', async () => {
-      prismaMock.workTask.findMany.mockResolvedValue([
-        { workTaskId: 2n, taskType: 'SETUP' } as any
+      prismaMock.assignment.findMany.mockResolvedValue([
+        { 
+          workTask: { workTaskId: 2n, taskType: 'SETUP' },
+          fieldStatus: 'active'
+        } as any
       ]);
 
       const res = await request(app)

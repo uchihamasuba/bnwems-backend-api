@@ -1,4 +1,4 @@
-﻿# Operations & Field Work: Survey & Assignment
+# Operations & Field Work: Survey & Assignment
 
 ## Overview
 This module handles **UC 2.12 (Survey Management)** and **UC 2.14 - 2.15 (Staff Assignment & Operation Planning)**.
@@ -13,13 +13,39 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 
 ## 1. Survey Management (UC 2.12)
 
+### `GET /api/v1/tasks`
+- **Use Case:** UC 2.12 / 2.15 - View All Tasks
+- **Description:** Retrieves a paginated list of all tasks in the system. Manager access required.
+- **Query Parameters:**
+  - `page` (number, default 1)
+  - `limit` (number, default 20)
+  - `orderId` (string, optional)
+  - `status` (string, optional)
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SV-00",
+  "data": [
+    {
+      "workTaskId": 1,
+      "orderId": 1,
+      "title": "Survey task",
+      "status": "pending"
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "totalCount": 100 }
+}
+```
+
 ### `POST /api/v1/orders/:id/tasks`
-- **Use Case:** UC 2.12 - Create Survey Task
-- **Description:** Manager creates a survey task linked to an order.
+- **Use Case:** UC 2.12 - Create Survey Task & UC 2.15.1 - Create Work Task
+- **Description:** Creates a task (survey or operational) linked to an order.
+- **Business Rules:**
+  - BR-52-05: If operational, must be linked to a related `scheduleId`.
 - **Request Body:**
 ```json
 {
-  "scheduleId": 1,
   "taskType": "survey",
   "scheduledStart": "2026-08-01T09:00:00Z",
   "scheduledEnd": "2026-08-01T12:00:00Z",
@@ -31,7 +57,7 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 {
   "success": true,
   "code": "MSG-SV-00",
-  "message": "Survey task created.",
+  "message": "Task created successfully.",
   "data": { "workTaskId": 1 }
 }
 ```
@@ -50,6 +76,10 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
     "evidences": [
       { "fileUrl": "https://storage.example.com/survey1.jpg" }
     ],
+    "surveyedBy": {
+      "userId": 1,
+      "fullName": "John Doe"
+    },
     "submittedAt": "2026-06-22T12:00:00Z"
   }
 }
@@ -101,28 +131,26 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 }
 ```
 
-### `POST /api/v1/tasks`
-- **Use Case:** UC 2.15.1 - Create Work Task for Staff
-- **Description:** Creates an operational task (e.g. preparation, transport, installation) and links it to a `Schedule`.
-- **Business Rules:**
-  - BR-52-05: Must be linked to a related `scheduleId`.
-- **Request Body:**
-```json
-{
-  "scheduleId": 1,
-  "taskType": "installation",
-  "scheduledStart": "2026-10-14T08:00:00Z",
-  "scheduledEnd": "2026-10-15T18:00:00Z",
-  "location": "123 Event Hall"
-}
-```
-- **Response (201 Created):**
+
+
+### `GET /api/v1/orders/:id/assignments`
+- **Use Case:** UC 2.15 - View Assignments
+- **Description:** Retrieves all staff assignments for a specific order.
+- **Response (200 OK):**
 ```json
 {
   "success": true,
   "code": "MSG-SV-00",
-  "message": "Task created successfully.",
-  "data": { "workTaskId": 1 }
+  "data": [
+    {
+      "assignmentId": 1,
+      "workTaskId": 1,
+      "userId": 1,
+      "assignedRole": "Leader Staff",
+      "fieldStatus": "pending",
+      "fullName": "John Doe"
+    }
+  ]
 }
 ```
 

@@ -24,17 +24,25 @@ class TaskService {
 
   public async getAssignedTasks(userId: string, date?: string, status?: string) {
     const whereClause: any = {
-      // Assignments are in Attendance? No, we don't have assignment relation directly?
-      // Wait, there is Assignment model? Let's assume we map it or query raw.
-      // But I will query WorkTask directly without assignment filtering if not mapped, or just fetch all.
-      // Wait, we need to map assignment table. Let's just fetch tasks.
+      userId: BigInt(userId)
     };
-    if (status) whereClause.status = status;
+    
+    if (status) {
+      whereClause.workTask = { status };
+    }
 
-    const tasks = await prisma.workTask.findMany({
+    const assignments = await prisma.assignment.findMany({
       where: whereClause,
-      orderBy: { createdAt: 'desc' },
+      include: {
+        workTask: true
+      },
+      orderBy: { assignedAt: 'desc' },
     });
+
+    const tasks = assignments.map(a => ({
+      ...a.workTask,
+      fieldStatus: a.fieldStatus
+    }));
 
     return tasks;
   }
@@ -96,11 +104,12 @@ class TaskService {
     }
   }
 
-  public async updateTaskProgress(id: string, status: string, notes?: string) {
+  public async updateTaskProgress(id: string, status: string, notes?: string, progressPercent?: number) {
     const existing = await prisma.workTask.findUnique({ where: { workTaskId: BigInt(id) } });
     if (!existing) throw new AppError('Task not found', 404);
 
     const updateData: any = { status };
+    if (progressPercent !== undefined) updateData.progressPercent = progressPercent;
 
     if (status !== 'in_progress' && status !== 'done' && status !== 'assigned') {
       throw new AppError('Invalid status update.', 400, 'MSG-UC25-01');

@@ -2,6 +2,29 @@ import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
 
 class AssignmentService {
+  public async getAssignmentsByOrder(orderId: string) {
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        workTask: {
+          orderId: BigInt(orderId)
+        }
+      },
+      include: {
+        workTask: true,
+        user: true
+      }
+    });
+
+    return assignments.map(a => ({
+      assignmentId: a.assignmentId.toString(),
+      workTaskId: a.workTaskId.toString(),
+      userId: a.userId.toString(),
+      assignedRole: a.roleInTask,
+      fieldStatus: a.fieldStatus,
+      fullName: a.user?.fullName || '',
+      taskTitle: a.workTask?.title || ''
+    }));
+  }
   public async assignStaff(taskId: string, assignments: any[]) {
     if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
       throw new AppError('Staff assignment information is missing.', 400, 'MSG-UC53-05');

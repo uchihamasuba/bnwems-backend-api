@@ -56,8 +56,9 @@ class PaymentService {
 
     if (!order) throw new AppError('Order not found', 404);
 
-    const quote = await prisma.quotation.findUnique({
-      where: { orderId: BigInt(finalOrderId) }
+    const quote = await prisma.quotation.findFirst({
+      where: { orderId: BigInt(finalOrderId) },
+      orderBy: { version: 'desc' }
     });
 
     if (quote && quote.status === 'confirmed') {

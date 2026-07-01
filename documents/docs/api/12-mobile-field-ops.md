@@ -1,4 +1,4 @@
-﻿# Operations & Field Work: Mobile Field Operations
+# Operations & Field Work: Mobile Field Operations
 
 ## Overview
 This module aggregates endpoints primarily consumed by the Mobile App for field operations.
@@ -37,7 +37,9 @@ It covers:
       "taskType": "installation",
       "scheduledStart": "2026-10-14T08:00:00Z",
       "location": "123 Event Hall",
-      "status": "pending"
+      "status": "pending",
+      "progressPercent": 0,
+      "fieldStatus": "pending"
     }
   ],
   "meta": { "totalCount": 5 }
@@ -88,10 +90,12 @@ It covers:
 - **Description:** Leader staff updates the progress status of a task.
 - **Business Rules:**
   - BR-25-01: Updating to `in_progress` sets `actualStart`. Updating to `completed` sets `actualEnd`.
+  - BR-25-02: `progressPercent` can be updated continuously (0-100).
 - **Request Body:**
 ```json
 {
   "status": "in_progress",
+  "progressPercent": 50,
   "notes": "Arrived at venue, starting setup."
 }
 ```
@@ -165,6 +169,34 @@ It covers:
   "success": true,
   "code": "MSG-MO-00",
   "message": "Handover record created."
+}
+```
+
+### `GET /api/v1/orders/:id/damage-loss`
+- **Use Case:** UC 2.28 - View Damage/Loss Report
+- **Description:** Retrieves damage and loss reports associated with an order.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-MO-00",
+  "data": [
+    {
+      "damageLossId": 1,
+      "orderId": 1,
+      "totalCompensation": 0,
+      "items": [
+        {
+          "equipmentItemId": 1,
+          "quantity": 1,
+          "damageType": "damaged",
+          "responsibleParty": "staff",
+          "responsibleUserId": 1
+        }
+      ],
+      "evidences": [{ "fileUrl": "url-to-image" }]
+    }
+  ]
 }
 ```
 

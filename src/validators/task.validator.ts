@@ -56,6 +56,7 @@ export const updateTaskProgressSchema = z.object({
   }),
   body: z.object({
     status: z.string().min(1, 'Status is required'),
+    progressPercent: z.number().min(0).max(100).optional(),
     notes: z.string().optional(),
   }),
 });

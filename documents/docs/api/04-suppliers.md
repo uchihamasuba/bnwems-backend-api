@@ -1,4 +1,4 @@
-﻿# Master Data & Policies: Supplier & Transaction Management
+# Master Data & Policies: Supplier & Transaction Management
 
 ## Overview
 This module handles **UC 2.16 (Supplier Transaction & Debt Management)** and **UC 2.24 (Supplier Item Receiving & Return Support)**.
@@ -95,6 +95,39 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
   "code": "MSG-SP-00",
   "message": "Supplier transaction created.",
   "data": { "supplierTransactionId": 1, "status": "draft" }
+}
+```
+
+### `GET /api/v1/supplier-transactions/:id`
+- **Use Case:** UC 2.16 - View Supplier Transaction Details
+- **Description:** Retrieves the detailed information of a specific supplier transaction, including its items and payment status.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SP-00",
+  "data": {
+    "supplierTransactionId": 1,
+    "status": "draft"
+  }
+}
+```
+
+### `PUT /api/v1/supplier-transactions/:id/status`
+- **Use Case:** UC 2.16 - Update Supplier Transaction Status
+- **Description:** Manually overrides or updates the status of a supplier transaction (e.g., cancelled).
+- **Request Body:**
+```json
+{
+  "status": "cancelled"
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SP-00",
+  "message": "Supplier transaction status updated."
 }
 ```
 

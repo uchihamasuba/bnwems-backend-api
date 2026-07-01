@@ -22,7 +22,8 @@ The ERD is organized into logical domains.
 ### 4. Order & Quotation Lifecycle
 - **Order**: The central business transaction with a customer.
 - **OrderItem**: The finalized list of items for the order, distinguishing between internal and supplier sources.
-- **Quotation**: The proposed pricing sent to the customer before order confirmation.
+- **OrderStatusHistory**: Tracks all status transitions for an order.
+- **Quotation**: The proposed pricing sent to the customer before order confirmation (supports versioning).
 - **QuotationItem**: The items and their line totals within a quotation.
 
 ### 5. Payment & Settlement
@@ -30,6 +31,7 @@ The ERD is organized into logical domains.
 - **PaymentRequest**: Requests sent to customers to pay deposits or final amounts.
 - **Payment**: Actual confirmed receipts of money.
 - **Settlement**: Detailed financial reconciliation of the order (original value, changes, fees, compensations).
+- **SettlementLine**: Line items detailing each financial adjustment applied in a settlement.
 
 ### 6. Scheduling
 - **Schedule**: Specific planned milestones (survey, preparation, transport, execution, collection, return). Combines schedule plans and activities.
@@ -73,7 +75,7 @@ The ERD is organized into logical domains.
 
 ## 3. Key Relationships & Workflows
 
-- **The Order Hub:** `Order` is strictly 1:1 with `Quotation` and `Settlement`. It has 1:N relationships with `PaymentRequest`, `WorkTask`, `ChangeRequest`, `HandoverRecord`, `Schedule`, `DamageLossReport`, `SurveyReport`, `InventoryReservation`, and `InventoryReport`.
+- **The Order Hub:** `Order` is strictly 1:1 with `Settlement`. It has 1:N relationships with `Quotation`, `OrderStatusHistory`, `PaymentRequest`, `WorkTask`, `ChangeRequest`, `HandoverRecord`, `Schedule`, `DamageLossReport`, `SurveyReport`, `InventoryReservation`, and `InventoryReport`.
 - **The Physical Flow:** An `Order` creates an `InventoryReservation`. A `Schedule` spawns a `WorkTask`. The `WorkTask` drives operations and triggers an `InventoryReport` (checkout/return), which updates the `Inventory` quantities directly.
 - **The Financial Flow:** `Quotation` establishes expected value. `PaymentRequest` drives actual `Payment`. Any `ChangeRequest` or `DamageLossReport` alters the final `Settlement`.
 - **The Subcontracting Flow:** If internal inventory is insufficient, a `SupplierTransaction` is created. Payments to suppliers are recorded via `SupplierPayment`.

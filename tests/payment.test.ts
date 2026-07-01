@@ -87,10 +87,10 @@ describe('Payment API (Module 11)', () => {
     });
   });
 
-  describe('PUT /api/v1/payments/:id/confirm', () => {
+  describe('PUT /api/v1/payment-requests/:id/confirm', () => {
     it('should return 400 if validation fails', async () => {
       const res = await request(app)
-        .put(`/api/v1/payments/${validId2}/confirm`)
+        .put(`/api/v1/payment-requests/${validId2}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: '' });
       expect(res.status).toBe(400);
@@ -101,7 +101,7 @@ describe('Payment API (Module 11)', () => {
       prismaMock.paymentRequest.findUnique.mockResolvedValue(null);
 
       const res = await request(app)
-        .put(`/api/v1/payments/${validId2}/confirm`)
+        .put(`/api/v1/payment-requests/${validId2}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'COMPLETED' });
 
@@ -118,7 +118,7 @@ describe('Payment API (Module 11)', () => {
       prismaMock.evidence.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/payments/${validId2}/confirm`)
+        .put(`/api/v1/payment-requests/${validId2}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'COMPLETED', evidenceUrl: 'http://example.com/receipt.jpg' });
 

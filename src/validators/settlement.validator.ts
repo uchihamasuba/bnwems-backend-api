@@ -6,10 +6,18 @@ export const recordSettlementSchema = z.object({
   }),
   body: z.object({
     originalValue: z.number().min(0, 'Original value must be non-negative'),
-    additionalFees: z.number().min(0).optional(),
+    changeAdjustment: z.number().optional(),
+    additionalFee: z.number().min(0).optional(),
     compensation: z.number().min(0).optional(),
-    paidAmount: z.number().min(0).optional(),
+    discount: z.number().min(0).optional(),
+    totalAmount: z.number().min(0).optional(),
+    totalPaid: z.number().min(0).optional(),
     remainingAmount: z.number(),
+    settlementLines: z.array(z.object({
+      lineType: z.enum(['original','change','additional_fee','compensation','deposit','payment']),
+      amount: z.number(),
+      note: z.string().optional()
+    })).optional(),
     evidences: z.array(z.object({
       fileUrl: z.string().url('Invalid URL format'),
     })).optional(),

@@ -41,9 +41,16 @@ export const getOrderById = async (req: Request, res: Response, next: NextFuncti
 export const createOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const actionUserId = req.user!.userId;
-    const { customerId, eventDate, venueAddress } = req.body;
+    const { customerId, eventDate, eventEndDate, eventType, guestCount, venueAddress } = req.body;
 
-    const result = await orderService.createOrder({ customerId, eventStartDate: eventDate, venueAddress }, actionUserId);
+    const result = await orderService.createOrder({ 
+      customerId, 
+      eventStartDate: eventDate,
+      eventEndDate,
+      eventType,
+      guestCount: guestCount ? Number(guestCount) : undefined,
+      venueAddress 
+    }, actionUserId);
 
     res.status(201).json({
       success: true,

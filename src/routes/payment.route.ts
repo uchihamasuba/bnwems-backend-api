@@ -13,8 +13,8 @@ nestedPaymentRouter.post('/request', authorizeRoles('ADMIN', 'MANAGER'), validat
 
 export const paymentRouter = Router();
 paymentRouter.use(authenticate);
-paymentRouter.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmPaymentSchema), paymentController.confirmPayment);
 
 export const paymentRequestRouter = Router();
 paymentRequestRouter.use(authenticate);
 paymentRequestRouter.get('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(getPaymentRequestByIdSchema), paymentController.getPaymentRequestById);
+paymentRequestRouter.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmPaymentSchema), paymentController.confirmPayment);

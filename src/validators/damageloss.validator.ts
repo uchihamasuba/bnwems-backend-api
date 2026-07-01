@@ -7,7 +7,8 @@ export const recordDamageLossSchema = z.object({
   body: z.object({
     reportDetails: z.object({
       items: z.array(z.object({
-        responsible: z.string().min(1, 'Responsible party is required'),
+        responsibleParty: z.string().min(1, 'Responsible party is required'),
+        responsibleUserId: z.union([z.number(), z.string()]).optional(),
       }).passthrough()).min(1, 'Missing report details.'),
     }),
     evidences: z.array(z.object({

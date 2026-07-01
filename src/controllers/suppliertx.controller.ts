@@ -54,10 +54,10 @@ export const createSupplierTransaction = async (req: AuthRequest, res: Response,
 export const receiveSupplierItems = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { evidenceUrls } = req.body;
+    const { evidenceUrls, items } = req.body;
     const userId = req.user!.userId;
 
-    await supplierTxService.receiveSupplierItems(id, evidenceUrls, userId);
+    await supplierTxService.receiveSupplierItems(id, items || req.body.receivedItems || [], evidenceUrls, userId);
 
     res.status(200).json({
       success: true,
@@ -71,10 +71,10 @@ export const receiveSupplierItems = async (req: AuthRequest, res: Response, next
 export const returnSupplierItems = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { evidenceUrls } = req.body;
+    const { evidenceUrls, items } = req.body;
     const userId = req.user!.userId;
 
-    await supplierTxService.returnSupplierItems(id, evidenceUrls, userId);
+    await supplierTxService.returnSupplierItems(id, items || req.body.returnedItems || [], evidenceUrls, userId);
 
     res.status(200).json({
       success: true,

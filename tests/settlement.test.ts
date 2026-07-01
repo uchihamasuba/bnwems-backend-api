@@ -36,9 +36,9 @@ describe('Settlement API (Module 11)', () => {
         .set('Authorization', `Bearer ${staffToken}`)
         .send({
           originalValue: 1000,
-          additionalFees: 100,
+          additionalFee: 100,
           compensation: 50,
-          paidAmount: 500,
+          totalPaid: 500,
           remainingAmount: 0 // Expected: 1000 + 100 - 50 - 500 = 550. Discrepancy > 0.1
         });
       
@@ -54,9 +54,9 @@ describe('Settlement API (Module 11)', () => {
         .set('Authorization', `Bearer ${staffToken}`)
         .send({
           originalValue: 1000,
-          additionalFees: 100,
+          additionalFee: 100,
           compensation: 50,
-          paidAmount: 500,
+          totalPaid: 500,
           remainingAmount: 550, // Correct
           evidences: []
         });

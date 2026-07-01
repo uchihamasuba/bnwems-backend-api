@@ -41,7 +41,7 @@ class OrderService {
   }
 
   public async createOrder(data: any, actionUserId: string) {
-    const { customerId, eventStartDate, venueAddress } = data;
+    const { customerId, eventStartDate, eventEndDate, eventType, guestCount, venueAddress } = data;
 
     if (new Date(eventStartDate) <= new Date()) {
       throw new AppError('Event date must be in the future.', 400, 'MSG-UC11-01');
@@ -51,6 +51,9 @@ class OrderService {
       data: {
         customerId: BigInt(customerId),
         eventDate: new Date(eventStartDate),
+        eventEndDate: eventEndDate ? new Date(eventEndDate) : null,
+        eventType: eventType || null,
+        guestCount: guestCount || null,
         eventLocation: venueAddress,
         status: 'draft',
         createdBy: BigInt(actionUserId)
@@ -75,8 +78,9 @@ class OrderService {
     });
     if (!order) throw new AppError('Order not found', 404);
 
-    const quote = await prisma.quotation.findUnique({
-      where: { orderId: BigInt(id) }
+    const quote = await prisma.quotation.findFirst({
+      where: { orderId: BigInt(id) },
+      orderBy: { version: 'desc' }
     });
 
     if (!quote || quote.status !== 'confirmed') {

@@ -3,20 +3,24 @@ import { AppError } from '../middlewares/error.middleware';
 
 class QuotationService {
   public async getQuotationsByOrder(orderId: string, page: number, limit: number) {
-    const quotation = await prisma.quotation.findUnique({
+    const quotations = await prisma.quotation.findMany({
       where: { orderId: BigInt(orderId) },
+      orderBy: { version: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
     
-    // API compatibility: return as array
-    const quotations = quotation ? [{
-      ...quotation,
-      version: 1,
-      subtotal: quotation.totalAmount,
-      tax: 0,
-      discount: 0
-    }] : [];
+    const mapped = quotations.map(q => ({
+      ...q,
+      subtotal: q.subtotal,
+      tax: q.tax,
+      discount: q.discount,
+      totalAmount: q.totalAmount
+    }));
 
-    return { quotations, totalCount: quotations.length };
+    const totalCount = await prisma.quotation.count({ where: { orderId: BigInt(orderId) } });
+
+    return { quotations: mapped, totalCount };
   }
 
   public async getQuotationById(id: string) {
@@ -31,10 +35,9 @@ class QuotationService {
     
     return {
       ...quotation,
-      version: 1,
-      subtotal: quotation.totalAmount,
-      tax: 0,
-      discount: 0,
+      subtotal: quotation.subtotal,
+      tax: quotation.tax,
+      discount: quotation.discount,
       items
     };
   }
@@ -45,31 +48,33 @@ class QuotationService {
     const order = await prisma.order.findUnique({ where: { orderId: BigInt(orderId) } });
     if (!order) throw new AppError('Order not found', 404);
 
-    let quote = await prisma.quotation.findUnique({ where: { orderId: BigInt(orderId) } });
+    const latestQuote = await prisma.quotation.findFirst({ 
+      where: { orderId: BigInt(orderId) },
+      orderBy: { version: 'desc' }
+    });
 
+    const newVersion = latestQuote ? latestQuote.version + 1 : 1;
+
+    let quote: any;
     await prisma.$transaction(async (prismaTx) => {
-      if (quote) {
-        quote = await prismaTx.quotation.update({
-          where: { quotationId: quote.quotationId },
-          data: { totalAmount }
-        });
-        await prismaTx.quotationItem.deleteMany({ where: { quotationId: quote.quotationId } });
-      } else {
-        quote = await prismaTx.quotation.create({
-          data: {
-            orderId: BigInt(orderId),
-            customerId: order.customerId,
-            totalAmount,
-            status: 'draft',
-            createdBy: BigInt(actionUserId),
-          },
-        });
-      }
+      quote = await prismaTx.quotation.create({
+        data: {
+          orderId: BigInt(orderId),
+          customerId: order.customerId,
+          subtotal: data.subtotal || totalAmount,
+          tax: data.tax || 0,
+          discount: data.discount || 0,
+          totalAmount,
+          version: newVersion,
+          status: 'draft',
+          createdBy: BigInt(actionUserId),
+        },
+      });
 
       if (items && items.length > 0) {
         await prismaTx.quotationItem.createMany({
           data: items.map((item: any) => ({
-            quotationId: quote!.quotationId,
+            quotationId: quote.quotationId,
             equipmentItemId: BigInt(item.equipmentItemId),
             quantity: item.quantity,
             unitPrice: item.unitPrice,
@@ -84,11 +89,11 @@ class QuotationService {
         userId: BigInt(actionUserId),
         action: 'CREATE_QUOTATION',
         entityType: 'Quotation',
-        entityId: quote!.quotationId,
+        entityId: quote.quotationId,
       },
     });
 
-    return quote!;
+    return quote;
   }
 
   public async updateQuotation(id: string, data: any) {
@@ -104,7 +109,12 @@ class QuotationService {
     await prisma.$transaction(async (prismaTx) => {
       await prismaTx.quotation.update({
         where: { quotationId: BigInt(id) },
-        data: { totalAmount },
+        data: { 
+          subtotal: data.subtotal || totalAmount,
+          tax: data.tax || 0,
+          discount: data.discount || 0,
+          totalAmount 
+        },
       });
       
       if (items) {
@@ -142,7 +152,7 @@ class QuotationService {
 
     await prisma.$transaction([
       prisma.quotation.update({ where: { quotationId: BigInt(id) }, data: { status: 'confirmed' } }),
-      prisma.order.update({ where: { orderId: quote.orderId }, data: { status: 'QUOTED' } }),
+      prisma.order.update({ where: { orderId: quote.orderId }, data: { status: 'confirmed' } }),
     ]);
 
     await prisma.auditLog.create({

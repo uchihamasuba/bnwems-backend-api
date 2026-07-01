@@ -27,7 +27,8 @@ describe('Quotation API (Module 8)', () => {
     });
 
     it('should return list of quotations', async () => {
-      prismaMock.quotation.findUnique.mockResolvedValue({ quotationId: 1n, subtotal: 100 } as any);
+      prismaMock.quotation.findMany.mockResolvedValue([{ quotationId: 1n, subtotal: 100 } as any]);
+      prismaMock.quotation.count.mockResolvedValue(1);
 
       const res = await request(app)
         .get(`/api/v1/orders/${validId2}/quotations`)

@@ -1,4 +1,4 @@
-﻿# Inventory Management
+# Inventory Management
 
 ## Overview
 This module handles **UC 2.13 (Date-based Inventory Management)** and **UC 2.23 (Inventory Check-out Supervision)**.
@@ -88,7 +88,7 @@ It ensures equipment availability by date and manages checkout/return operations
 
 ## 2. Check-out and Return Operations (UC 2.23)
 
-### `GET /api/v1/inventory-reports`
+### `GET /api/v1/inventory/inventory-reports`
 - **Use Case:** UC 2.23 - View Inventory Reports
 - **Description:** Retrieves a history of inventory operations (checkout, return, adjustments).
 - **Query Parameters:**

@@ -1,4 +1,4 @@
-﻿# Sales & Customer Lifecycle: Order Lifecycle & Change Requests
+# Sales & Customer Lifecycle: Order Lifecycle & Change Requests
 
 ## Overview
 This module handles **UC 2.11 (Order Lifecycle Management)** and **UC 2.27 (Field Change Request Management)**.
@@ -18,7 +18,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 - **Query Parameters:**
   - `page` (number, default 1)
   - `limit` (number, default 20)
-  - `status` (enum, optional) - draft, quoted, confirmed, in_progress, completed
+  - `status` (enum, optional) - draft, confirmed, deposit_paid, in_progress, settlement_pending, completed, cancelled
   - `search` (string, optional) - searches `orderNumber`
   - `startDate`, `endDate` (string, optional)
 - **Response (200 OK):**
@@ -32,6 +32,9 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
       "orderNumber": "ORD-2026-0001",
       "customerId": 1,
       "eventStartDate": "2026-10-15T00:00:00Z",
+      "eventEndDate": "2026-10-16T00:00:00Z",
+      "eventType": "wedding",
+      "guestCount": 300,
       "venueAddress": "123 Event Hall",
       "status": "confirmed",
       "createdAt": "2026-06-22T10:00:00Z"
@@ -54,6 +57,9 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
     "orderNumber": "ORD-2026-0001",
     "customerId": 1,
     "eventStartDate": "2026-10-15T00:00:00Z",
+    "eventEndDate": "2026-10-16T00:00:00Z",
+    "eventType": "wedding",
+    "guestCount": 300,
     "venueAddress": "123 Event Hall",
     "status": "confirmed",
     "customer": {
@@ -78,6 +84,8 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
   "customerId": 1,
   "eventStartDate": "2026-10-15T00:00:00Z",
   "eventEndDate": "2026-10-16T00:00:00Z",
+  "eventType": "wedding",
+  "guestCount": 300,
   "venueAddress": "123 Event Hall"
 }
 ```
@@ -87,7 +95,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
   "success": true,
   "code": "MSG-CO-00",
   "message": "Order created successfully.",
-  "data": { "orderId": 1 }
+  "data": { "orderId": 1, "orderNumber": "ORD-2026-0001" }
 }
 ```
 
@@ -191,7 +199,13 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
       "orderId": 1,
       "type": "add",
       "items": [
-        { "equipmentItemId": 1, "quantity": 1, "action": "add" }
+        {
+          "equipmentItemId": 1,
+          "equipmentItemName": "Standard Speaker Set",
+          "equipmentItemCode": "SPK-001",
+          "quantity": 2,
+          "action": "add"
+        }
       ],
       "status": "pending",
       "createdAt": "2026-06-24T09:00:00Z"
@@ -233,7 +247,13 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
     "orderId": 1,
     "type": "add",
     "items": [
-      { "equipmentItemId": 1, "quantity": 1, "action": "add" }
+      {
+        "equipmentItemId": 1,
+        "equipmentItemName": "Standard Speaker Set",
+        "equipmentItemCode": "SPK-001",
+        "quantity": 1,
+        "action": "add"
+      }
     ],
     "status": "pending",
     "createdAt": "2026-06-24T09:00:00Z",

@@ -21,6 +21,9 @@ export const createOrderSchema = z.object({
   body: z.object({
     customerId: z.string().regex(/^\d+$/, 'Invalid ID format'),
     eventDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: 'Invalid date format' }),
+    eventEndDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: 'Invalid date format' }).optional(),
+    eventType: z.string().optional(),
+    guestCount: z.union([z.number(), z.string().regex(/^\d+$/)]).optional(),
     venueAddress: z.string().optional(),
   }),
 });

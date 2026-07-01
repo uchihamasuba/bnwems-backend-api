@@ -3,9 +3,9 @@ import { AppError } from '../middlewares/error.middleware';
 
 class SettlementService {
   public async recordSettlement(orderId: string, data: any, userId: string) {
-    const { originalValue, additionalFees, compensation, paidAmount, remainingAmount, evidences } = data;
+    const { originalValue, changeAdjustment, additionalFee, compensation, discount, totalAmount, totalPaid, remainingAmount, settlementLines, evidences } = data;
 
-    const expectedRemaining = Number(originalValue) + Number(additionalFees || 0) - Number(compensation || 0) - Number(paidAmount || 0);
+    const expectedRemaining = Number(originalValue) + Number(changeAdjustment || 0) + Number(additionalFee || 0) - Number(compensation || 0) - Number(discount || 0) - Number(totalPaid || 0);
     
     if (Math.abs(expectedRemaining - remainingAmount) > 0.1) {
       throw new AppError('Settlement discrepancy detected.', 400, 'MSG-UC30-01');
@@ -15,14 +15,28 @@ class SettlementService {
       data: {
         orderId: BigInt(orderId),
         originalValue,
-        additionalFee: additionalFees || 0,
+        changeAdjustment: changeAdjustment || 0,
+        additionalFee: additionalFee || 0,
         compensation: compensation || 0,
-        totalPaid: paidAmount || 0,
+        discount: discount || 0,
+        totalAmount: totalAmount || (Number(originalValue) + Number(changeAdjustment || 0) + Number(additionalFee || 0) - Number(compensation || 0) - Number(discount || 0)),
+        totalPaid: totalPaid || 0,
         remainingAmount,
         status: 'draft',
         recordedBy: BigInt(userId),
       },
     });
+
+    if (settlementLines && Array.isArray(settlementLines)) {
+      await prisma.settlementLine.createMany({
+        data: settlementLines.map((line: any) => ({
+          settlementId: newSettlement.settlementId,
+          lineType: line.lineType,
+          amount: line.amount,
+          note: line.note || null,
+        }))
+      });
+    }
 
     if (evidences && Array.isArray(evidences)) {
       for (const e of evidences) {
@@ -75,7 +89,10 @@ class SettlementService {
   public async getSettlementByOrder(orderId: string) {
     const settlement = await prisma.settlement.findFirst({
       where: { orderId: BigInt(orderId) },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        settlementLines: true
+      }
     });
 
     if (!settlement) {

@@ -19,7 +19,6 @@ nestedTaskRouter.post('/', authorizeRoles('ADMIN', 'MANAGER'), validate(createTa
 
 export const taskRouter = Router();
 taskRouter.use(authenticate);
-taskRouter.post('/', authorizeRoles('ADMIN', 'MANAGER'), validate(createTaskSchema), taskController.createTask);
 taskRouter.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getTasksSchema), taskController.getTasks);
 taskRouter.get('/assigned', validate(getAssignedTasksSchema), taskController.getAssignedTasks);
 taskRouter.get('/:id/pick-list', validate(viewPickListSchema), taskController.viewPickList);

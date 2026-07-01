@@ -17,3 +17,17 @@ export const assignStaff = async (req: AuthRequest, res: Response, next: NextFun
     next(error);
   }
 };
+
+export const getAssignments = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { orderId } = req.params;
+    const assignments = await assignmentService.getAssignmentsByOrder(orderId);
+
+    res.status(200).json({
+      success: true,
+      data: assignments
+    });
+  } catch (error) {
+    next(error);
+  }
+};

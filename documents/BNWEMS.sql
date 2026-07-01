@@ -33,7 +33,9 @@ DROP TABLE IF EXISTS task_progress_updates;
 DROP TABLE IF EXISTS assignments;
 DROP TABLE IF EXISTS work_tasks;
 DROP TABLE IF EXISTS schedules;
+DROP TABLE IF EXISTS settlement_lines;
 DROP TABLE IF EXISTS settlements;
+DROP TABLE IF EXISTS order_status_history;
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS payment_requests;
 DROP TABLE IF EXISTS company_bank_accounts;
@@ -134,9 +136,12 @@ CREATE TABLE orders (
   order_number   VARCHAR(30) NULL,
   customer_id    BIGINT NOT NULL,
   event_date     DATE   NOT NULL,
+  event_end_date DATE   NULL,
+  event_type     VARCHAR(50) NULL,
+  guest_count    INT    NULL,
   event_location VARCHAR(255) NULL,
   total_value    DECIMAL(12,2) NOT NULL DEFAULT 0,
-  status         ENUM('draft','confirmed','in_progress','completed','cancelled') NOT NULL DEFAULT 'draft',
+  status         ENUM('draft','confirmed','deposit_paid','in_progress','settlement_pending','completed','cancelled') NOT NULL DEFAULT 'draft',
   revenue_status ENUM('pending','recognized') NOT NULL DEFAULT 'pending',
   recognized_at  DATETIME NULL,
   created_by     BIGINT NOT NULL,
@@ -163,12 +168,16 @@ CREATE TABLE quotations (
   quotation_id BIGINT NOT NULL AUTO_INCREMENT,
   customer_id  BIGINT NOT NULL,
   order_id     BIGINT NOT NULL,
+  version      INT NOT NULL DEFAULT 1,
+  subtotal     DECIMAL(12,2) NOT NULL DEFAULT 0,
+  tax          DECIMAL(12,2) NOT NULL DEFAULT 0,
+  discount     DECIMAL(12,2) NOT NULL DEFAULT 0,
   total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
   status       ENUM('draft','confirmed','deleted') NOT NULL DEFAULT 'draft',
   created_by   BIGINT NOT NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (quotation_id), UNIQUE KEY uq_quotation_order (order_id),
+  PRIMARY KEY (quotation_id), KEY idx_quotation_order (order_id),
   CONSTRAINT fk_quotation_customer FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
   CONSTRAINT fk_quotation_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id),
   CONSTRAINT fk_quotation_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id)
@@ -249,6 +258,7 @@ CREATE TABLE settlements (
   change_adjustment DECIMAL(12,2) NOT NULL DEFAULT 0,
   additional_fee    DECIMAL(12,2) NOT NULL DEFAULT 0,
   compensation      DECIMAL(12,2) NOT NULL DEFAULT 0,
+  discount          DECIMAL(12,2) NOT NULL DEFAULT 0,
   total_amount      DECIMAL(12,2) NOT NULL DEFAULT 0,  -- hóa đơn cuối
   total_paid        DECIMAL(12,2) NOT NULL DEFAULT 0,
   remaining_amount  DECIMAL(12,2) NOT NULL DEFAULT 0,  -- còn phải thu
@@ -262,6 +272,17 @@ CREATE TABLE settlements (
   CONSTRAINT fk_settle_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
   CONSTRAINT fk_settle_recorder  FOREIGN KEY (recorded_by)  REFERENCES internal_users (user_id),
   CONSTRAINT fk_settle_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE settlement_lines (
+  id              BIGINT NOT NULL AUTO_INCREMENT,
+  settlement_id   BIGINT NOT NULL,
+  line_type       ENUM('original','change','additional_fee','compensation','deposit','payment') NOT NULL,
+  amount          DECIMAL(12,2) NOT NULL,
+  note            VARCHAR(255) NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), KEY idx_sline_settle (settlement_id),
+  CONSTRAINT fk_sline_settle FOREIGN KEY (settlement_id) REFERENCES settlements (settlement_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 6. SCHEDULE (gộp plan + activities) ----------------------------------------
@@ -292,6 +313,7 @@ CREATE TABLE work_tasks (
   title         VARCHAR(200) NOT NULL,
   description   TEXT NULL,
   status        ENUM('draft','assigned','in_progress','done') NOT NULL DEFAULT 'draft',
+  progress_percent INT NOT NULL DEFAULT 0,
   created_by    BIGINT NOT NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -306,6 +328,7 @@ CREATE TABLE assignments (
   work_task_id  BIGINT NOT NULL,
   user_id       BIGINT NOT NULL,
   role_in_task  ENUM('leader','technical') NOT NULL,
+  field_status  ENUM('pending','ready','in_setup','completed') NOT NULL DEFAULT 'pending',
   assigned_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (assignment_id), UNIQUE KEY uq_assign (work_task_id, user_id),
   CONSTRAINT fk_assign_task FOREIGN KEY (work_task_id) REFERENCES work_tasks (work_task_id) ON DELETE CASCADE,
@@ -467,6 +490,8 @@ CREATE TABLE supplier_transaction_items (
   equipment_item_id       BIGINT NULL,
   description             VARCHAR(255) NULL,
   quantity                INT NOT NULL,
+  quantity_received       INT NOT NULL DEFAULT 0,
+  quantity_returned       INT NOT NULL DEFAULT 0,
   unit_cost               DECIMAL(12,2) NOT NULL,
   PRIMARY KEY (id), KEY idx_stitem_trans (supplier_transaction_id),
   CONSTRAINT fk_stitem_trans     FOREIGN KEY (supplier_transaction_id) REFERENCES supplier_transactions (supplier_transaction_id) ON DELETE CASCADE,
@@ -584,6 +609,8 @@ CREATE TABLE damage_loss_items (
   source                       ENUM('internal','supplier') NOT NULL DEFAULT 'internal',
   supplier_transaction_item_id BIGINT NULL,
   compensation_amount          DECIMAL(12,2) NOT NULL DEFAULT 0,
+  responsible_party            VARCHAR(20) NULL,
+  responsible_user_id          BIGINT NULL,
   PRIMARY KEY (id), KEY idx_dli_report (damage_loss_id),
   CONSTRAINT fk_dli_report    FOREIGN KEY (damage_loss_id)               REFERENCES damage_loss_reports (damage_loss_id) ON DELETE CASCADE,
   CONSTRAINT fk_dli_equipment FOREIGN KEY (equipment_item_id)            REFERENCES equipment (equipment_item_id),
@@ -656,6 +683,18 @@ CREATE TABLE audit_logs (
   PRIMARY KEY (log_id), KEY idx_audit_entity (entity_type, entity_id),
   CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES internal_users (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE order_status_history (
+  history_id  BIGINT NOT NULL AUTO_INCREMENT,
+  order_id    BIGINT NOT NULL,
+  from_status VARCHAR(50) NULL,
+  to_status   VARCHAR(50) NOT NULL,
+  changed_by  BIGINT NULL,
+  changed_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  note        TEXT NULL,
+  PRIMARY KEY (history_id), KEY idx_osh_order (order_id),
+  CONSTRAINT fk_osh_order FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- =============================================================================
 -- SEED — khớp schema 40 bảng. 3 đơn: 1 hoàn tất, 2 thi công, 3 xác nhận.
 -- Tài khoản: admin/Admin@123 · manager01/Manager@123 · leader01..02/Leader@123 · tech01..02/Tech@123
@@ -723,10 +762,10 @@ INSERT INTO company_bank_accounts (bank_account_id, bank_code, account_number, a
 INSERT INTO wage_rules (wage_rule_id, role_in_task, rate_per_session, effective_from) VALUES
   (1,'leader',500000,'2026-01-01'),(2,'technical',350000,'2026-01-01');
 
-INSERT INTO orders (order_id, order_number, customer_id, event_date, event_location, total_value, status, revenue_status, recognized_at, created_by) VALUES
-  (1,'DH-2026-0001',1,'2026-05-10','Trung tâm tiệc cưới Sao Mai',50000000,'completed','recognized','2026-05-31 18:00:00',2),
-  (2,'DH-2026-0002',2,'2026-06-20','Hội trường công ty XYZ',30000000,'in_progress','pending',NULL,2),
-  (3,'DH-2026-0003',3,'2026-07-15','Nhà văn hóa Hà Đông',18000000,'confirmed','pending',NULL,2);
+INSERT INTO orders (order_id, order_number, customer_id, event_date, event_end_date, event_type, guest_count, event_location, total_value, status, revenue_status, recognized_at, created_by) VALUES
+  (1,'DH-2026-0001',1,'2026-05-10','2026-05-11','wedding',300,'Trung tâm tiệc cưới Sao Mai',50000000,'completed','recognized','2026-05-31 18:00:00',2),
+  (2,'DH-2026-0002',2,'2026-06-20',NULL,'corporate',150,'Hội trường công ty XYZ',30000000,'in_progress','pending',NULL,2),
+  (3,'DH-2026-0003',3,'2026-07-15',NULL,'birthday',50,'Nhà văn hóa Hà Đông',18000000,'confirmed','pending',NULL,2);
 
 INSERT INTO order_items (id, order_id, equipment_item_id, quantity, unit_price, source) VALUES
   (1,1,1,20,50000,'internal'),(2,1,5,200,25000,'internal'),(3,1,8,20,15000,'internal'),
@@ -734,8 +773,8 @@ INSERT INTO order_items (id, order_id, equipment_item_id, quantity, unit_price, 
   (7,2,2,15,40000,'internal'),(8,2,4,150,10000,'internal'),(9,2,50,1,500000,'internal'),
   (10,3,2,10,40000,'internal'),(11,3,3,80,8000,'internal'),(12,3,27,1,150000,'internal');
 
-INSERT INTO quotations (quotation_id, customer_id, order_id, total_amount, status, created_by) VALUES
-  (1,1,1,50000000,'confirmed',2),(2,2,2,30000000,'confirmed',2),(3,3,3,18000000,'confirmed',2);
+INSERT INTO quotations (quotation_id, customer_id, order_id, subtotal, tax, discount, total_amount, status, created_by) VALUES
+  (1,1,1,50000000,0,0,50000000,'confirmed',2),(2,2,2,30000000,0,0,30000000,'confirmed',2),(3,3,3,18000000,0,0,18000000,'confirmed',2);
 
 INSERT INTO quotation_items (id, quotation_id, equipment_item_id, quantity, unit_price, line_total) VALUES
   (1,1,1,20,50000,1000000),(2,1,5,200,25000,5000000),(3,1,8,20,15000,300000),
@@ -826,8 +865,8 @@ INSERT INTO supplier_transactions (supplier_transaction_id, supplier_id, order_i
   (1,1,1,'rental',5000000,5000000,'paid','returned',2),
   (2,2,2,'purchase',3000000,0,'unpaid','received',2);
 
-INSERT INTO supplier_transaction_items (id, supplier_transaction_id, equipment_item_id, description, quantity, unit_cost) VALUES
-  (1,1,46,'Thuê chữ phông cao cấp',1,3000000),(2,1,NULL,'Thuê backdrop đặc biệt',1,2000000),(3,2,NULL,'Mua hoa tươi',1,3000000);
+INSERT INTO supplier_transaction_items (id, supplier_transaction_id, equipment_item_id, description, quantity, quantity_received, quantity_returned, unit_cost) VALUES
+  (1,1,46,'Thuê chữ phông cao cấp',1,1,1,3000000),(2,1,NULL,'Thuê backdrop đặc biệt',1,1,1,2000000),(3,2,NULL,'Mua hoa tươi',1,1,0,3000000);
 
 INSERT INTO supplier_payments (payment_id, supplier_transaction_id, amount, paid_at, recorded_by, note) VALUES
   (1,1,5000000,'2026-05-20 10:00:00',2,'Thanh toán NCC Minh Anh');

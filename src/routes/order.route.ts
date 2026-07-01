@@ -20,6 +20,10 @@ router.get('/:id/field-progress', authorizeRoles('ADMIN', 'MANAGER'), orderContr
 router.get('/:id/evidences', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF', 'TECHNICAL_STAFF'), validate(getOrderEvidencesSchema), orderController.getOrderEvidences);
 router.get('/:id/mobile-summary', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF', 'TECHNICAL_STAFF'), validate(getMobileSummarySchema), orderController.getMobileSummary);
 router.get('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(getOrderByIdSchema), orderController.getOrderById);
+
+import * as assignmentController from '../controllers/assignment.controller';
+router.get('/:orderId/assignments', authorizeRoles('ADMIN', 'MANAGER'), assignmentController.getAssignments);
+
 router.post('/', authorizeRoles('ADMIN', 'MANAGER'), validate(createOrderSchema), orderController.createOrder);
 router.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmOrderSchema), orderController.confirmOrder);
 router.put('/:id/change-date', authorizeRoles('ADMIN', 'MANAGER'), validate(changeEventDateSchema), orderController.changeEventDate);

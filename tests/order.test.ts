@@ -149,7 +149,7 @@ describe('Order API (Module 8)', () => {
 
     it('should confirm order successfully', async () => {
       prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n } as any);
-      prismaMock.quotation.findUnique.mockResolvedValue({ status: 'confirmed' } as any);
+      prismaMock.quotation.findFirst.mockResolvedValue({ status: 'confirmed' } as any);
       prismaMock.order.update.mockResolvedValue({} as any);
 
       const res = await request(app)
@@ -187,6 +187,22 @@ describe('Order API (Module 8)', () => {
     it('should get payment requests for order', async () => {
       const res = await request(app).get('/api/v1/orders/1/payment-requests').set('Authorization', `Bearer ${adminToken}`);
       expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+    });
+  });
+
+  describe('GET /api/v1/orders/:id/assignments', () => {
+    it('should return list of assignments for the order', async () => {
+      prismaMock.assignment.findMany.mockResolvedValue([
+        { assignmentId: 1n, workTaskId: 1n, userId: 1n, roleInTask: 'LEADER' } as any
+      ]);
+
+      const res = await request(app)
+        .get(`/api/v1/orders/${validId1}/assignments`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
     });
   });
 

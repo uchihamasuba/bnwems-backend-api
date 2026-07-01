@@ -29,6 +29,9 @@ class ChangeRequestService {
         changeRequestId: {
           in: changeRequestIds
         }
+      },
+      include: {
+        equipmentItem: true
       }
     });
 
@@ -38,6 +41,8 @@ class ChangeRequestService {
         id: item.id.toString(),
         changeRequestId: item.changeRequestId.toString(),
         equipmentItemId: item.equipmentItemId.toString(),
+        equipmentItemName: item.equipmentItem?.name,
+        equipmentItemCode: item.equipmentItem?.code
       }));
       
       return {
@@ -61,7 +66,8 @@ class ChangeRequestService {
     if (!req) throw new AppError('Change request not found', 404);
 
     const items = await prisma.changeRequestItem.findMany({
-      where: { changeRequestId: BigInt(id) }
+      where: { changeRequestId: BigInt(id) },
+      include: { equipmentItem: true }
     });
 
     return {
@@ -76,6 +82,8 @@ class ChangeRequestService {
         id: item.id.toString(),
         changeRequestId: item.changeRequestId.toString(),
         equipmentItemId: item.equipmentItemId.toString(),
+        equipmentItemName: item.equipmentItem?.name,
+        equipmentItemCode: item.equipmentItem?.code
       }))
     };
   }

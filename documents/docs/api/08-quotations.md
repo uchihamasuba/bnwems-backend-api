@@ -1,4 +1,4 @@
-﻿# Sales & Customer Lifecycle: Quotation Management
+# Sales & Customer Lifecycle: Quotation Management
 
 ## Overview
 This module handles **UC 2.10 (Quotation Management)**.
@@ -107,7 +107,7 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 - **Use Case:** UC 2.10 - Update Quotation
 - **Description:** Updates the details of an existing draft quotation. 
 - **Business Rules:**
-  - BR-10-04: Cannot update if `status` is `accepted` (throws MSG-UC10-04).
+  - BR-10-04: Cannot update if `status` is `confirmed` (throws MSG-UC10-04).
 - **Request Body:**
 ```json
 {
@@ -137,7 +137,7 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 - **Use Case:** UC 2.10 - Soft Delete Quotation
 - **Description:** Soft-deletes a quotation.
 - **Business Rules:**
-  - BR-10-05: Cannot delete accepted quotations.
+  - BR-10-05: Cannot delete confirmed quotations.
 - **Response (200 OK):**
 ```json
 {
@@ -151,14 +151,14 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 - **Use Case:** UC 2.10 - Confirm Quotation
 - **Description:** Confirms the quotation as agreed by the customer. 
 - **Business Rules:**
-  - BR-10-06: Transitions the quotation status to `accepted`.
-  - BR-10-07: Automatically updates the parent `Order` status to `quoted`.
+  - BR-10-06: Transitions the quotation status to `confirmed`.
+  - BR-10-07: Automatically updates the parent `Order` status to `confirmed` (if it was `draft`).
 - **Response (200 OK):**
 ```json
 {
   "success": true,
   "code": "MSG-QO-00",
   "message": "Quotation confirmed.",
-  "data": { "status": "accepted" }
+  "data": { "status": "confirmed" }
 }
 ```

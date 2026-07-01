@@ -66,7 +66,7 @@ class SupplierTxService {
     return newTx;
   }
 
-  public async receiveSupplierItems(id: string, evidenceUrls: string[], userId: string) {
+  public async receiveSupplierItems(id: string, items: any[], evidenceUrls: string[], userId: string) {
     const tx = await prisma.supplierTransaction.findUnique({ where: { supplierTransactionId: BigInt(id) } });
     if (!tx) throw new AppError('Transaction not found', 404);
 
@@ -77,6 +77,15 @@ class SupplierTxService {
           status: 'completed',
         },
       });
+
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          await prismaTx.supplierTransactionItem.updateMany({
+            where: { supplierTransactionId: BigInt(id), equipmentItemId: BigInt(item.equipmentItemId) },
+            data: { quantityReceived: item.quantityReceived }
+          });
+        }
+      }
 
       if (evidenceUrls && Array.isArray(evidenceUrls)) {
         await Promise.all(evidenceUrls.map(url => prismaTx.evidence.create({
@@ -93,24 +102,35 @@ class SupplierTxService {
     });
   }
 
-  public async returnSupplierItems(id: string, evidenceUrls: string[], userId: string) {
-    await prisma.supplierTransaction.update({
-      where: { supplierTransactionId: BigInt(id) },
-      data: {
-        status: 'returned',
-      },
-    });
-
-    if (evidenceUrls && Array.isArray(evidenceUrls)) {
-      await Promise.all(evidenceUrls.map(url => prisma.evidence.create({
+  public async returnSupplierItems(id: string, items: any[], evidenceUrls: string[], userId: string) {
+    await prisma.$transaction(async (prismaTx) => {
+      await prismaTx.supplierTransaction.update({
+        where: { supplierTransactionId: BigInt(id) },
         data: {
-          refType: 'SupplierTransaction',
-          refId: BigInt(id),
-          fileUrl: url,
-          uploadedBy: BigInt(userId)
+          status: 'returned',
+        },
+      });
+
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          await prismaTx.supplierTransactionItem.updateMany({
+            where: { supplierTransactionId: BigInt(id), equipmentItemId: BigInt(item.equipmentItemId) },
+            data: { quantityReturned: item.quantityReturned }
+          });
         }
-      })));
-    }
+      }
+
+      if (evidenceUrls && Array.isArray(evidenceUrls)) {
+        await Promise.all(evidenceUrls.map(url => prismaTx.evidence.create({
+          data: {
+            refType: 'SupplierTransaction',
+            refId: BigInt(id),
+            fileUrl: url,
+            uploadedBy: BigInt(userId)
+          }
+        })));
+      }
+    });
   }
 
   public async updateSupplierTxStatus(id: string, status: string, evidenceUrls: string[], userId: string) {
