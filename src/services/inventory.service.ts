@@ -31,6 +31,55 @@ class InventoryService {
     return { inventory: data, totalCount };
   }
 
+  public async createInventory(data: any) {
+    const equipmentItemId = BigInt(data.equipmentItemId);
+    
+    const eq = await prisma.equipment.findUnique({ where: { equipmentItemId } });
+    if (!eq) {
+      throw new AppError('Equipment not found', 404);
+    }
+
+    const newInventory = await prisma.inventory.create({
+      data: {
+        equipmentItemId,
+        totalQuantity: data.availableQuantity,
+        availableQuantity: data.availableQuantity,
+        reservedQuantity: 0,
+        damagedQuantity: 0,
+      },
+    });
+
+    return newInventory;
+  }
+
+  public async updateInventory(id: string, data: any) {
+    const inventoryId = BigInt(id);
+
+    const existing = await prisma.inventory.findUnique({
+      where: { inventoryId },
+    });
+    if (!existing) {
+      throw new AppError('Inventory not found', 404);
+    }
+
+    const availableQuantity = data.availableQuantity ?? existing.availableQuantity;
+    const reservedQuantity = data.reservedQuantity ?? existing.reservedQuantity;
+    const damagedQuantity = data.damagedQuantity ?? existing.damagedQuantity;
+    const totalQuantity = availableQuantity + reservedQuantity + damagedQuantity;
+
+    const updated = await prisma.inventory.update({
+      where: { inventoryId },
+      data: {
+        totalQuantity,
+        availableQuantity,
+        reservedQuantity,
+        damagedQuantity,
+      },
+    });
+
+    return updated;
+  }
+
   public async checkAvailability(eventDate: string, itemId: string) {
     const inventories = await prisma.inventory.findMany({
       where: { equipmentItemId: BigInt(itemId) },

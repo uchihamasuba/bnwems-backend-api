@@ -171,15 +171,40 @@ describe('Order API (Module 8)', () => {
 
   describe('GET /api/v1/orders/:id/evidences', () => {
     it('should get evidences for order', async () => {
+      prismaMock.evidence.findMany.mockResolvedValue([{ evidenceId: 1n }] as any);
       const res = await request(app).get('/api/v1/orders/1/evidences').set('Authorization', `Bearer ${adminToken}`);
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
     });
   });
 
   describe('GET /api/v1/orders/:id/mobile-summary', () => {
     it('should get mobile summary for order', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n, customerId: 1n } as any);
+      prismaMock.customer.findUnique.mockResolvedValue({ customerId: 1n } as any);
+      prismaMock.workTask.findMany.mockResolvedValue([{ workTaskId: 1n, orderId: 1n }] as any);
+      prismaMock.payment.findMany.mockResolvedValue([{ paymentId: 1n, orderId: 1n }] as any);
+      prismaMock.changeRequest.findMany.mockResolvedValue([{ changeRequestId: 1n, orderId: 1n, requestedBy: 1n }] as any);
+      prismaMock.handoverRecord.findMany.mockResolvedValue([{ handoverId: 1n, orderId: 1n, recordedBy: 1n }] as any);
+
       const res = await request(app).get('/api/v1/orders/1/mobile-summary').set('Authorization', `Bearer ${adminToken}`);
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('GET /api/v1/orders/:id/workflow-timeline', () => {
+    it('should get workflow timeline for order', async () => {
+      prismaMock.auditLog.findMany.mockResolvedValue([{ action: 'CREATE_ORDER', createdAt: new Date(), userId: 1n }] as any);
+      prismaMock.workTask.findMany.mockResolvedValue([{ taskCategory: 'SETUP', status: 'done', updatedAt: new Date(), workTaskId: 1n }] as any);
+      prismaMock.payment.findMany.mockResolvedValue([{ status: 'success', paidAt: new Date(), amount: 100 }] as any);
+      prismaMock.changeRequest.findMany.mockResolvedValue([{ status: 'approved', updatedAt: new Date(), type: 'add' }] as any);
+
+      const res = await request(app).get(`/api/v1/orders/${validId1}/workflow-timeline`).set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(4);
     });
   });
 

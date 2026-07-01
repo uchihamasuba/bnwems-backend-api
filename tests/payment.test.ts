@@ -103,7 +103,7 @@ describe('Payment API (Module 11)', () => {
       const res = await request(app)
         .put(`/api/v1/payment-requests/${validId2}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'COMPLETED' });
+        .send({ status: 'completed' });
 
       expect(res.status).toBe(404);
     });
@@ -120,7 +120,7 @@ describe('Payment API (Module 11)', () => {
       const res = await request(app)
         .put(`/api/v1/payment-requests/${validId2}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'COMPLETED', evidenceUrl: 'http://example.com/receipt.jpg' });
+        .send({ status: 'completed', evidenceUrl: 'http://example.com/receipt.jpg' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -130,10 +130,16 @@ describe('Payment API (Module 11)', () => {
 
   describe('GET /api/v1/payment-requests/:id', () => {
     it('should return payment request details', async () => {
+      prismaMock.paymentRequest.findUnique.mockResolvedValue({ paymentRequestId: 1n, orderId: 1n } as any);
+      prismaMock.payment.findMany.mockResolvedValue([{ paymentId: 2n, orderId: 1n }] as any);
+
       const res = await request(app)
         .get('/api/v1/payment-requests/1')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+        
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.payments).toHaveLength(1);
     });
   });
 });

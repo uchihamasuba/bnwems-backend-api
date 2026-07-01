@@ -20,6 +20,9 @@ import { settlementRouter } from './settlement.route';
 import reportRoutes from './report.route';
 import dashboardRoutes from './dashboard.route';
 import uploadRoutes from './upload.route';
+import catalogRoutes from './catalog.route';
+import warehouseHistoryRoutes from './warehouse-history.route';
+import managerRoutes from './manager.route';
 
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 
@@ -29,6 +32,7 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/equipment', equipmentRoutes);
+router.use('/', catalogRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/policies', policyRoutes);
 router.use('/attendance', attendanceRoutes);
@@ -38,6 +42,7 @@ router.use('/orders', orderRoutes);
 router.use('/quotations', quotationRouter);
 router.use('/change-requests', changeRequestRouter);
 router.use('/inventory', inventoryRoutes);
+router.use('/warehouse-histories', warehouseHistoryRoutes);
 router.use('/schedules', scheduleRoutes);
 router.use('/tasks', taskRouter);
 router.use('/', suppliertxRoutes);
@@ -47,5 +52,6 @@ router.use('/settlements', settlementRouter);
 router.use('/reports', reportRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/manager', managerRoutes);
 
 export default router;

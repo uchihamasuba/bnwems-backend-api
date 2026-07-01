@@ -262,11 +262,14 @@ describe('Task API (Module 8)', () => {
 
   describe('PUT /api/v1/tasks/:id/survey-report/review', () => {
     it('should review survey report', async () => {
+      prismaMock.surveyReport.findFirst.mockResolvedValue({ surveyReportId: 1n, status: 'submitted' } as any);
+      prismaMock.surveyReport.update.mockResolvedValue({} as any);
       const res = await request(app)
         .put('/api/v1/tasks/1/survey-report/review')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'confirmed' });
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+        .send({ status: 'approved' });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
     });
   });
 });

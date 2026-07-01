@@ -60,3 +60,9 @@ export const getMobileSummarySchema = z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
 });
+
+export const getWorkflowTimelineSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+});

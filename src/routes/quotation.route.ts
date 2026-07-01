@@ -17,5 +17,6 @@ quotationRouter.use(authenticate);
 quotationRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
 quotationRouter.get('/:id', validate(getQuotationByIdSchema), quotationController.getQuotationById);
 quotationRouter.put('/:id', validate(updateQuotationSchema), quotationController.updateQuotation);
+quotationRouter.delete('/:id', validate(deleteQuotationSchema), quotationController.deleteQuotation);
 quotationRouter.put('/:id/confirm', validate(confirmQuotationSchema), quotationController.confirmQuotation);
 quotationRouter.patch('/:id/status', validate(updateQuotationStatusSchema), quotationController.updateQuotationStatus);

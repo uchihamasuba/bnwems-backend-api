@@ -29,7 +29,8 @@ export const confirmPaymentSchema = z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
-    status: z.string().min(1, 'Status is required'),
+    status: z.enum(['completed', 'failed']),
     evidenceUrl: z.string().url('Invalid URL format').optional(),
+    note: z.string().optional(),
   }),
 });

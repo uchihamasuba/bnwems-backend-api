@@ -2,10 +2,27 @@ import { z } from 'zod';
 
 export const getInventorySchema = z.object({
   query: z.object({
-    warehouseId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),
-    catalogItemId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),
     page: z.string().regex(/^\d+$/, 'Page must be a number').optional(),
     limit: z.string().regex(/^\d+$/, 'Limit must be a number').optional(),
+    equipmentItemId: z.string().regex(/^\d+$/, 'Invalid equipmentItemId').optional(),
+  }),
+});
+
+export const createInventorySchema = z.object({
+  body: z.object({
+    equipmentItemId: z.number().int().positive('equipmentItemId is required'),
+    availableQuantity: z.number().int().min(0, 'availableQuantity must be >= 0'),
+  }),
+});
+
+export const updateInventorySchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+  body: z.object({
+    availableQuantity: z.number().int().min(0, 'availableQuantity must be >= 0').optional(),
+    reservedQuantity: z.number().int().min(0, 'reservedQuantity must be >= 0').optional(),
+    damagedQuantity: z.number().int().min(0, 'damagedQuantity must be >= 0').optional(),
   }),
 });
 

@@ -15,28 +15,75 @@ It ensures equipment availability by date and manages checkout/return operations
 
 ### `GET /api/v1/inventory`
 - **Use Case:** UC 2.13 - View Inventory
-- **Description:** Retrieves the current stock levels.
-- **Query Parameters:**
-  - `equipmentItemId` (string, optional)
+- **Description:** Retrieves a paginated list of inventory across warehouses.
+- **Query Parameters:** 
   - `page` (number, default 1)
   - `limit` (number, default 20)
+  - `equipmentItemId` (string, optional)
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-WH-00",
   "data": [
     {
-      "inventoryId": 1,
-      "equipmentItemId": 1,
+      "inventoryId": "1",
+      "equipmentItemId": "1",
       "totalQuantity": 100,
-      "availableQuantity": 80,
-      "reservedQuantity": 18,
-      "damagedQuantity": 2,
-      "updatedAt": "2026-06-22T10:00:00Z"
+      "availableQuantity": 90,
+      "reservedQuantity": 10,
+      "damagedQuantity": 0
     }
   ],
-  "meta": { "page": 1, "limit": 20, "totalCount": 150 }
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "totalCount": 1
+  }
+}
+```
+
+### `POST /api/v1/inventory`
+- **Use Case:** UC 2.13 - Adjust Inventory
+- **Description:** Adds new inventory for an equipment item. Admin/Manager only.
+- **Request Body:**
+```json
+{
+  "equipmentItemId": 1,
+  "availableQuantity": 100
+}
+```
+- **Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Inventory created successfully.",
+  "data": {
+    "inventoryId": "1",
+    "equipmentItemId": "1",
+    "totalQuantity": 100,
+    "availableQuantity": 100,
+    "reservedQuantity": 0,
+    "damagedQuantity": 0
+  }
+}
+```
+
+### `PUT /api/v1/inventory/:id`
+- **Use Case:** UC 2.13 - Adjust Inventory
+- **Description:** Manually adjusts inventory levels. Admin/Manager only.
+- **Request Body:**
+```json
+{
+  "availableQuantity": 90,
+  "reservedQuantity": 10,
+  "damagedQuantity": 0
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Inventory updated successfully."
 }
 ```
 

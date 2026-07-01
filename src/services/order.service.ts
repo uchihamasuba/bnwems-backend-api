@@ -151,11 +151,123 @@ class OrderService {
       where: { orderId: BigInt(id) },
     });
 
+    const payments = await prisma.payment.findMany({
+      where: { orderId: BigInt(id) },
+    });
+
+    const changeRequests = await prisma.changeRequest.findMany({
+      where: { orderId: BigInt(id) },
+    });
+
+    const handovers = await prisma.handoverRecord.findMany({
+      where: { orderId: BigInt(id) },
+    });
+
     return {
-      order,
-      customer,
-      tasks,
+      order: {
+        ...order,
+        orderId: order.orderId.toString(),
+        customerId: order.customerId.toString(),
+        createdBy: order.createdBy?.toString(),
+      },
+      customer: {
+        ...customer,
+        customerId: customer?.customerId.toString(),
+      },
+      tasks: tasks.map(t => ({
+        ...t,
+        workTaskId: t.workTaskId.toString(),
+        orderId: t.orderId.toString(),
+        createdBy: t.createdBy?.toString(),
+      })),
+      payments: payments.map(p => ({
+        ...p,
+        paymentId: p.paymentId.toString(),
+        orderId: p.orderId.toString(),
+        paymentRequestId: p.paymentRequestId?.toString(),
+        confirmedBy: p.confirmedBy?.toString(),
+      })),
+      changeRequests: changeRequests.map(c => ({
+        ...c,
+        changeRequestId: c.changeRequestId.toString(),
+        orderId: c.orderId.toString(),
+        requestedBy: c.requestedBy.toString(),
+        approvedBy: c.approvedBy?.toString(),
+        reconciledBy: c.reconciledBy?.toString(),
+      })),
+      handovers: handovers.map(h => ({
+        ...h,
+        handoverId: h.handoverId.toString(),
+        orderId: h.orderId.toString(),
+        recordedBy: h.recordedBy.toString(),
+      })),
     };
+  }
+
+  public async getWorkflowTimeline(id: string) {
+    const orderId = BigInt(id);
+
+    const auditLogs = await prisma.auditLog.findMany({
+      where: { entityType: 'Order', entityId: orderId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const tasks = await prisma.workTask.findMany({
+      where: { orderId },
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    const payments = await prisma.payment.findMany({
+      where: { orderId },
+      orderBy: { paidAt: 'asc' },
+    });
+
+    const changeRequests = await prisma.changeRequest.findMany({
+      where: { orderId },
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    const timeline: any[] = [];
+
+    auditLogs.forEach(log => {
+      timeline.push({
+        type: 'AUDIT',
+        title: log.action,
+        timestamp: log.createdAt,
+        user: log.userId?.toString(),
+      });
+    });
+
+    tasks.forEach(task => {
+      timeline.push({
+        type: 'TASK',
+        title: `Task ${task.taskCategory} - ${task.status}`,
+        timestamp: task.updatedAt,
+        details: task.workTaskId.toString(),
+      });
+    });
+
+    payments.forEach(payment => {
+      timeline.push({
+        type: 'PAYMENT',
+        title: `Payment ${payment.status}`,
+        timestamp: payment.paidAt,
+        amount: payment.amount,
+      });
+    });
+
+    changeRequests.forEach(cr => {
+      timeline.push({
+        type: 'CHANGE_REQUEST',
+        title: `Change Request - ${cr.status}`,
+        timestamp: cr.updatedAt,
+        details: cr.type,
+      });
+    });
+
+    timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    return timeline;
   }
 }
 

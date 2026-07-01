@@ -13,9 +13,9 @@ describe('Inventory API (Module 5)', () => {
   });
 
   describe('GET /api/v1/inventory', () => {
-    it('should return 400 for invalid warehouse ID format', async () => {
+    it('should return 400 for invalid equipmentItemId format', async () => {
       const res = await request(app)
-        .get('/api/v1/inventory?warehouseId=abc')
+        .get('/api/v1/inventory?equipmentItemId=abc')
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
@@ -183,6 +183,40 @@ describe('Inventory API (Module 5)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ orderId: 1, items: [] });
       expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
+    });
+  });
+
+  describe('POST /api/v1/inventory', () => {
+    it('should create inventory successfully', async () => {
+      prismaMock.equipment.findUnique.mockResolvedValue({ equipmentItemId: 1n } as any);
+      prismaMock.inventory.create.mockResolvedValue({
+        inventoryId: 1n, equipmentItemId: 1n, totalQuantity: 10, availableQuantity: 10, reservedQuantity: 0, damagedQuantity: 0
+      } as any);
+
+      const res = await request(app)
+        .post('/api/v1/inventory')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ equipmentItemId: 1, availableQuantity: 10 });
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('PUT /api/v1/inventory/:id', () => {
+    it('should update inventory successfully', async () => {
+      prismaMock.inventory.findUnique.mockResolvedValue({
+        inventoryId: 1n, equipmentItemId: 1n, totalQuantity: 10, availableQuantity: 10, reservedQuantity: 0, damagedQuantity: 0
+      } as any);
+      prismaMock.inventory.update.mockResolvedValue({
+        inventoryId: 1n, equipmentItemId: 1n, totalQuantity: 15, availableQuantity: 15, reservedQuantity: 0, damagedQuantity: 0
+      } as any);
+
+      const res = await request(app)
+        .put('/api/v1/inventory/1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ availableQuantity: 15 });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
     });
   });
 });

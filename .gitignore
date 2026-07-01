@@ -54,3 +54,6 @@ diff_apis.js
 fix_tests.js
 list_routes.ts
 scaffold.ps1
+getUsers.ts
+temp_seed.sql
+prisma/temp_seed.sql

@@ -82,7 +82,41 @@ model BusinessPolicy {
 }
 
 // =============================================================================
-// 3. EQUIPMENT
+// 3. CATALOG
+// =============================================================================
+model CatalogCategory {
+  categoryId   BigInt   @id @default(autoincrement()) @map("category_id")
+  name         String   @db.VarChar(150)
+  description  String?  @db.Text
+  displayOrder Int      @default(0) @map("display_order")
+  notes        String?  @db.Text
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  items        CatalogItem[]
+
+  @@map("catalog_categories")
+}
+
+model CatalogItem {
+  itemId      BigInt           @id @default(autoincrement()) @map("item_id")
+  name        String           @db.VarChar(150)
+  description String?          @db.Text
+  itemType    String           @map("item_type") @db.VarChar(50) // SERVICE, EQUIPMENT, MATERIAL, PACKAGE
+  basePrice   Decimal          @default(0) @map("base_price") @db.Decimal(12, 2)
+  categoryId  BigInt?          @map("category_id")
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  category    CatalogCategory? @relation(fields: [categoryId], references: [categoryId])
+
+  @@map("catalog_items")
+}
+
+// =============================================================================
+// 4. EQUIPMENT
 // =============================================================================
 model Equipment {
   equipmentItemId   BigInt              @id @default(autoincrement()) @map("equipment_item_id")

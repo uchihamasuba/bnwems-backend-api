@@ -166,5 +166,19 @@ describe('Quotation API (Module 8)', () => {
     });
   });
 
+  describe('DELETE /api/v1/quotations/:id', () => {
+    it('should delete quotation successfully', async () => {
+      prismaMock.quotation.findUnique.mockResolvedValue({ quotationId: 1n, status: 'draft' } as any);
+      prismaMock.quotation.delete.mockResolvedValue({} as any);
+
+      const res = await request(app)
+        .delete(`/api/v1/quotations/${validId1}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
 
 });

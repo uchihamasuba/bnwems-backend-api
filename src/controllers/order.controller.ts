@@ -149,3 +149,16 @@ export const getMobileSummary = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const getWorkflowTimeline = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const timeline = await orderService.getWorkflowTimeline(id);
+    res.status(200).json({
+      success: true,
+      data: timeline,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
