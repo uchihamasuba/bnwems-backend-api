@@ -32,7 +32,7 @@ export const confirmWage = async (req: AuthRequest, res: Response, next: NextFun
 
     res.status(200).json({
       success: true,
-      message: 'Wage summary confirmed.',
+      message: 'Xác nhận bảng lương thành công.',
     });
   } catch (error) {
     next(error);

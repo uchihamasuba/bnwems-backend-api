@@ -7,7 +7,7 @@ class ManagerController {
       const data = await managerService.getPendingApprovals();
       res.status(200).json({
         success: true,
-        message: 'Pending approvals retrieved successfully',
+        message: 'Lấy danh sách chờ phê duyệt thành công.',
         data
       });
     } catch (error) {

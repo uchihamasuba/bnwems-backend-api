@@ -28,7 +28,7 @@ class EquipmentService {
   public async getEquipmentById(id: string) {
     const item = await prisma.equipment.findUnique({ where: { equipmentItemId: BigInt(id) } });
     if (!item) {
-      throw new AppError('Equipment item not found.', 404);
+      throw new AppError('Không tìm thấy thiết bị.', 404);
     }
     return item;
   }

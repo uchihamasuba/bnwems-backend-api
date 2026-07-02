@@ -26,7 +26,7 @@ export const createPolicy = async (req: AuthRequest, res: Response, next: NextFu
 
     res.status(201).json({
       success: true,
-      message: 'Policy created successfully.',
+      message: 'Tạo chính sách thành công.',
     });
   } catch (error) {
     next(error);
@@ -43,7 +43,7 @@ export const updatePolicy = async (req: AuthRequest, res: Response, next: NextFu
 
     res.status(200).json({
       success: true,
-      message: 'Policy updated successfully.',
+      message: 'Cập nhật chính sách thành công.',
     });
   } catch (error) {
     next(error);

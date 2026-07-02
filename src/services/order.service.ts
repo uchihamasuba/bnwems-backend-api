@@ -32,7 +32,7 @@ class OrderService {
       where: { orderId: BigInt(id) },
     });
 
-    if (!order) throw new AppError('Order not found', 404);
+    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
     
     // Manual join to avoid relation naming issues if not mapped properly in schema
     const customer = await prisma.customer.findUnique({ where: { customerId: order.customerId } });
@@ -44,7 +44,7 @@ class OrderService {
     const { customerId, eventStartDate, eventEndDate, eventType, guestCount, venueAddress } = data;
 
     if (new Date(eventStartDate) <= new Date()) {
-      throw new AppError('Event date must be in the future.', 400, 'MSG-UC11-01');
+      throw new AppError('Ngày sự kiện phải ở trong tương lai.', 400, 'MSG-UC11-01');
     }
 
     const newOrder = await prisma.order.create({
@@ -76,7 +76,7 @@ class OrderService {
     const order = await prisma.order.findUnique({
       where: { orderId: BigInt(id) },
     });
-    if (!order) throw new AppError('Order not found', 404);
+    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
 
     const quote = await prisma.quotation.findFirst({
       where: { orderId: BigInt(id) },
@@ -84,7 +84,7 @@ class OrderService {
     });
 
     if (!quote || quote.status !== 'confirmed') {
-      throw new AppError('Cannot confirm order without an accepted quotation.', 400, 'MSG-UC11-04');
+      throw new AppError('Không thể xác nhận đơn hàng khi chưa có báo giá được chấp nhận.', 400, 'MSG-UC11-04');
     }
 
     await prisma.order.update({
@@ -141,7 +141,7 @@ class OrderService {
     const order = await prisma.order.findUnique({
       where: { orderId: BigInt(id) },
     });
-    if (!order) throw new AppError('Order not found', 404);
+    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
 
     const customer = await prisma.customer.findUnique({
       where: { customerId: order.customerId },

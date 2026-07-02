@@ -29,7 +29,7 @@ class NotificationService {
     });
 
     if (!notification || notification.userId !== BigInt(userId)) {
-      throw new AppError('Notification not found or access denied.', 404, 'MSG-UC03-01');
+      throw new AppError('Không tìm thấy thông báo hoặc bị từ chối truy cập.', 404, 'MSG-UC03-01');
     }
 
     await prisma.notification.update({

@@ -9,7 +9,7 @@ export class UploadService {
    */
   static async uploadImageToFirebase(file: Express.Multer.File, folder: string = 'general') {
     if (!storage) {
-      throw new Error('Firebase Storage is not initialized');
+      throw new Error('Firebase Storage chưa được khởi tạo.');
     }
 
     const bucket = storage.bucket();

@@ -52,7 +52,7 @@ class UserService {
 
     const existingUser = await prisma.internalUser.findUnique({ where: { username } });
     if (existingUser) {
-      throw new AppError('Username already exists.', 400, 'MSG-UC04-05');
+      throw new AppError('Tên đăng nhập đã tồn tại.', 400, 'MSG-UC04-05');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);

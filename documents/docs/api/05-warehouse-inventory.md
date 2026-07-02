@@ -5,15 +5,15 @@ This module handles **UC 2.13 (Date-based Inventory Management)** and **UC 2.23 
 It ensures equipment availability by date and manages checkout/return operations. Key entities involved are `Inventory` and `InventoryReport`.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC13-01`: Required information is missing or invalid.
-- `MSG-UC13-02`: System cannot complete the request.
-- `MSG-UC13-04`: Insufficient inventory available for the requested date.
-- `MSG-UC23-01`: Scanned items do not match the assigned pick-list.
-- `MSG-UC23-02`: Items must be returned before confirming inventory return.
+- `MSG-UC13-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC13-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC13-04`: Không đủ hàng trong kho cho ngày yêu cầu.
+- `MSG-UC23-01`: Các thiết bị đã quét không khớp với danh sách được giao.
+- `MSG-UC23-02`: Phải trả lại thiết bị/vật tư trước khi xác nhận nhập kho.
 
 ## 1. Inventory Management (UC 2.13)
 
-### `GET /api/v1/inventory`
+### 1. `GET /api/v1/inventory`
 - **Use Case:** UC 2.13 - View Inventory
 - **Description:** Retrieves a paginated list of inventory across warehouses.
 - **Query Parameters:** 
@@ -42,7 +42,7 @@ It ensures equipment availability by date and manages checkout/return operations
 }
 ```
 
-### `POST /api/v1/inventory`
+### 2. `POST /api/v1/inventory`
 - **Use Case:** UC 2.13 - Adjust Inventory
 - **Description:** Adds new inventory for an equipment item. Admin/Manager only.
 - **Request Body:**
@@ -56,7 +56,7 @@ It ensures equipment availability by date and manages checkout/return operations
 ```json
 {
   "success": true,
-  "message": "Inventory created successfully.",
+  "message": "Tạo kho thành công.",
   "data": {
     "inventoryId": "1",
     "equipmentItemId": "1",
@@ -68,7 +68,7 @@ It ensures equipment availability by date and manages checkout/return operations
 }
 ```
 
-### `PUT /api/v1/inventory/:id`
+### 3. `PUT /api/v1/inventory/:id`
 - **Use Case:** UC 2.13 - Adjust Inventory
 - **Description:** Manually adjusts inventory levels. Admin/Manager only.
 - **Request Body:**
@@ -83,11 +83,11 @@ It ensures equipment availability by date and manages checkout/return operations
 ```json
 {
   "success": true,
-  "message": "Inventory updated successfully."
+  "message": "Cập nhật kho thành công."
 }
 ```
 
-### `GET /api/v1/inventory/availability`
+### 4. `GET /api/v1/inventory/availability`
 - **Use Case:** UC 2.13 - Check Inventory Availability
 - **Description:** Checks if sufficient inventory is available for a given event date, factoring in existing reservations.
 - **Business Rules:**
@@ -97,7 +97,7 @@ It ensures equipment availability by date and manages checkout/return operations
 ```json
 {
   "success": true,
-  "code": "MSG-WH-00",
+  "code": "MSG-WH-01",
   "data": {
     "equipmentItemId": 1,
     "isAvailable": true,
@@ -106,7 +106,7 @@ It ensures equipment availability by date and manages checkout/return operations
 }
 ```
 
-### `POST /api/v1/inventory/reserve`
+### 5. `POST /api/v1/inventory/reserve`
 - **Use Case:** UC 2.13 - Reserve Inventory
 - **Description:** Reserves inventory for an order once it is confirmed.
 - **Business Rules:**
@@ -128,14 +128,14 @@ It ensures equipment availability by date and manages checkout/return operations
 ```json
 {
   "success": true,
-  "code": "MSG-WH-00",
-  "message": "Inventory successfully reserved."
+  "code": "MSG-WH-02",
+  "message": "Giữ chỗ kho thành công."
 }
 ```
 
 ## 2. Check-out and Return Operations (UC 2.23)
 
-### `GET /api/v1/inventory/inventory-reports`
+### 6. `GET /api/v1/inventory/inventory-reports`
 - **Use Case:** UC 2.23 - View Inventory Reports
 - **Description:** Retrieves a history of inventory operations (checkout, return, adjustments).
 - **Query Parameters:**
@@ -146,7 +146,7 @@ It ensures equipment availability by date and manages checkout/return operations
 ```json
 {
   "success": true,
-  "code": "MSG-WH-00",
+  "code": "MSG-WH-03",
   "data": [
     {
       "inventoryReportId": 1,
@@ -160,7 +160,7 @@ It ensures equipment availability by date and manages checkout/return operations
 }
 ```
 
-### `POST /api/v1/inventory/checkout`
+### 7. `POST /api/v1/inventory/checkout`
 - **Use Case:** UC 2.23 - Confirm Inventory Check-out
 - **Description:** Records an inventory checkout operation, decreasing `reservedQuantity`, but `totalQuantity` remains the same until items are lost. Generates an `InventoryReport`.
 - **Business Rules:**
@@ -181,12 +181,12 @@ It ensures equipment availability by date and manages checkout/return operations
 ```json
 {
   "success": true,
-  "code": "MSG-WH-00",
-  "message": "Items checked out successfully."
+  "code": "MSG-WH-04",
+  "message": "Xuất kho thành công."
 }
 ```
 
-### `POST /api/v1/inventory/return`
+### 8. `POST /api/v1/inventory/return`
 - **Use Case:** UC 2.23 - Confirm Inventory Return Report
 - **Description:** Records the return of inventory back to the warehouse after an event. Generates an `InventoryReport`.
 - **Business Rules:**
@@ -209,7 +209,32 @@ It ensures equipment availability by date and manages checkout/return operations
 ```json
 {
   "success": true,
-  "code": "MSG-WH-00",
-  "message": "Items returned to inventory."
+  "code": "MSG-WH-05",
+  "message": "Nhập lại kho thành công."
+}
+```
+
+### 9. `GET /api/v1/warehouse-histories`
+- **Use Case:** UC 2.23 - View Warehouse History
+- **Description:** Retrieves the detailed history of warehouse transactions (checkout, return, adjustment).
+- **Query Parameters:**
+  - `page` (number, default 1)
+  - `limit` (number, default 20)
+  - `transactionType` (enum, optional) - CHECKOUT, RETURN, ADJUSTMENT
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-WH-06",
+  "data": [
+    {
+      "id": "1",
+      "warehouseId": "1",
+      "transactionType": "CHECKOUT",
+      "performedBy": "1",
+      "createdAt": "2026-06-22T10:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "totalCount": 1 }
 }
 ```

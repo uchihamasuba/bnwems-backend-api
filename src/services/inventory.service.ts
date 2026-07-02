@@ -36,7 +36,7 @@ class InventoryService {
     
     const eq = await prisma.equipment.findUnique({ where: { equipmentItemId } });
     if (!eq) {
-      throw new AppError('Equipment not found', 404);
+      throw new AppError('Không tìm thấy thiết bị.', 404);
     }
 
     const newInventory = await prisma.inventory.create({
@@ -59,7 +59,7 @@ class InventoryService {
       where: { inventoryId },
     });
     if (!existing) {
-      throw new AppError('Inventory not found', 404);
+      throw new AppError('Không tìm thấy dữ liệu kho.', 404);
     }
 
     const availableQuantity = data.availableQuantity ?? existing.availableQuantity;
@@ -123,12 +123,12 @@ class InventoryService {
         where: { equipmentItemId: BigInt(item.equipmentItemId) },
       });
       if (!inv) {
-        throw new AppError('Item not found in inventory', 404);
+        throw new AppError('Không tìm thấy vật tư trong kho.', 404);
       }
       
       const availability = await this.checkAvailability(eventDate, item.equipmentItemId);
       if (item.quantity > availability.availableQuantityOnDate) {
-        throw new AppError('Insufficient inventory available for the requested date.', 400, 'MSG-UC13-04');
+        throw new AppError('Không đủ số lượng trong kho cho ngày yêu cầu.', 400, 'MSG-UC13-04');
       }
     }
 

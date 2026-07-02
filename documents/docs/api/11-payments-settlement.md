@@ -5,21 +5,21 @@ This module handles **UC 2.19 (Payment & Settlement Management)** and **UC 2.30 
 It deals with financial transactions (`Payment`) and the final reconciliation of an order (`Settlement`).
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC19-01`: Required information is missing or invalid.
-- `MSG-UC19-02`: System cannot complete the request.
-- `MSG-UC19-04`: Payment amount exceeds total order amount.
-- `MSG-UC30-01`: Settlement discrepancy detected.
+- `MSG-UC19-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC19-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC19-04`: Số tiền thanh toán vượt quá tổng giá trị đơn hàng.
+- `MSG-UC30-01`: Phát hiện chênh lệch quyết toán.
 
 ## 1. Payment Management (UC 2.19)
 
-### `GET /api/v1/orders/:id/payments`
+### 1. `GET /api/v1/orders/:id/payments`
 - **Use Case:** UC 2.19 - Track Payments
 - **Description:** Retrieves all payment records associated with an order.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
+  "code": "MSG-PM-01",
   "data": [
     {
       "paymentId": 1,
@@ -36,14 +36,14 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 }
 ```
 
-### `GET /api/v1/orders/:id/payment-requests`
+### 2. `GET /api/v1/orders/:id/payments`
 - **Use Case:** Payment Confirmation (List)
 - **Description:** Hiển thị danh sách payment request chờ duyệt của đơn hàng.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
+  "code": "MSG-PM-02",
   "data": [
     {
       "paymentRequestId": 1,
@@ -56,14 +56,14 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 }
 ```
 
-### `GET /api/v1/payment-requests/:id`
+### 3. `GET /api/v1/payment-requests/:id`
 - **Use Case:** Payment Confirmation (Detail)
 - **Description:** Lấy chi tiết payment request và bằng chứng thanh toán.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
+  "code": "MSG-PM-03",
   "data": {
     "paymentRequestId": 1,
     "orderId": 1,
@@ -77,7 +77,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 }
 ```
 
-### `POST /api/v1/orders/:id/payments/request`
+### 4. `POST /api/v1/orders/:id/payments/request`
 - **Use Case:** UC 2.19 - Create Deposit Payment Request
 - **Description:** Manager creates a payment request (e.g., Deposit) and generates payment instructions.
 - **Business Rules:**
@@ -94,13 +94,13 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
-  "message": "Payment request created.",
+  "code": "MSG-PM-04",
+  "message": "Tạo yêu cầu thanh toán thành công.",
   "data": { "paymentRequestId": 1, "paymentUrl": "vnpay-qr-url" }
 }
 ```
 
-### `PUT /api/v1/payment-requests/:id/confirm`
+### 5. `PUT /api/v1/payment-requests/:id/confirm`
 - **Use Case:** UC 2.19 - Confirm Deposit / Confirm Final Payment
 - **Description:** Manager confirms a payment manually after verifying evidence.
 - **Business Rules:**
@@ -117,21 +117,21 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
-  "message": "Payment confirmed successfully."
+  "code": "MSG-PM-05",
+  "message": "Xác nhận thanh toán thành công."
 }
 ```
 
 ## 2. Settlement Management (UC 2.19 & UC 2.30)
 
-### `GET /api/v1/orders/:id/settlement`
+### 6. `GET /api/v1/orders/:id/settlement`
 - **Use Case:** UC 2.30 - View Settlement (Field)
 - **Description:** Retrieves the existing settlement record for an order.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
+  "code": "MSG-PM-06",
   "data": {
     "settlementId": 1,
     "orderId": 1,
@@ -155,7 +155,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 }
 ```
 
-### `POST /api/v1/orders/:id/settlement`
+### 7. `POST /api/v1/orders/:id/settlement`
 - **Use Case:** UC 2.30 - Record Settlement (Field)
 - **Description:** Leader staff records on-site settlement info, including extra charges or compensation.
 - **Business Rules:**
@@ -191,13 +191,13 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
-  "message": "Field settlement recorded.",
+  "code": "MSG-PM-07",
+  "message": "Ghi nhận quyết toán hiện trường thành công.",
   "data": { "settlementId": 1 }
 }
 ```
 
-### `PUT /api/v1/settlements/:id/confirm`
+### 8. `PUT /api/v1/settlements/:id/confirm`
 - **Use Case:** UC 2.19 - Confirm Settlement
 - **Description:** Manager reviews and confirms the final settlement amount after the event.
 - **Business Rules:**
@@ -212,7 +212,7 @@ It deals with financial transactions (`Payment`) and the final reconciliation of
 ```json
 {
   "success": true,
-  "code": "MSG-PM-00",
-  "message": "Settlement confirmed."
+  "code": "MSG-PM-08",
+  "message": "Xác nhận quyết toán thành công."
 }
 ```

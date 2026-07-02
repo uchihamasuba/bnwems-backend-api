@@ -11,7 +11,7 @@ export const assignStaff = async (req: AuthRequest, res: Response, next: NextFun
 
     res.status(200).json({
       success: true,
-      message: 'Staff assigned and notified.',
+      message: 'Đã phân công và thông báo cho nhân viên.',
     });
   } catch (error) {
     next(error);

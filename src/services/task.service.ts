@@ -51,7 +51,7 @@ class TaskService {
     const { taskType, scheduledStart, scheduledEnd, location } = data;
 
     if (!finalOrderId || !taskType || !scheduledStart || !scheduledEnd) {
-      throw new AppError('Required information is missing', 400);
+      throw new AppError('Thiếu thông tin bắt buộc.', 400);
     }
 
     const newTask = await prisma.workTask.create({
@@ -72,10 +72,10 @@ class TaskService {
     const { scheduledStart, scheduledEnd, location } = data;
 
     const existing = await prisma.workTask.findUnique({ where: { workTaskId: BigInt(id) } });
-    if (!existing) throw new AppError('Task not found', 404);
+    if (!existing) throw new AppError('Không tìm thấy công việc.', 404);
 
     if (existing.status !== 'draft') {
-      throw new AppError('Cannot modify an already started task. Only update progress.', 400);
+      throw new AppError('Không thể thay đổi công việc đã bắt đầu. Chỉ có thể cập nhật tiến độ.', 400);
     }
 
     await prisma.workTask.update({
@@ -88,10 +88,10 @@ class TaskService {
 
   public async cancelTask(id: string, status: string) {
     const existing = await prisma.workTask.findUnique({ where: { workTaskId: BigInt(id) } });
-    if (!existing) throw new AppError('Task not found', 404);
+    if (!existing) throw new AppError('Không tìm thấy công việc.', 404);
 
     if (existing.status !== 'draft' && existing.status !== 'pending') {
-      throw new AppError('Task cannot be deleted because it has already started or been executed.', 400, 'MSG-UC55-06');
+      throw new AppError('Không thể xóa công việc vì nó đã bắt đầu hoặc đã thực hiện xong.', 400, 'MSG-UC55-06');
     }
 
     if (status === 'cancelled' || status === 'deleted') {
@@ -100,19 +100,19 @@ class TaskService {
         data: { status: 'cancelled' }
       });
     } else {
-      throw new AppError('Invalid status for cancellation.', 400);
+      throw new AppError('Trạng thái không hợp lệ để hủy.', 400);
     }
   }
 
   public async updateTaskProgress(id: string, status: string, notes?: string, progressPercent?: number) {
     const existing = await prisma.workTask.findUnique({ where: { workTaskId: BigInt(id) } });
-    if (!existing) throw new AppError('Task not found', 404);
+    if (!existing) throw new AppError('Không tìm thấy công việc.', 404);
 
     const updateData: any = { status };
     if (progressPercent !== undefined) updateData.progressPercent = progressPercent;
 
     if (status !== 'in_progress' && status !== 'done' && status !== 'assigned') {
-      throw new AppError('Invalid status update.', 400, 'MSG-UC25-01');
+      throw new AppError('Cập nhật trạng thái không hợp lệ.', 400, 'MSG-UC25-01');
     }
     
     // Notes can go to description, but let's just append if provided
@@ -130,18 +130,18 @@ class TaskService {
     const existingTask = await prisma.workTask.findUnique({
       where: { workTaskId: BigInt(id) },
     });
-    if (!existingTask) throw new AppError('Task not found', 404);
+    if (!existingTask) throw new AppError('Không tìm thấy công việc.', 404);
 
     const existingReport = await prisma.surveyReport.findFirst({
       where: { workTaskId: BigInt(id) }
     });
 
     if (existingReport) {
-      throw new AppError('Survey report already submitted.', 400, 'MSG-UC12-01');
+      throw new AppError('Báo cáo khảo sát đã được nộp.', 400, 'MSG-UC12-01');
     }
 
     if (!evidences || !Array.isArray(evidences) || evidences.length === 0) {
-      throw new AppError('Must include at least one photo evidence.', 400);
+      throw new AppError('Phải bao gồm ít nhất một ảnh bằng chứng.', 400);
     }
 
     const report = await prisma.surveyReport.create({
@@ -176,13 +176,13 @@ class TaskService {
     const task = await prisma.workTask.findUnique({
       where: { workTaskId: BigInt(id) }
     });
-    if (!task) throw new AppError('Task not found', 404);
+    if (!task) throw new AppError('Không tìm thấy công việc.', 404);
 
     const report = await prisma.surveyReport.findFirst({
       where: { workTaskId: BigInt(id) }
     });
 
-    if (!report) throw new AppError('Survey report not found', 404);
+    if (!report) throw new AppError('Không tìm thấy báo cáo khảo sát.', 404);
 
     const evidences = await prisma.evidence.findMany({
       where: { refType: 'SurveyReport', refId: report.surveyReportId }
@@ -200,7 +200,7 @@ class TaskService {
     const task = await prisma.workTask.findUnique({
       where: { workTaskId: BigInt(id) }
     });
-    if (!task) throw new AppError('Task not found', 404);
+    if (!task) throw new AppError('Không tìm thấy công việc.', 404);
     
     const quotation = await prisma.quotation.findFirst({
       where: { orderId: task.orderId, status: 'confirmed' }
@@ -225,8 +225,8 @@ class TaskService {
       where: { workTaskId: BigInt(id) }
     });
 
-    if (!report) throw new AppError('Survey report not found', 404);
-    if (report.status === 'approved') throw new AppError('Report already approved', 400);
+    if (!report) throw new AppError('Không tìm thấy báo cáo khảo sát.', 404);
+    if (report.status === 'approved') throw new AppError('Báo cáo đã được phê duyệt.', 400);
 
     await prisma.surveyReport.update({
       where: { surveyReportId: report.surveyReportId },

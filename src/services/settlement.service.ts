@@ -8,7 +8,7 @@ class SettlementService {
     const expectedRemaining = Number(originalValue) + Number(changeAdjustment || 0) + Number(additionalFee || 0) - Number(compensation || 0) - Number(discount || 0) - Number(totalPaid || 0);
     
     if (Math.abs(expectedRemaining - remainingAmount) > 0.1) {
-      throw new AppError('Settlement discrepancy detected.', 400, 'MSG-UC30-01');
+      throw new AppError('Phát hiện có sự sai lệch trong quyết toán.', 400, 'MSG-UC30-01');
     }
 
     const newSettlement = await prisma.settlement.create({
@@ -56,11 +56,11 @@ class SettlementService {
 
   public async confirmSettlement(id: string, status: string, userId: string) {
     if (status !== 'confirmed' && status !== 'CONFIRMED') {
-      throw new AppError('Status must be confirmed.', 400);
+      throw new AppError('Trạng thái phải là đã xác nhận.', 400);
     }
 
     const settlement = await prisma.settlement.findUnique({ where: { settlementId: BigInt(id) } });
-    if (!settlement) throw new AppError('Settlement not found', 404);
+    if (!settlement) throw new AppError('Không tìm thấy quyết toán.', 404);
 
     await prisma.$transaction([
       prisma.settlement.update({
@@ -96,7 +96,7 @@ class SettlementService {
     });
 
     if (!settlement) {
-      throw new AppError('Settlement not found', 404);
+      throw new AppError('Không tìm thấy quyết toán.', 404);
     }
 
     return settlement;

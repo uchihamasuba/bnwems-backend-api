@@ -43,7 +43,7 @@ export const createEquipment = async (req: AuthRequest, res: Response, next: Nex
 
     res.status(201).json({
       success: true,
-      message: 'Equipment item created successfully.',
+      message: 'Tạo thiết bị thành công.',
       data: newItem,
     });
   } catch (error) {
@@ -60,7 +60,7 @@ export const updateEquipment = async (req: AuthRequest, res: Response, next: Nex
 
     res.status(200).json({
       success: true,
-      message: 'Equipment item updated successfully.',
+      message: 'Cập nhật thiết bị thành công.',
     });
   } catch (error) {
     next(error);
@@ -77,7 +77,7 @@ export const deactivateEquipment = async (req: AuthRequest, res: Response, next:
 
     res.status(200).json({
       success: true,
-      message: 'Equipment item status changed successfully.',
+      message: 'Thay đổi trạng thái thiết bị thành công.',
     });
   } catch (error) {
     next(error);

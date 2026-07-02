@@ -34,7 +34,7 @@ export const markAsRead = async (req: AuthRequest, res: Response, next: NextFunc
 
     res.status(200).json({
       success: true,
-      message: 'Notification marked as read.',
+      message: 'Đã đánh dấu thông báo là đã đọc.',
     });
   } catch (error) {
     next(error);
@@ -49,7 +49,7 @@ export const markAllAsRead = async (req: AuthRequest, res: Response, next: NextF
 
     res.status(200).json({
       success: true,
-      message: 'All notifications marked as read.',
+      message: 'Đã đánh dấu tất cả thông báo là đã đọc.',
     });
   } catch (error) {
     next(error);

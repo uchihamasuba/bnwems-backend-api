@@ -5,15 +5,15 @@ This module handles **UC 2.12 (Survey Management)** and **UC 2.14 - 2.15 (Staff 
 It manages `Schedule` entities and their associated `WorkTask` entities, assigning `InternalUser` personnel to them through the `Assignment` entity.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC53-01`: Required information is missing or invalid.
-- `MSG-UC53-02`: System cannot complete the request.
-- `MSG-UC53-05`: Staff assignment information is missing.
-- `MSG-UC55-06`: Task cannot be deleted because it has already started or been executed.
-- `MSG-UC12-01`: Survey report already submitted.
+- `MSG-UC53-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC53-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC53-05`: Thiếu thông tin phân công nhân viên.
+- `MSG-UC55-06`: Không thể xóa công việc vì nó đã bắt đầu hoặc đã được thực hiện.
+- `MSG-UC12-01`: Báo cáo khảo sát đã được gửi.
 
 ## 1. Survey Management (UC 2.12)
 
-### `GET /api/v1/tasks`
+### 1. `GET /api/v1/tasks`
 - **Use Case:** UC 2.12 / 2.15 - View All Tasks
 - **Description:** Retrieves a paginated list of all tasks in the system. Manager access required.
 - **Query Parameters:**
@@ -25,7 +25,7 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
+  "code": "MSG-SV-01",
   "data": [
     {
       "workTaskId": 1,
@@ -38,7 +38,7 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 }
 ```
 
-### `POST /api/v1/orders/:id/tasks`
+### 2. `POST /api/v1/orders/:id/tasks`
 - **Use Case:** UC 2.12 - Create Survey Task & UC 2.15.1 - Create Work Task
 - **Description:** Creates a task (survey or operational) linked to an order.
 - **Business Rules:**
@@ -56,20 +56,20 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
-  "message": "Task created successfully.",
+  "code": "MSG-SV-02",
+  "message": "Tạo công việc thành công.",
   "data": { "workTaskId": 1 }
 }
 ```
 
-### `GET /api/v1/tasks/:id/survey-report`
+### 3. `GET /api/v1/tasks/:id/survey-report`
 - **Use Case:** UC 2.12 - View Survey Report
 - **Description:** Manager reviews submitted survey reports attached to a task.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
+  "code": "MSG-SV-03",
   "data": {
     "workTaskId": 1,
     "notes": "Venue has strict height limits.",
@@ -78,14 +78,14 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
     ],
     "surveyedBy": {
       "userId": 1,
-      "fullName": "John Doe"
+      "fullName": "Nguyễn Văn A"
     },
     "submittedAt": "2026-06-22T12:00:00Z"
   }
 }
 ```
 
-### `PUT /api/v1/tasks/:id/survey-report/review`
+### 4. `PUT /api/v1/tasks/:id/survey-report/review`
 - **Use Case:** UC 2.12 - Survey Report Approval
 - **Description:** Manager duyệt hoặc yêu cầu bổ sung báo cáo khảo sát.
 - **Request Body:**
@@ -99,14 +99,14 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
-  "message": "Survey report review submitted."
+  "code": "MSG-SV-04",
+  "message": "Bản đánh giá báo cáo khảo sát đã được gửi."
 }
 ```
 
 ## 2. Staff Assignment (UC 2.14, 2.15)
 
-### `GET /api/v1/schedules`
+### 5. `GET /api/v1/schedules`
 - **Use Case:** UC 2.14 - View Schedule List
 - **Description:** Manager views scheduled operations for orders.
 - **Query Parameters:**
@@ -118,7 +118,7 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
+  "code": "MSG-SV-05",
   "data": [
     {
       "scheduleId": 1,
@@ -133,14 +133,14 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 
 
 
-### `GET /api/v1/orders/:id/assignments`
+### 6. `GET /api/v1/orders/:id/assignments`
 - **Use Case:** UC 2.15 - View Assignments
 - **Description:** Retrieves all staff assignments for a specific order.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
+  "code": "MSG-SV-06",
   "data": [
     {
       "assignmentId": 1,
@@ -148,13 +148,13 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
       "userId": 1,
       "assignedRole": "Leader Staff",
       "fieldStatus": "pending",
-      "fullName": "John Doe"
+      "fullName": "Nguyễn Văn A"
     }
   ]
 }
 ```
 
-### `POST /api/v1/tasks/:id/assignments`
+### 7. `POST /api/v1/tasks/:id/assignments`
 - **Use Case:** UC 2.15.2 - Assign Work Task for Staff
 - **Description:** Assigns staff members to a specific task.
 - **Business Rules:**
@@ -179,12 +179,12 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
-  "message": "Staff assigned and notified."
+  "code": "MSG-SV-07",
+  "message": "Đã phân công nhân viên và gửi thông báo."
 }
 ```
 
-### `PUT /api/v1/tasks/:id`
+### 8. `PUT /api/v1/tasks/:id`
 - **Use Case:** UC 2.15.3 - Edit Work Task
 - **Description:** Modifies a task.
 - **Business Rules:**
@@ -196,7 +196,7 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 }
 ```
 
-### `PATCH /api/v1/tasks/:id/status`
+### 9. `PATCH /api/v1/tasks/:id/status`
 - **Use Case:** UC 2.15.4 - Soft Delete / Cancel Task
 - **Description:** Soft-deletes or cancels an unscheduled or draft task.
 - **Business Rules:**
@@ -205,7 +205,7 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 ```json
 {
   "success": true,
-  "code": "MSG-SV-00",
-  "message": "Task deleted."
+  "code": "MSG-SV-08",
+  "message": "Xóa công việc thành công."
 }
 ```

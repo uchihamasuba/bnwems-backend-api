@@ -11,7 +11,7 @@ export const recordDamageLoss = async (req: AuthRequest, res: Response, next: Ne
 
     res.status(201).json({
       success: true,
-      message: 'Damage/Loss report submitted successfully.',
+      message: 'Gửi báo cáo hư hỏng/mất mát thành công.',
       data: { id: newReport.id },
     });
   } catch (error) {

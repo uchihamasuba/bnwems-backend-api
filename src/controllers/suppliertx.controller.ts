@@ -43,7 +43,7 @@ export const createSupplierTransaction = async (req: AuthRequest, res: Response,
 
     res.status(201).json({
       success: true,
-      message: 'Supplier transaction created.',
+      message: 'Tạo giao dịch nhà cung cấp thành công.',
       data: { id: newTx.supplierTransactionId, status: newTx.status },
     });
   } catch (error) {
@@ -61,7 +61,7 @@ export const receiveSupplierItems = async (req: AuthRequest, res: Response, next
 
     res.status(200).json({
       success: true,
-      message: 'Items received and logged.',
+      message: 'Đã nhận và ghi nhận hàng hóa.',
     });
   } catch (error) {
     next(error);
@@ -78,7 +78,7 @@ export const returnSupplierItems = async (req: AuthRequest, res: Response, next:
 
     res.status(200).json({
       success: true,
-      message: 'Items returned to supplier successfully.',
+      message: 'Hoàn trả hàng cho nhà cung cấp thành công.',
     });
   } catch (error) {
     next(error);
@@ -95,7 +95,7 @@ export const updateSupplierTxStatus = async (req: AuthRequest, res: Response, ne
 
     res.status(200).json({
       success: true,
-      message: 'Supplier transaction status updated.',
+      message: 'Cập nhật trạng thái giao dịch nhà cung cấp thành công.',
     });
   } catch (error) {
     next(error);
@@ -112,7 +112,7 @@ export const paySupplierTransaction = async (req: AuthRequest, res: Response, ne
 
     res.status(200).json({
       success: true,
-      message: 'Supplier payment recorded successfully.',
+      message: 'Ghi nhận thanh toán nhà cung cấp thành công.',
     });
   } catch (error) {
     next(error);

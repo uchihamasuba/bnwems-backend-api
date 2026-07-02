@@ -103,7 +103,7 @@ class ReportService {
     const tasksCompleted = tasks.filter(t => t.status === 'done').length;
 
     if (totalTasks > 0 && tasksCompleted < totalTasks) {
-      throw new AppError('Order results are incomplete for verification.', 400, 'MSG-UC15-01');
+      throw new AppError('Kết quả đơn hàng chưa hoàn tất để có thể xác minh.', 400, 'MSG-UC15-01');
     }
 
     const handover = await prisma.handoverRecord.findFirst({ where: { orderId: BigInt(orderId) } });

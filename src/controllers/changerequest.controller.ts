@@ -44,7 +44,7 @@ export const createChangeRequest = async (req: AuthRequest, res: Response, next:
 
     res.status(201).json({
       success: true,
-      message: 'Change request submitted for approval.',
+      message: 'Đã gửi yêu cầu thay đổi để phê duyệt.',
       data: newRequest,
     });
   } catch (error) {
@@ -61,7 +61,7 @@ export const approveChangeRequest = async (req: AuthRequest, res: Response, next
 
     res.status(200).json({
       success: true,
-      message: 'Change request status updated.',
+      message: 'Cập nhật trạng thái yêu cầu thay đổi.',
     });
   } catch (error) {
     next(error);

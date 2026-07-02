@@ -25,7 +25,7 @@ export const createInventory = async (req: Request, res: Response, next: NextFun
 
     res.status(201).json({
       success: true,
-      message: 'Inventory created successfully.',
+      message: 'Tạo dữ liệu kho thành công.',
       data: newInventory,
     });
   } catch (error) {
@@ -40,7 +40,7 @@ export const updateInventory = async (req: Request, res: Response, next: NextFun
 
     res.status(200).json({
       success: true,
-      message: 'Inventory updated successfully.',
+      message: 'Cập nhật dữ liệu kho thành công.',
       data: updatedInventory,
     });
   } catch (error) {
@@ -72,7 +72,7 @@ export const reserveInventory = async (req: Request, res: Response, next: NextFu
 
     res.status(200).json({
       success: true,
-      message: 'Inventory reserved successfully.',
+      message: 'Giữ chỗ kho thành công.',
       data,
     });
   } catch (error) {
@@ -104,7 +104,7 @@ export const checkoutInventory = async (req: Request, res: Response, next: NextF
 
     res.status(200).json({
       success: true,
-      message: 'Inventory checked out successfully.',
+      message: 'Xuất kho thành công.',
       data,
     });
   } catch (error) {
@@ -119,7 +119,7 @@ export const returnInventory = async (req: Request, res: Response, next: NextFun
 
     res.status(200).json({
       success: true,
-      message: 'Inventory returned successfully.',
+      message: 'Nhập lại kho thành công.',
       data,
     });
   } catch (error) {

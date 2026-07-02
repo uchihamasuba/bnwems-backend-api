@@ -63,7 +63,7 @@ class ChangeRequestService {
     const req = await prisma.changeRequest.findUnique({
       where: { changeRequestId: BigInt(id) }
     });
-    if (!req) throw new AppError('Change request not found', 404);
+    if (!req) throw new AppError('Không tìm thấy yêu cầu thay đổi.', 404);
 
     const items = await prisma.changeRequestItem.findMany({
       where: { changeRequestId: BigInt(id) },

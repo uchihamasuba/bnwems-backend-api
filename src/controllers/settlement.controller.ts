@@ -11,7 +11,7 @@ export const recordSettlement = async (req: AuthRequest, res: Response, next: Ne
 
     res.status(201).json({
       success: true,
-      message: 'Field settlement recorded.',
+      message: 'Ghi nhận quyết toán hiện trường thành công.',
       data: { id: newSettlement.settlementId },
     });
   } catch (error) {
@@ -29,7 +29,7 @@ export const confirmSettlement = async (req: AuthRequest, res: Response, next: N
 
     res.status(200).json({
       success: true,
-      message: 'Settlement confirmed.',
+      message: 'Xác nhận quyết toán thành công.',
     });
   } catch (error) {
     next(error);

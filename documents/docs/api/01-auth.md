@@ -4,11 +4,11 @@
 This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account Management)** for `Internal User`. It uses JSON Web Tokens (JWT) for session management and relies on the `InternalUser` entity.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC01-01`: Required information is missing or invalid.
-- `MSG-UC01-02`: Invalid username or password.
-- `MSG-UC01-03`: Account is locked or inactive.
-- `MSG-UC01-04`: Token expired or invalid.
-- `MSG-UC02-01`: Password change failed (old password incorrect).
+- `MSG-UC01-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC01-02`: Tên người dùng hoặc mật khẩu không hợp lệ.
+- `MSG-UC01-03`: Tài khoản bị khóa hoặc không hoạt động.
+- `MSG-UC01-04`: Token đã hết hạn hoặc không hợp lệ.
+- `MSG-UC02-01`: Đổi mật khẩu thất bại (mật khẩu cũ không chính xác).
 
 ## Endpoints
 
@@ -30,8 +30,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "Login successful",
+  "code": "MSG-AU-01",
+  "message": "Đăng nhập thành công",
   "data": {
     "token": "eyJhbGciOiJIUzI1...",
     "expiresIn": 86400,
@@ -40,7 +40,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
       "username": "adminUser",
       "fullName": "System Admin",
       "avatarUrl": "https://example.com/avatar.jpg",
-      "bio": "System Administrator",
+      "bio": "Quản trị viên hệ thống",
       "role": {
         "roleId": 1,
         "roleName": "Admin"
@@ -59,8 +59,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "Logged out successfully."
+  "code": "MSG-AU-02",
+  "message": "Đăng xuất thành công."
 }
 ```
 
@@ -77,8 +77,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "If the account exists, a recovery email has been sent."
+  "code": "MSG-AU-03",
+  "message": "Nếu tài khoản tồn tại, email khôi phục sẽ được gửi."
 }
 ```
 
@@ -101,8 +101,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "Password changed successfully."
+  "code": "MSG-AU-04",
+  "message": "Đổi mật khẩu thành công."
 }
 ```
 
@@ -114,7 +114,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
+  "code": "MSG-AU-05",
   "data": {
     "userId": 1,
     "username": "adminUser",
@@ -122,7 +122,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
     "email": "admin@example.com",
     "phone": "+123456789",
     "avatarUrl": "https://example.com/avatar.jpg",
-    "bio": "System Administrator",
+    "bio": "Quản trị viên hệ thống",
     "role": {
       "roleId": 1,
       "roleName": "Admin"
@@ -143,7 +143,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 {
   "fullName": "System Admin Updated",
   "phone": "+1234567890",
-  "bio": "Updated System Administrator",
+  "bio": "Quản trị viên hệ thống (đã cập nhật)",
   "avatarUrl": "https://example.com/new-avatar.jpg"
 }
 ```
@@ -151,8 +151,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "Profile updated successfully.",
+  "code": "MSG-AU-06",
+  "message": "Cập nhật hồ sơ thành công.",
   "data": {
     "userId": 1,
     "username": "adminUser",
@@ -160,7 +160,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
     "email": "admin@example.com",
     "phone": "+1234567890",
     "avatarUrl": "https://example.com/new-avatar.jpg",
-    "bio": "Updated System Administrator",
+    "bio": "Quản trị viên hệ thống (đã cập nhật)",
     "role": {
       "roleId": 1,
       "roleName": "Admin"
@@ -187,8 +187,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "Device token registered successfully."
+  "code": "MSG-AU-07",
+  "message": "Đăng ký token thiết bị thành công."
 }
 ```
 
@@ -201,12 +201,12 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
+  "code": "MSG-AU-08",
   "data": [
     {
       "notificationId": 1,
-      "title": "New Order Assigned",
-      "body": "You have been assigned to Order #ORD-010.",
+      "title": "Được phân công đơn hàng mới",
+      "body": "Bạn đã được phân công thực hiện đơn hàng #ORD-010.",
       "type": "ORDER_ASSIGNMENT",
       "referenceId": 10,
       "isRead": false,
@@ -230,8 +230,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "Notification marked as read."
+  "code": "MSG-AU-09",
+  "message": "Đã đánh dấu thông báo là đã đọc."
 }
 ```
 
@@ -243,7 +243,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "code": "MSG-AU-00",
-  "message": "All notifications marked as read."
+  "code": "MSG-AU-10",
+  "message": "Đã đánh dấu tất cả thông báo là đã đọc."
 }
 ```

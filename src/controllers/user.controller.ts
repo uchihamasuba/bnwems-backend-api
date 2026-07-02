@@ -33,7 +33,7 @@ export const createUser = async (req: AuthRequest, res: Response, next: NextFunc
 
     res.status(201).json({
       success: true,
-      message: 'User created successfully',
+      message: 'Tạo người dùng thành công.',
       data: newUser,
     });
   } catch (error) {
@@ -50,7 +50,7 @@ export const updateUser = async (req: AuthRequest, res: Response, next: NextFunc
 
     res.status(200).json({
       success: true,
-      message: 'User updated successfully',
+      message: 'Cập nhật người dùng thành công.',
     });
   } catch (error) {
     next(error);
@@ -67,7 +67,7 @@ export const updateStatus = async (req: AuthRequest, res: Response, next: NextFu
 
     res.status(200).json({
       success: true,
-      message: 'User status updated successfully',
+      message: 'Cập nhật trạng thái người dùng thành công.',
     });
   } catch (error) {
     next(error);
@@ -84,7 +84,7 @@ export const resetPassword = async (req: AuthRequest, res: Response, next: NextF
 
     res.status(200).json({
       success: true,
-      message: 'User password reset successfully',
+      message: 'Đặt lại mật khẩu người dùng thành công.',
     });
   } catch (error) {
     next(error);

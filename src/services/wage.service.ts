@@ -25,14 +25,14 @@ class WageService {
 
   public async confirmWage(id: string, status: string, actionUserId: string) {
     if (status.toUpperCase() !== 'CONFIRMED') {
-      throw new AppError('Status must be CONFIRMED.', 400);
+      throw new AppError('Trạng thái phải là CONFIRMED.', 400);
     }
 
     // BR-17-02: Check if there are PENDING attendances for the period
     // In reality, query attendances. We skip detailed validation for now.
 
     const wageSummary = await prisma.wageSummary.findUnique({ where: { wageSummaryId: BigInt(id) } });
-    if (!wageSummary) throw new AppError('Wage summary not found', 404);
+    if (!wageSummary) throw new AppError('Không tìm thấy bảng tổng hợp lương.', 404);
 
     await prisma.wageSummary.update({
       where: { wageSummaryId: BigInt(id) },

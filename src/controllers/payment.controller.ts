@@ -42,7 +42,7 @@ export const requestPayment = async (req: AuthRequest, res: Response, next: Next
 
     res.status(201).json({
       success: true,
-      message: 'Payment request created.',
+      message: 'Tạo yêu cầu thanh toán thành công.',
       data: {
         id: newPayment.paymentRequestId,
         paymentUrl: paymentMethod === 'VNPAY_QR' ? 'vnpay-mock-url' : null,
@@ -63,7 +63,7 @@ export const confirmPayment = async (req: AuthRequest, res: Response, next: Next
 
     res.status(200).json({
       success: true,
-      message: 'Payment confirmed successfully.',
+      message: 'Xác nhận thanh toán thành công.',
     });
   } catch (error) {
     next(error);

@@ -12,11 +12,11 @@ class AuthService {
     });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-      throw new AppError('Invalid username or password.', 401, 'MSG-UC01-02');
+      throw new AppError('Tên đăng nhập hoặc mật khẩu không hợp lệ.', 401, 'MSG-UC01-02');
     }
 
     if (user.status !== 'active') {
-      throw new AppError('Account is locked or inactive.', 403, 'MSG-UC01-03');
+      throw new AppError('Tài khoản bị khóa hoặc không hoạt động.', 403, 'MSG-UC01-03');
     }
 
     const expiresIn = 86400; // 24 hours
@@ -68,11 +68,11 @@ class AuthService {
   public async changePassword(userId: string, oldPassword: string, newPassword: string) {
     const user = await prisma.internalUser.findUnique({ where: { userId: BigInt(userId) } });
     if (!user) {
-      throw new AppError('User not found.', 404);
+      throw new AppError('Không tìm thấy người dùng.', 404);
     }
 
     if (!(await bcrypt.compare(oldPassword, user.passwordHash))) {
-      throw new AppError('Old password incorrect.', 400, 'MSG-UC02-01');
+      throw new AppError('Mật khẩu cũ không đúng.', 400, 'MSG-UC02-01');
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
@@ -115,7 +115,7 @@ class AuthService {
     });
 
     if (!user) {
-      throw new AppError('User not found.', 404);
+      throw new AppError('Không tìm thấy người dùng.', 404);
     }
 
     return user;

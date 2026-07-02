@@ -29,7 +29,7 @@ class CustomerService {
 
   public async getCustomerById(id: string) {
     const customer = await prisma.customer.findUnique({ where: { customerId: BigInt(id) } });
-    if (!customer) throw new AppError('Customer not found', 404);
+    if (!customer) throw new AppError('Không tìm thấy khách hàng.', 404);
     return customer;
   }
 
@@ -38,7 +38,7 @@ class CustomerService {
 
     const existing = await prisma.customer.findUnique({ where: { phone } });
     if (existing) {
-      throw new AppError('Phone number already exists.', 400, 'MSG-UC09-05');
+      throw new AppError('Số điện thoại đã tồn tại.', 400, 'MSG-UC09-05');
     }
 
     const newCustomer = await prisma.customer.create({

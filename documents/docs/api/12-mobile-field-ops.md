@@ -12,14 +12,14 @@ It covers:
 - **UC 2.28:** Damage/Loss Recording
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC20-01`: Task not found or access denied.
-- `MSG-UC25-01`: Invalid progress state transition.
-- `MSG-UC26-01`: Missing customer signature/evidence for handover.
-- `MSG-UC28-01`: Missing evidence for damage/loss report.
+- `MSG-UC20-01`: Không tìm thấy công việc hoặc bị từ chối truy cập.
+- `MSG-UC25-01`: Chuyển đổi trạng thái tiến độ không hợp lệ.
+- `MSG-UC26-01`: Thiếu chữ ký khách hàng/bằng chứng cho việc bàn giao.
+- `MSG-UC28-01`: Thiếu bằng chứng cho báo cáo hư hỏng/mất mát.
 
 ## Endpoints
 
-### `GET /api/v1/tasks/assigned`
+### 1. `GET /api/v1/tasks/assigned`
 - **Use Case:** UC 2.20 - View Assigned Tasks
 - **Description:** Mobile staff views their assigned tasks.
 - **Query Parameters:**
@@ -29,7 +29,7 @@ It covers:
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
+  "code": "MSG-MO-01",
   "data": [
     {
       "workTaskId": 1,
@@ -46,14 +46,14 @@ It covers:
 }
 ```
 
-### `GET /api/v1/tasks/:id/pick-list`
+### 2. `GET /api/v1/tasks/:id/pick-list`
 - **Use Case:** UC 2.21 - View Pick List
 - **Description:** Retrieves the pick-list of equipment for a specific task (preparation, delivery, etc.).
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
+  "code": "MSG-MO-02",
   "data": [
     {
       "equipmentItemId": 1,
@@ -64,7 +64,7 @@ It covers:
 }
 ```
 
-### `POST /api/v1/tasks/:id/survey-report`
+### 3. `POST /api/v1/tasks/:id/survey-report`
 - **Use Case:** UC 2.22 - Record Survey Report
 - **Description:** Leader staff uploads survey details and images from the field.
 - **Business Rules:**
@@ -72,7 +72,7 @@ It covers:
 - **Request Body:**
 ```json
 {
-  "notes": "Venue height limits noted.",
+  "notes": "Đã ghi nhận giới hạn chiều cao của địa điểm.",
   "evidences": [{ "fileUrl": "url-to-image" }]
 }
 ```
@@ -80,12 +80,12 @@ It covers:
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
-  "message": "Survey report submitted."
+  "code": "MSG-MO-03",
+  "message": "Đã gửi báo cáo khảo sát."
 }
 ```
 
-### `PUT /api/v1/tasks/:id/progress`
+### 4. `PUT /api/v1/tasks/:id/progress`
 - **Use Case:** UC 2.25 - Update Field Progress
 - **Description:** Leader staff updates the progress status of a task.
 - **Business Rules:**
@@ -96,26 +96,26 @@ It covers:
 {
   "status": "in_progress",
   "progressPercent": 50,
-  "notes": "Arrived at venue, starting setup."
+  "notes": "Đã đến địa điểm, bắt đầu lắp đặt."
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
-  "message": "Task progress updated."
+  "code": "MSG-MO-04",
+  "message": "Cập nhật tiến độ công việc thành công."
 }
 ```
 
-### `GET /api/v1/orders/field-progress`
+### 5. `GET /api/v1/orders/field-progress`
 - **Use Case:** Field Task Progress Tracking
 - **Description:** Xem timeline tiến độ xuất kho, vận chuyển, lắp đặt, bàn giao, thu hồi, hoàn kho theo đơn hàng.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
+  "code": "MSG-MO-05",
   "data": [
     {
       "taskType": "preparation",
@@ -131,14 +131,14 @@ It covers:
 }
 ```
 
-### `GET /api/v1/orders/:id/mobile-summary`
+### 6. `GET /api/v1/orders/:id/mobile-summary`
 - **Use Case:** Order Status Checking
 - **Description:** Gom trạng thái đơn hàng, thanh toán, và vận hành phục vụ cho màn hình tổng quan đơn của mobile.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
+  "code": "MSG-MO-06",
   "data": {
     "orderId": 1,
     "orderNumber": "ORD-2026-0001",
@@ -150,7 +150,7 @@ It covers:
 }
 ```
 
-### `POST /api/v1/orders/:id/handover`
+### 7. `POST /api/v1/orders/:id/handover`
 - **Use Case:** UC 2.26 - Record Handover Evidence
 - **Description:** Leader staff uploads handover photos and confirmation after setup.
 - **Business Rules:**
@@ -159,7 +159,7 @@ It covers:
 ```json
 {
   "customerAgreed": true,
-  "notes": "Customer signed off.",
+  "notes": "Khách hàng đã ký nghiệm thu.",
   "evidences": [{ "fileUrl": "url-to-image" }]
 }
 ```
@@ -167,40 +167,12 @@ It covers:
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
-  "message": "Handover record created."
+  "code": "MSG-MO-07",
+  "message": "Tạo biên bản bàn giao thành công."
 }
 ```
 
-### `GET /api/v1/orders/:id/damage-loss`
-- **Use Case:** UC 2.28 - View Damage/Loss Report
-- **Description:** Retrieves damage and loss reports associated with an order.
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "code": "MSG-MO-00",
-  "data": [
-    {
-      "damageLossId": 1,
-      "orderId": 1,
-      "totalCompensation": 0,
-      "items": [
-        {
-          "equipmentItemId": 1,
-          "quantity": 1,
-          "damageType": "damaged",
-          "responsibleParty": "staff",
-          "responsibleUserId": 1
-        }
-      ],
-      "evidences": [{ "fileUrl": "url-to-image" }]
-    }
-  ]
-}
-```
-
-### `POST /api/v1/orders/:id/damage-loss`
+### 8. `POST /api/v1/orders/:id/damage-loss`
 - **Use Case:** UC 2.28 - Record Damage/Loss Report
 - **Description:** Leader staff records any damaged or lost items during collection/return.
 - **Business Rules:**
@@ -227,7 +199,7 @@ It covers:
 ```json
 {
   "success": true,
-  "code": "MSG-MO-00",
-  "message": "Damage/Loss report submitted successfully."
+  "code": "MSG-MO-09",
+  "message": "Gửi báo cáo hư hỏng/mất mát thành công."
 }
 ```

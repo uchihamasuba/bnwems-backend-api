@@ -41,7 +41,7 @@ export const createCustomer = async (req: AuthRequest, res: Response, next: Next
 
     res.status(201).json({
       success: true,
-      message: 'Customer registered successfully.',
+      message: 'Đăng ký khách hàng thành công.',
       data: { id: newCustomer.customerId },
     });
   } catch (error) {
@@ -58,7 +58,7 @@ export const updateCustomer = async (req: AuthRequest, res: Response, next: Next
 
     res.status(200).json({
       success: true,
-      message: 'Customer updated successfully.',
+      message: 'Cập nhật khách hàng thành công.',
     });
   } catch (error) {
     next(error);

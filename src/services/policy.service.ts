@@ -47,7 +47,7 @@ class PolicyService {
 
   public async updatePolicy(id: string, rules: any, actionUserId: string) {
     const policy = await prisma.businessPolicy.findUnique({ where: { policyId: BigInt(id) } });
-    if (!policy) throw new AppError('Policy not found', 404);
+    if (!policy) throw new AppError('Không tìm thấy chính sách.', 404);
 
     await prisma.businessPolicy.update({
       where: { policyId: BigInt(id) },

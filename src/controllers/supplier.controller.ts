@@ -29,7 +29,7 @@ export const createSupplier = async (req: AuthRequest, res: Response, next: Next
 
     res.status(201).json({
       success: true,
-      message: 'Supplier created successfully.',
+      message: 'Tạo nhà cung cấp thành công.',
       data: newSupplier,
     });
   } catch (error) {

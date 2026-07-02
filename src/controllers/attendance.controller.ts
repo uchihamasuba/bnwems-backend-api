@@ -11,7 +11,7 @@ export const checkIn = async (req: AuthRequest, res: Response, next: NextFunctio
 
     res.status(200).json({
       success: true,
-      message: 'Check-in successful.',
+      message: 'Điểm danh thành công.',
     });
   } catch (error) {
     next(error);
@@ -28,7 +28,7 @@ export const confirmAttendance = async (req: AuthRequest, res: Response, next: N
 
     res.status(200).json({
       success: true,
-      message: 'Attendance confirmed.',
+      message: 'Đã xác nhận điểm danh.',
     });
   } catch (error) {
     next(error);

@@ -24,7 +24,7 @@ class PaymentService {
       where: { paymentRequestId: BigInt(id) }
     });
     
-    if (!pr) throw new AppError('Payment request not found', 404);
+    if (!pr) throw new AppError('Không tìm thấy yêu cầu thanh toán.', 404);
     
     const payments = await prisma.payment.findMany({
       where: { paymentRequestId: BigInt(id) }
@@ -47,14 +47,14 @@ class PaymentService {
 
   public async requestPayment(finalOrderId: string, amount: number, paymentType: string, paymentMethod: string, userId: string) {
     if (!finalOrderId || !amount || !paymentType || !paymentMethod) {
-      throw new AppError('Required information is missing', 400, 'MSG-UC19-01');
+      throw new AppError('Thiếu thông tin bắt buộc.', 400, 'MSG-UC19-01');
     }
 
     const order = await prisma.order.findUnique({
       where: { orderId: BigInt(finalOrderId) }
     });
 
-    if (!order) throw new AppError('Order not found', 404);
+    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
 
     const quote = await prisma.quotation.findFirst({
       where: { orderId: BigInt(finalOrderId) },
@@ -87,11 +87,11 @@ class PaymentService {
     const isFailed = status.toLowerCase() === 'failed';
 
     if (!isCompleted && !isFailed) {
-      throw new AppError('Status must be completed or failed', 400);
+      throw new AppError('Trạng thái phải là hoàn thành hoặc thất bại.', 400);
     }
 
     const pr = await prisma.paymentRequest.findUnique({ where: { paymentRequestId: BigInt(id) } });
-    if (!pr) throw new AppError('Payment request not found', 404);
+    if (!pr) throw new AppError('Không tìm thấy yêu cầu thanh toán.', 404);
 
     await prisma.$transaction(async (tx) => {
       if (isCompleted) {

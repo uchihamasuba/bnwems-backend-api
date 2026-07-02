@@ -5,14 +5,14 @@ This module handles **UC 2.11 (Order Lifecycle Management)** and **UC 2.27 (Fiel
 It manages `Order` and `ChangeRequest` entities from creation to completion.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC11-01`: Required information is missing or invalid.
-- `MSG-UC11-02`: System cannot complete the request.
-- `MSG-UC11-04`: Cannot confirm order without an accepted quotation.
-- `MSG-UC27-01`: Change request requires manager approval.
+- `MSG-UC11-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC11-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC11-04`: Không thể xác nhận đơn hàng khi chưa có báo giá được chấp nhận.
+- `MSG-UC27-01`: Yêu cầu thay đổi cần được quản lý phê duyệt.
 
 ## 1. Order Lifecycle Management (UC 2.11)
 
-### `GET /api/v1/orders`
+### 1. `GET /api/v1/orders`
 - **Use Case:** UC 2.11 - View Order List
 - **Description:** Retrieves a paginated list of orders for operational processing. Manager/Staff access required.
 - **Query Parameters:**
@@ -25,7 +25,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
+  "code": "MSG-CO-01",
   "data": [
     {
       "orderId": 1,
@@ -44,14 +44,14 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 
-### `GET /api/v1/orders/:id`
+### 2. `GET /api/v1/orders/:id`
 - **Use Case:** UC 2.11 - View Order Details
 - **Description:** Retrieves detailed order information including customer, quotation, and related operational data.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
+  "code": "MSG-CO-02",
   "data": {
     "orderId": 1,
     "orderNumber": "ORD-2026-0001",
@@ -72,7 +72,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 
-### `POST /api/v1/orders`
+### 3. `POST /api/v1/orders`
 - **Use Case:** UC 2.11 - Create Order
 - **Description:** Creates a new customer order in `draft` status.
 - **Business Rules:**
@@ -93,13 +93,13 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
-  "message": "Order created successfully.",
+  "code": "MSG-CO-03",
+  "message": "Tạo đơn hàng thành công.",
   "data": { "orderId": 1, "orderNumber": "ORD-2026-0001" }
 }
 ```
 
-### `PUT /api/v1/orders/:id/confirm`
+### 4. `PUT /api/v1/orders/:id/confirm`
 - **Use Case:** UC 2.11 - Confirm Order
 - **Description:** Confirms an order after quotation agreement and deposit payment. Triggers inventory reservation.
 - **Business Rules:**
@@ -110,13 +110,13 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
-  "message": "Order confirmed.",
+  "code": "MSG-CO-04",
+  "message": "Xác nhận đơn hàng thành công.",
   "data": { "status": "confirmed" }
 }
 ```
 
-### `PUT /api/v1/orders/:id/change-date`
+### 5. `PUT /api/v1/orders/:id/change-date`
 - **Use Case:** UC 2.11 - Change Event Date
 - **Description:** Changes the event date, rechecking inventory availability.
 - **Business Rules:**
@@ -133,12 +133,12 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
-  "message": "Order date updated."
+  "code": "MSG-CO-05",
+  "message": "Cập nhật ngày đơn hàng thành công."
 }
 ```
 
-### `PUT /api/v1/orders/:id/close`
+### 6. `PUT /api/v1/orders/:id/close`
 - **Use Case:** UC 2.11 - Confirm Order Closure
 - **Description:** Reviews all final order data and closes the order.
 - **Business Rules:**
@@ -147,20 +147,20 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
-  "message": "Order closed successfully.",
+  "code": "MSG-CO-06",
+  "message": "Đóng đơn hàng thành công.",
   "data": { "status": "completed" }
 }
 ```
 
-### `GET /api/v1/orders/:id/evidences`
+### 7. `GET /api/v1/orders/:id/evidences`
 - **Use Case:** Evidence Viewing
 - **Description:** Tổng hợp ảnh minh chứng theo đơn (khảo sát, thanh toán, hư hỏng, bàn giao, hoàn kho).
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
+  "code": "MSG-CO-07",
   "data": [
     {
       "evidenceId": 1,
@@ -178,9 +178,27 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 
+### 8. `GET /api/v1/orders/:id/workflow-timeline`
+- **Use Case:** View Order Timeline
+- **Description:** Retrieves the timeline of workflow events for a specific order.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-CO-08",
+  "data": [
+    {
+      "milestone": "ORDER_CREATED",
+      "timestamp": "2026-06-22T10:00:00Z",
+      "status": "completed"
+    }
+  ]
+}
+```
+
 ## 2. Field Change Request Management (UC 2.27)
 
-### `GET /api/v1/change-requests`
+### 14. `GET /api/v1/change-requests`
 - **Use Case:** UC 2.27 - View Change Request List
 - **Description:** Retrieves a paginated list of field change requests, primarily used to build the Manager's pending-approval queue.
 - **Query Parameters:**
@@ -192,7 +210,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
+  "code": "MSG-CO-09",
   "data": [
     {
       "changeRequestId": 1,
@@ -201,7 +219,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
       "items": [
         {
           "equipmentItemId": 1,
-          "equipmentItemName": "Standard Speaker Set",
+          "equipmentItemName": "Bộ loa tiêu chuẩn",
           "equipmentItemCode": "SPK-001",
           "quantity": 2,
           "action": "add"
@@ -215,14 +233,14 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 
-### `GET /api/v1/orders/:id/change-requests`
+### 15. `GET /api/v1/orders/:id/change-requests`
 - **Use Case:** Change Request Approval (List)
 - **Description:** Hiển thị danh sách phát sinh theo đơn hàng (queue phát sinh).
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
+  "code": "MSG-CO-10",
   "data": [
     {
       "changeRequestId": 1,
@@ -234,14 +252,14 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 
-### `GET /api/v1/change-requests/:id`
+### 16. `GET /api/v1/change-requests/:id`
 - **Use Case:** Change Request Approval (Detail)
 - **Description:** Lấy chi tiết một yêu cầu thay đổi (phát sinh) cụ thể.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
+  "code": "MSG-CO-11",
   "data": {
     "changeRequestId": 1,
     "orderId": 1,
@@ -249,7 +267,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
     "items": [
       {
         "equipmentItemId": 1,
-        "equipmentItemName": "Standard Speaker Set",
+        "equipmentItemName": "Bộ loa tiêu chuẩn",
         "equipmentItemCode": "SPK-001",
         "quantity": 1,
         "action": "add"
@@ -262,7 +280,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 
-### `POST /api/v1/orders/:id/change-requests`
+### 17. `POST /api/v1/orders/:id/change-requests`
 - **Use Case:** UC 2.27 - Record Change Request
 - **Description:** Submits an on-site change request (add/remove items).
 - **Request Body:**
@@ -275,19 +293,19 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 - **Payload Rules:**
-  - `type`: Overall request type (`add`, `remove`, `replace`).
-  - `action`: Specific item action. For `type="replace"`, the `items` array must contain both the removed items (`action="remove"`) and the new items (`action="add"`).
+  - `type`: Loại yêu cầu tổng thể (`add`, `remove`, `replace`).
+  - `action`: Hành động cho từng thiết bị cụ thể. Với `type="replace"`, mảng `items` phải bao gồm cả thiết bị bị gỡ bỏ (`action="remove"`) và thiết bị thêm mới (`action="add"`).
   - *Note: Pricing adjustments are calculated automatically upon approval and added to the final settlement.*
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
-  "message": "Change request submitted for approval."
+  "code": "MSG-CO-12",
+  "message": "Yêu cầu thay đổi đã được gửi để phê duyệt."
 }
 ```
 
-### `PUT /api/v1/change-requests/:id/approve`
+### 18. `PUT /api/v1/change-requests/:id/approve`
 - **Use Case:** UC 2.27 - Approve Change Request
 - **Description:** Approves or rejects a field change request.
 - **Business Rules:**
@@ -302,7 +320,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 ```json
 {
   "success": true,
-  "code": "MSG-CO-00",
-  "message": "Change request status updated."
+  "code": "MSG-CO-13",
+  "message": "Cập nhật trạng thái yêu cầu thay đổi thành công."
 }
 ```

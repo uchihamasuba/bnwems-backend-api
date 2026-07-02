@@ -42,7 +42,7 @@ export const createQuotation = async (req: AuthRequest, res: Response, next: Nex
 
     res.status(201).json({
       success: true,
-      message: 'Quotation created.',
+      message: 'Tạo báo giá thành công.',
       data: { id: newQuote.quotationId, version: 1 },
     });
   } catch (error) {
@@ -58,7 +58,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response, next: Nex
 
     res.status(200).json({
       success: true,
-      message: 'Quotation updated successfully.',
+      message: 'Cập nhật báo giá thành công.',
     });
   } catch (error) {
     next(error);
@@ -73,7 +73,7 @@ export const deleteQuotation = async (req: AuthRequest, res: Response, next: Nex
 
     res.status(200).json({
       success: true,
-      message: 'Quotation deleted successfully.',
+      message: 'Xóa báo giá thành công.',
     });
   } catch (error) {
     next(error);
@@ -89,7 +89,7 @@ export const confirmQuotation = async (req: AuthRequest, res: Response, next: Ne
 
     res.status(200).json({
       success: true,
-      message: 'Quotation confirmed.',
+      message: 'Xác nhận báo giá thành công.',
       data: { status: 'ACCEPTED' },
     });
   } catch (error) {
@@ -107,7 +107,7 @@ export const updateQuotationStatus = async (req: AuthRequest, res: Response, nex
 
     res.status(200).json({
       success: true,
-      message: 'Quotation status updated.',
+      message: 'Cập nhật trạng thái báo giá thành công.',
       data: { status },
     });
   } catch (error) {

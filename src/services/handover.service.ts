@@ -5,7 +5,7 @@ class HandoverService {
     const { customerAgreed, notes, evidences } = data;
 
     if (!customerAgreed) {
-      throw new Error('Customer must agree to handover.');
+      throw new Error('Khách hàng phải đồng ý biên bản bàn giao.');
     }
 
     const newHandover = await prisma.handoverRecord.create({

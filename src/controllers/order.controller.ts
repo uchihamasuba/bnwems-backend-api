@@ -54,7 +54,7 @@ export const createOrder = async (req: AuthRequest, res: Response, next: NextFun
 
     res.status(201).json({
       success: true,
-      message: 'Order created successfully.',
+      message: 'Tạo đơn hàng thành công.',
       data: result,
     });
   } catch (error) {
@@ -70,7 +70,7 @@ export const confirmOrder = async (req: AuthRequest, res: Response, next: NextFu
 
     res.status(200).json({
       success: true,
-      message: 'Order confirmed.',
+      message: 'Xác nhận đơn hàng thành công.',
       data: { status: 'CONFIRMED' },
     });
   } catch (error) {
@@ -87,7 +87,7 @@ export const changeEventDate = async (req: AuthRequest, res: Response, next: Nex
 
     res.status(200).json({
       success: true,
-      message: 'Order date updated.',
+      message: 'Cập nhật ngày đơn hàng thành công.',
     });
   } catch (error) {
     next(error);
@@ -102,7 +102,7 @@ export const closeOrder = async (req: AuthRequest, res: Response, next: NextFunc
 
     res.status(200).json({
       success: true,
-      message: 'Order closed successfully.',
+      message: 'Đóng đơn hàng thành công.',
       data: { status: 'COMPLETED' },
     });
   } catch (error) {

@@ -5,15 +5,15 @@ This module handles **UC 2.16 (Supplier Transaction & Debt Management)** and **U
 It manages external partners, their transactions (`SupplierTransaction`), receiving/returns, and financial payments (`SupplierPayment`).
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC16-01`: Required information is missing or invalid.
-- `MSG-UC16-02`: System cannot complete the request.
-- `MSG-UC16-03`: You do not have permission to perform this action.
-- `MSG-UC24-01`: Received item quantities do not match the transaction agreement.
-- `MSG-UC24-02`: Evidence missing for supplier return.
+- `MSG-UC16-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC16-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC16-03`: Bạn không có quyền thực hiện thao tác này.
+- `MSG-UC24-01`: Số lượng hàng nhận không khớp với thỏa thuận giao dịch.
+- `MSG-UC24-02`: Thiếu bằng chứng cho việc trả lại hàng nhà cung cấp.
 
 ## 1. Supplier Master Data (UC 2.16)
 
-### `GET /api/v1/suppliers`
+### 1. `GET /api/v1/suppliers`
 - **Use Case:** UC 2.16 (implied) - View Supplier List
 - **Description:** Retrieves a paginated list of suppliers. Manager access required.
 - **Query Parameters:**
@@ -25,14 +25,14 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
+  "code": "MSG-SP-01",
   "data": [
     {
       "supplierId": 1,
-      "name": "AudioVisual Pro Inc.",
-      "contactPerson": "John Doe",
+      "name": "Công ty TNHH AudioVisual Pro",
+      "contactPerson": "Nguyễn Văn A",
       "phone": "+123456789",
-      "address": "123 Supplier St",
+      "address": "123 Đường Nguyễn Trãi",
       "status": "active"
     }
   ],
@@ -40,7 +40,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 }
 ```
 
-### `POST /api/v1/suppliers`
+### 2. `POST /api/v1/suppliers`
 - **Description:** Creates a new supplier record. Manager access required.
 - **Business Rules:**
   - BR-16-01: Supplier name must be unique.
@@ -48,24 +48,24 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Request Body:**
 ```json
 {
-  "name": "AudioVisual Pro Inc.",
-  "contactPerson": "John Doe",
+  "name": "Công ty TNHH AudioVisual Pro",
+  "contactPerson": "Nguyễn Văn A",
   "phone": "+123456789",
-  "address": "123 Supplier St"
+  "address": "123 Đường Nguyễn Trãi"
 }
 ```
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
-  "message": "Supplier created successfully."
+  "code": "MSG-SP-02",
+  "message": "Tạo nhà cung cấp thành công."
 }
 ```
 
 ## 2. Supplier Transactions (UC 2.16, UC 2.24)
 
-### `POST /api/v1/supplier-transactions`
+### 3. `POST /api/v1/supplier-transactions`
 - **Use Case:** UC 2.16 - Create Supplier Rental/Purchase Order
 - **Description:** Creates a transaction to rent or purchase items from a supplier for an order.
 - **Business Rules:**
@@ -92,20 +92,20 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
-  "message": "Supplier transaction created.",
+  "code": "MSG-SP-03",
+  "message": "Tạo giao dịch nhà cung cấp thành công.",
   "data": { "supplierTransactionId": 1, "status": "draft" }
 }
 ```
 
-### `GET /api/v1/supplier-transactions/:id`
+### 4. `GET /api/v1/supplier-transactions/:id`
 - **Use Case:** UC 2.16 - View Supplier Transaction Details
 - **Description:** Retrieves the detailed information of a specific supplier transaction, including its items and payment status.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
+  "code": "MSG-SP-04",
   "data": {
     "supplierTransactionId": 1,
     "status": "draft"
@@ -113,7 +113,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 }
 ```
 
-### `PUT /api/v1/supplier-transactions/:id/status`
+### 5. `PUT /api/v1/supplier-transactions/:id/status`
 - **Use Case:** UC 2.16 - Update Supplier Transaction Status
 - **Description:** Manually overrides or updates the status of a supplier transaction (e.g., cancelled).
 - **Request Body:**
@@ -126,12 +126,12 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
-  "message": "Supplier transaction status updated."
+  "code": "MSG-SP-05",
+  "message": "Cập nhật trạng thái giao dịch nhà cung cấp thành công."
 }
 ```
 
-### `PUT /api/v1/supplier-transactions/:id/receive`
+### 6. `PUT /api/v1/supplier-transactions/:id/receive`
 - **Use Case:** UC 2.24 - Supplier Item Receiving Support
 - **Description:** Records the receipt of equipment/materials from a supplier.
 - **Business Rules:**
@@ -147,12 +147,12 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
-  "message": "Items received and logged."
+  "code": "MSG-SP-06",
+  "message": "Đã nhận và ghi nhận thiết bị/vật tư."
 }
 ```
 
-### `PUT /api/v1/supplier-transactions/:id/return`
+### 7. `PUT /api/v1/supplier-transactions/:id/return`
 - **Use Case:** UC 2.24 - Supplier Item Return Support
 - **Description:** Records the return of rented equipment to a supplier.
 - **Business Rules:**
@@ -168,14 +168,14 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
-  "message": "Items returned to supplier successfully."
+  "code": "MSG-SP-07",
+  "message": "Trả lại thiết bị/vật tư cho nhà cung cấp thành công."
 }
 ```
 
 ## 3. Supplier Payment Management (UC 2.16)
 
-### `GET /api/v1/supplier-transactions`
+### 8. `GET /api/v1/supplier-transactions`
 - **Use Case:** UC 2.16 - Monitor Supplier Debt
 - **Description:** Retrieves supplier transactions to monitor payments and debts.
 - **Query Parameters:**
@@ -185,7 +185,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
+  "code": "MSG-SP-08",
   "data": [
     {
       "supplierTransactionId": 1,
@@ -202,7 +202,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 }
 ```
 
-### `POST /api/v1/supplier-transactions/:id/payments`
+### 9. `POST /api/v1/supplier-transactions/:id/payments`
 - **Use Case:** UC 2.16 - Record Supplier Payment
 - **Description:** Records a payment made to a supplier, increasing the `paidAmount`.
 - **Business Rules:**
@@ -220,7 +220,7 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ```json
 {
   "success": true,
-  "code": "MSG-SP-00",
-  "message": "Payment recorded successfully."
+  "code": "MSG-SP-09",
+  "message": "Ghi nhận thanh toán thành công."
 }
 ```

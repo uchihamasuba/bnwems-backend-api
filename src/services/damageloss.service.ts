@@ -8,7 +8,7 @@ class DamageLossService {
     // BR-28-01: Must specify responsible party
     const invalidItems = reportDetails.items.filter((i: any) => !i.responsibleParty);
     if (invalidItems.length > 0) {
-      throw new AppError('Must specify responsible party for all items.', 400, 'MSG-UC28-01');
+      throw new AppError('Phải chỉ định người chịu trách nhiệm cho tất cả các mục.', 400, 'MSG-UC28-01');
     }
 
     const newReport = await prisma.damageLossReport.create({

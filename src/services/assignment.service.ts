@@ -27,11 +27,11 @@ class AssignmentService {
   }
   public async assignStaff(taskId: string, assignments: any[]) {
     if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
-      throw new AppError('Staff assignment information is missing.', 400, 'MSG-UC53-05');
+      throw new AppError('Thiếu thông tin phân công nhân viên.', 400, 'MSG-UC53-05');
     }
 
     const task = await prisma.workTask.findUnique({ where: { workTaskId: BigInt(taskId) } });
-    if (!task) throw new AppError('Task not found', 404);
+    if (!task) throw new AppError('Không tìm thấy công việc.', 404);
 
     await prisma.$transaction(async (tx) => {
       const existingAssignments = await tx.assignment.findMany({

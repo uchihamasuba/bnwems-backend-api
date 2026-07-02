@@ -5,14 +5,14 @@ This module handles **UC 2.10 (Quotation Management)**.
 It manages `Quotation` records, which act as versioned proposals attached to an `Order`.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC10-01`: Required information is missing or invalid.
-- `MSG-UC10-02`: System cannot complete the request.
-- `MSG-UC10-03`: You do not have permission to perform this action.
-- `MSG-UC10-04`: Quotation cannot be modified after confirmation.
+- `MSG-UC10-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC10-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC10-03`: Bạn không có quyền thực hiện thao tác này.
+- `MSG-UC10-04`: Không thể sửa báo giá sau khi đã xác nhận.
 
 ## Endpoints
 
-### `GET /api/v1/orders/:orderId/quotations`
+### 1. `GET /api/v1/orders/:orderId/quotations`
 - **Use Case:** UC 2.10 - View Quotation
 - **Description:** Retrieves the list of quotation versions for a specific order. Manager access required.
 - **Query Parameters:**
@@ -22,7 +22,7 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 ```json
 {
   "success": true,
-  "code": "MSG-QO-00",
+  "code": "MSG-QO-01",
   "data": [
     {
       "quotationId": 1,
@@ -40,14 +40,14 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 }
 ```
 
-### `GET /api/v1/quotations/:id`
+### 2. `GET /api/v1/quotations/:id`
 - **Use Case:** UC 2.10 - View Quotation (Details)
 - **Description:** Retrieves the details of a specific quotation version, including its calculated item details.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-QO-00",
+  "code": "MSG-QO-02",
   "data": {
     "quotationId": 1,
     "orderId": 1,
@@ -70,7 +70,7 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 }
 ```
 
-### `POST /api/v1/orders/:orderId/quotations`
+### 3. `POST /api/v1/orders/:orderId/quotations`
 - **Use Case:** UC 2.10 - Create Quotation
 - **Description:** Creates a new quotation draft for an order. If one already exists, creates a new version.
 - **Business Rules:**
@@ -97,13 +97,13 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 ```json
 {
   "success": true,
-  "code": "MSG-QO-00",
-  "message": "Quotation created.",
+  "code": "MSG-QO-03",
+  "message": "Tạo báo giá thành công.",
   "data": { "quotationId": 2, "version": 2 }
 }
 ```
 
-### `PUT /api/v1/quotations/:id`
+### 4. `PUT /api/v1/quotations/:id`
 - **Use Case:** UC 2.10 - Update Quotation
 - **Description:** Updates the details of an existing draft quotation. 
 - **Business Rules:**
@@ -128,12 +128,26 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 ```json
 {
   "success": true,
-  "code": "MSG-QO-00",
-  "message": "Quotation updated successfully."
+  "code": "MSG-QO-04",
+  "message": "Cập nhật báo giá thành công."
 }
 ```
 
-### `PATCH /api/v1/quotations/:id/status`
+### 5. `DELETE /api/v1/quotations/:id`
+- **Use Case:** Delete Quotation
+- **Description:** Hard-deletes a quotation.
+- **Business Rules:**
+  - BR-10-06: Cannot delete confirmed quotations.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-QO-05",
+  "message": "Xóa báo giá thành công."
+}
+```
+
+### 6. `PATCH /api/v1/quotations/:id/status`
 - **Use Case:** UC 2.10 - Soft Delete Quotation
 - **Description:** Soft-deletes a quotation.
 - **Business Rules:**
@@ -142,12 +156,12 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 ```json
 {
   "success": true,
-  "code": "MSG-QO-00",
-  "message": "Quotation deleted successfully."
+  "code": "MSG-QO-05",
+  "message": "Xóa báo giá thành công."
 }
 ```
 
-### `PUT /api/v1/quotations/:id/confirm`
+### 7. `PUT /api/v1/quotations/:id/confirm`
 - **Use Case:** UC 2.10 - Confirm Quotation
 - **Description:** Confirms the quotation as agreed by the customer. 
 - **Business Rules:**
@@ -157,8 +171,8 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 ```json
 {
   "success": true,
-  "code": "MSG-QO-00",
-  "message": "Quotation confirmed.",
+  "code": "MSG-QO-06",
+  "message": "Xác nhận báo giá thành công.",
   "data": { "status": "confirmed" }
 }
 ```

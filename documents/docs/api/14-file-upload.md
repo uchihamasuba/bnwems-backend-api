@@ -4,10 +4,10 @@
 This module provides a unified API for uploading files (images, documents) to Firebase Storage. This supports other modules that require storing and using file/image URLs (such as user avatars, equipment images, survey photos, and evidence).
 
 ## Standard Error Codes
-- `MSG-UF-01`: No file provided or file is empty.
-- `MSG-UF-02`: File format not supported (e.g., not an image).
-- `MSG-UF-03`: File size exceeds the allowed limit.
-- `MSG-UF-04`: Upload to Firebase Storage failed.
+- `MSG-UF-01`: Không có tệp được cung cấp hoặc tệp trống.
+- `MSG-UF-02`: Định dạng tệp không được hỗ trợ (ví dụ: không phải là ảnh).
+- `MSG-UF-03`: Kích thước tệp vượt quá giới hạn cho phép.
+- `MSG-UF-04`: Tải lên Firebase Storage thất bại.
 
 ## Endpoints
 
@@ -18,14 +18,14 @@ This module provides a unified API for uploading files (images, documents) to Fi
   - `Authorization: Bearer <token>`
   - `Content-Type: multipart/form-data`
 - **Request Body (FormData):**
-  - `file`: The image file (jpeg, png, webp, etc.)
-  - `folder`: (Optional) The target folder name in Firebase Storage (e.g., `avatars`, `equipments`, `surveys`, `evidence`). Defaults to `general`.
+  - `file`: Tệp hình ảnh (jpeg, png, webp, v.v.)
+  - `folder`: (Tùy chọn) Tên thư mục đích trên Firebase Storage (ví dụ: `avatars`, `equipments`, `surveys`, `evidence`). Mặc định là `general`.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "code": "MSG-UF-00",
-  "message": "Image uploaded successfully",
+  "code": "MSG-UF-01",
+  "message": "Tải ảnh lên thành công",
   "data": {
     "url": "https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/avatars%2Fimage123.jpg?alt=media",
     "fileName": "image123.jpg",

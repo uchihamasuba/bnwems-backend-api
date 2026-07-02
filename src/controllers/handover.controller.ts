@@ -11,7 +11,7 @@ export const recordHandover = async (req: AuthRequest, res: Response, next: Next
 
     res.status(201).json({
       success: true,
-      message: 'Handover record created.',
+      message: 'Tạo biên bản bàn giao thành công.',
       data: { id: newHandover.id },
     });
   } catch (error) {

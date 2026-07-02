@@ -27,7 +27,7 @@ class QuotationService {
     const quotation = await prisma.quotation.findUnique({ 
       where: { quotationId: BigInt(id) },
     });
-    if (!quotation) throw new AppError('Quotation not found.', 404);
+    if (!quotation) throw new AppError('Không tìm thấy báo giá.', 404);
     
     const items = await prisma.quotationItem.findMany({
       where: { quotationId: BigInt(id) }
@@ -46,7 +46,7 @@ class QuotationService {
     const { totalAmount, items } = data;
 
     const order = await prisma.order.findUnique({ where: { orderId: BigInt(orderId) } });
-    if (!order) throw new AppError('Order not found', 404);
+    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
 
     const latestQuote = await prisma.quotation.findFirst({ 
       where: { orderId: BigInt(orderId) },
@@ -100,10 +100,10 @@ class QuotationService {
     const { totalAmount, items } = data;
 
     const existing = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!existing) throw new AppError('Quotation not found.', 404);
+    if (!existing) throw new AppError('Không tìm thấy báo giá.', 404);
 
     if (existing.status === 'confirmed' || existing.status === 'SENT') {
-      throw new AppError('Cannot modify after confirmation.', 400, 'MSG-UC10-04');
+      throw new AppError('Không thể chỉnh sửa sau khi đã xác nhận.', 400, 'MSG-UC10-04');
     }
 
     await prisma.$transaction(async (prismaTx) => {
@@ -134,10 +134,10 @@ class QuotationService {
 
   public async deleteQuotation(id: string) {
     const existing = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!existing) throw new AppError('Quotation not found.', 404);
+    if (!existing) throw new AppError('Không tìm thấy báo giá.', 404);
 
     if (existing.status === 'confirmed') {
-      throw new AppError('Cannot delete accepted quotation.', 400, 'MSG-UC10-05');
+      throw new AppError('Không thể xóa báo giá đã được chấp nhận.', 400, 'MSG-UC10-05');
     }
 
     await prisma.$transaction(async (prismaTx) => {
@@ -148,7 +148,7 @@ class QuotationService {
 
   public async confirmQuotation(id: string, actionUserId: string) {
     const quote = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!quote) throw new AppError('Quotation not found.', 404);
+    if (!quote) throw new AppError('Không tìm thấy báo giá.', 404);
 
     await prisma.$transaction([
       prisma.quotation.update({ where: { quotationId: BigInt(id) }, data: { status: 'confirmed' } }),
@@ -167,7 +167,7 @@ class QuotationService {
 
   public async updateQuotationStatus(id: string, status: string, actionUserId: string) {
     const quote = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!quote) throw new AppError('Quotation not found.', 404);
+    if (!quote) throw new AppError('Không tìm thấy báo giá.', 404);
 
     await prisma.quotation.update({ where: { quotationId: BigInt(id) }, data: { status } });
 

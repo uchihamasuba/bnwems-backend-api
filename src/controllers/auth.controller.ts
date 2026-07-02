@@ -9,7 +9,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: 'Đăng nhập thành công.',
       data: result,
     });
   } catch (error) {
@@ -25,7 +25,7 @@ export const logout = async (req: AuthRequest, res: Response, next: NextFunction
 
     res.status(200).json({
       success: true,
-      message: 'Logged out successfully.',
+      message: 'Đăng xuất thành công.',
     });
   } catch (error) {
     next(error);
@@ -39,7 +39,7 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     res.status(200).json({
       success: true,
-      message: 'If the account exists, a recovery email has been sent.',
+      message: 'Nếu tài khoản tồn tại, email khôi phục đã được gửi.',
     });
   } catch (error) {
     next(error);
@@ -55,7 +55,7 @@ export const changePassword = async (req: AuthRequest, res: Response, next: Next
 
     res.status(200).json({
       success: true,
-      message: 'Password changed successfully.',
+      message: 'Đổi mật khẩu thành công.',
     });
   } catch (error) {
     next(error);
@@ -85,7 +85,7 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
 
     res.status(200).json({
       success: true,
-      message: 'Profile updated successfully.',
+      message: 'Cập nhật hồ sơ thành công.',
       data: updatedUser,
     });
   } catch (error) {
@@ -102,7 +102,7 @@ export const registerDeviceToken = async (req: AuthRequest, res: Response, next:
 
     res.status(200).json({
       success: true,
-      message: 'Device token registered successfully.',
+      message: 'Đăng ký token thiết bị thành công.',
     });
   } catch (error) {
     next(error);

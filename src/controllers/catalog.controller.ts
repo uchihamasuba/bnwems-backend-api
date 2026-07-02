@@ -47,7 +47,7 @@ export const createCatalogCategory = async (req: Request, res: Response, next: N
 
     res.status(201).json({
       success: true,
-      message: 'Catalog category created successfully',
+      message: 'Tạo danh mục thành công.',
       data: newCategory,
     });
   } catch (error) {
@@ -62,7 +62,7 @@ export const updateCatalogCategory = async (req: Request, res: Response, next: N
 
     res.status(200).json({
       success: true,
-      message: 'Catalog category updated successfully',
+      message: 'Cập nhật danh mục thành công.',
       data: updatedCategory,
     });
   } catch (error) {
@@ -79,7 +79,7 @@ export const updateCatalogCategoryStatus = async (req: Request, res: Response, n
 
     res.status(200).json({
       success: true,
-      message: 'Catalog category status updated successfully',
+      message: 'Cập nhật trạng thái danh mục thành công.',
     });
   } catch (error) {
     next(error);
@@ -134,7 +134,7 @@ export const createCatalogItem = async (req: Request, res: Response, next: NextF
 
     res.status(201).json({
       success: true,
-      message: 'Catalog item created successfully',
+      message: 'Tạo thiết bị/vật tư thành công.',
       data: newItem,
     });
   } catch (error) {
@@ -149,7 +149,7 @@ export const updateCatalogItem = async (req: Request, res: Response, next: NextF
 
     res.status(200).json({
       success: true,
-      message: 'Catalog item updated successfully',
+      message: 'Cập nhật thiết bị/vật tư thành công.',
       data: updatedItem,
     });
   } catch (error) {
@@ -166,7 +166,7 @@ export const updateCatalogItemStatus = async (req: Request, res: Response, next:
 
     res.status(200).json({
       success: true,
-      message: 'Catalog item status updated successfully',
+      message: 'Cập nhật trạng thái thiết bị/vật tư thành công.',
     });
   } catch (error) {
     next(error);

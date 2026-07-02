@@ -57,7 +57,7 @@ export const catalogCategoryService = {
     });
 
     if (!category) {
-      const error: any = new Error('Catalog category not found');
+      const error: any = new Error('Không tìm thấy danh mục.');
       error.statusCode = 404;
       throw error;
     }
@@ -97,7 +97,7 @@ export const catalogCategoryService = {
       where: { categoryId },
     });
     if (!existing) {
-      const error: any = new Error('Catalog category not found');
+      const error: any = new Error('Không tìm thấy danh mục.');
       error.statusCode = 404;
       throw error;
     }
@@ -125,7 +125,7 @@ export const catalogCategoryService = {
       where: { categoryId },
     });
     if (!existing) {
-      const error: any = new Error('Catalog category not found');
+      const error: any = new Error('Không tìm thấy danh mục.');
       error.statusCode = 404;
       throw error;
     }
@@ -197,7 +197,7 @@ export const catalogItemService = {
     });
 
     if (!item) {
-      const error: any = new Error('Catalog item not found');
+      const error: any = new Error('Không tìm thấy thiết bị/vật tư.');
       error.statusCode = 404;
       throw error;
     }
@@ -241,7 +241,7 @@ export const catalogItemService = {
       where: { itemId },
     });
     if (!existing) {
-      const error: any = new Error('Catalog item not found');
+      const error: any = new Error('Không tìm thấy thiết bị/vật tư.');
       error.statusCode = 404;
       throw error;
     }
@@ -271,7 +271,7 @@ export const catalogItemService = {
       where: { itemId },
     });
     if (!existing) {
-      const error: any = new Error('Catalog item not found');
+      const error: any = new Error('Không tìm thấy thiết bị/vật tư.');
       error.statusCode = 404;
       throw error;
     }

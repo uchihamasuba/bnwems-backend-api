@@ -48,7 +48,7 @@ export const createTask = async (req: AuthRequest, res: Response, next: NextFunc
 
     res.status(201).json({
       success: true,
-      message: 'Task created successfully.',
+      message: 'Tạo công việc thành công.',
       data: { id: newTask.workTaskId },
     });
   } catch (error) {
@@ -64,7 +64,7 @@ export const updateTask = async (req: AuthRequest, res: Response, next: NextFunc
 
     res.status(200).json({
       success: true,
-      message: 'Task updated successfully.',
+      message: 'Cập nhật công việc thành công.',
     });
   } catch (error) {
     next(error);
@@ -81,7 +81,7 @@ export const cancelTask = async (req: AuthRequest, res: Response, next: NextFunc
     res.status(200).json({
       success: true,
       code: 'MSG-SV-00',
-      message: 'Task deleted.',
+      message: 'Đã xóa công việc.',
     });
   } catch (error) {
     next(error);
@@ -97,7 +97,7 @@ export const updateTaskProgress = async (req: AuthRequest, res: Response, next: 
 
     res.status(200).json({
       success: true,
-      message: 'Task progress updated.',
+      message: 'Cập nhật tiến độ công việc thành công.',
     });
   } catch (error) {
     next(error);
@@ -114,7 +114,7 @@ export const recordSurveyReport = async (req: AuthRequest, res: Response, next: 
 
     res.status(201).json({
       success: true,
-      message: 'Survey report submitted.',
+      message: 'Gửi báo cáo khảo sát thành công.',
     });
   } catch (error) {
     next(error);
@@ -161,7 +161,7 @@ export const reviewSurveyReport = async (req: AuthRequest, res: Response, next: 
 
     res.status(200).json({
       success: true,
-      message: 'Survey report reviewed successfully.',
+      message: 'Đánh giá báo cáo khảo sát thành công.',
     });
   } catch (error) {
     next(error);

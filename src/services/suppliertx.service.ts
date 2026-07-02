@@ -26,7 +26,7 @@ class SupplierTxService {
     const tx = await prisma.supplierTransaction.findUnique({
       where: { supplierTransactionId: BigInt(id) }
     });
-    if (!tx) throw new AppError('Transaction not found', 404);
+    if (!tx) throw new AppError('Không tìm thấy giao dịch.', 404);
 
     const items = await prisma.supplierTransactionItem.findMany({
       where: { supplierTransactionId: BigInt(id) }
@@ -68,7 +68,7 @@ class SupplierTxService {
 
   public async receiveSupplierItems(id: string, items: any[], evidenceUrls: string[], userId: string) {
     const tx = await prisma.supplierTransaction.findUnique({ where: { supplierTransactionId: BigInt(id) } });
-    if (!tx) throw new AppError('Transaction not found', 404);
+    if (!tx) throw new AppError('Không tìm thấy giao dịch.', 404);
 
     await prisma.$transaction(async (prismaTx) => {
       await prismaTx.supplierTransaction.update({
@@ -156,7 +156,7 @@ class SupplierTxService {
       const tx = await prismaTx.supplierTransaction.findUnique({
         where: { supplierTransactionId: BigInt(id) }
       });
-      if (!tx) throw new AppError('Supplier transaction not found', 404);
+      if (!tx) throw new AppError('Không tìm thấy giao dịch nhà cung cấp.', 404);
 
       await prismaTx.supplierPayment.create({
         data: {
