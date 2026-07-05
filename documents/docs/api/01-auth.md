@@ -55,6 +55,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 - **Use Case:** UC 2.1 - Logout
 - **Description:** Invalidates the current user session.
 - **Headers:** `Authorization: Bearer <token>`
+- **Request Body:** None (Empty body)
 - **Response (200 OK):**
 ```json
 {
@@ -226,6 +227,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 - **Use Case:** UC 7 - Mark Notification as Read
 - **Description:** Marks a specific notification as read.
 - **Headers:** `Authorization: Bearer <token>`
+- **Request Body:** None (Empty body)
 - **Response (200 OK):**
 ```json
 {
@@ -239,6 +241,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 - **Use Case:** UC 7 - Mark All Notifications as Read
 - **Description:** Marks all unread notifications for the user as read.
 - **Headers:** `Authorization: Bearer <token>`
+- **Request Body:** None (Empty body)
 - **Response (200 OK):**
 ```json
 {

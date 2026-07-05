@@ -9,14 +9,23 @@ class PaymentService {
       orderBy: { createdAt: 'desc' },
     });
     
-    // Manual mapping for evidences if needed, or just return payments
-    return payments.map(p => ({
-      ...p,
-      paymentId: p.paymentId.toString(),
-      paymentRequestId: p.paymentRequestId?.toString(),
-      orderId: p.orderId.toString(),
-      confirmedBy: p.confirmedBy?.toString()
+    // Fetch payment requests to get paymentType
+    const mappedPayments = await Promise.all(payments.map(async (p) => {
+      let paymentType = null;
+      if (p.paymentRequestId) {
+        const pr = await prisma.paymentRequest.findUnique({ where: { paymentRequestId: p.paymentRequestId } });
+        paymentType = pr ? pr.paymentType : null;
+      }
+      return {
+        ...p,
+        paymentType,
+        paymentId: p.paymentId.toString(),
+        paymentRequestId: p.paymentRequestId?.toString(),
+        orderId: p.orderId.toString(),
+        confirmedBy: p.confirmedBy?.toString()
+      };
     }));
+    return mappedPayments;
   }
 
   public async getPaymentRequestById(id: string) {

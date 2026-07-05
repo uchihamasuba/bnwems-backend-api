@@ -57,3 +57,6 @@ scaffold.ps1
 getUsers.ts
 temp_seed.sql
 prisma/temp_seed.sql
+check_api.ts
+check_docs_clarity.ts
+diff.ts

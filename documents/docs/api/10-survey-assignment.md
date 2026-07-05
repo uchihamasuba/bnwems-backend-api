@@ -201,6 +201,12 @@ It manages `Schedule` entities and their associated `WorkTask` entities, assigni
 - **Description:** Soft-deletes or cancels an unscheduled or draft task.
 - **Business Rules:**
   - BR-55-07: Cannot delete if `status` is not `pending`. Returns `MSG-UC55-06`.
+- **Request Body:**
+```json
+{
+  "status": "cancelled"
+}
+```
 - **Response (200 OK):**
 ```json
 {

@@ -41,13 +41,16 @@ export const getOrderById = async (req: Request, res: Response, next: NextFuncti
 export const createOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const actionUserId = req.user!.userId;
-    const { customerId, eventDate, eventEndDate, eventType, guestCount, venueAddress } = req.body;
+    const { customerId, eventDate, eventEndDate, eventType, eventName, notes, guestCount, venueAddress } = req.body;
 
     const result = await orderService.createOrder({ 
       customerId, 
       eventStartDate: eventDate,
+      eventDate,
       eventEndDate,
       eventType,
+      eventName,
+      notes,
       guestCount: guestCount ? Number(guestCount) : undefined,
       venueAddress 
     }, actionUserId);
@@ -56,6 +59,65 @@ export const createOrder = async (req: AuthRequest, res: Response, next: NextFun
       success: true,
       message: 'Tạo đơn hàng thành công.',
       data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const actionUserId = req.user!.userId;
+    const { id } = req.params;
+    
+    const updatedOrder = await orderService.updateOrder(id, req.body, actionUserId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật đơn hàng thành công.',
+      data: {
+        ...updatedOrder,
+        orderId: updatedOrder.orderId.toString(),
+        customerId: updatedOrder.customerId.toString(),
+        createdBy: updatedOrder.createdBy.toString()
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const cancelOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const actionUserId = req.user!.userId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    await orderService.cancelOrder(id, reason, actionUserId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Hủy đơn hàng thành công.',
+      data: { status: 'CANCELLED' }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getOrderStatusHistory = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const history = await orderService.getOrderStatusHistory(id);
+
+    res.status(200).json({
+      success: true,
+      data: history.map(h => ({
+        ...h,
+        historyId: h.historyId.toString(),
+        orderId: h.orderId.toString(),
+        changedBy: h.changedBy?.toString()
+      }))
     });
   } catch (error) {
     next(error);

@@ -188,10 +188,18 @@ class TaskService {
       where: { refType: 'SurveyReport', refId: report.surveyReportId }
     });
 
+    const user = await prisma.internalUser.findUnique({
+      where: { userId: report.recordedBy }
+    });
+
     return {
-      taskId: task.workTaskId,
+      workTaskId: task.workTaskId.toString(),
       notes: report.siteCondition,
       evidences,
+      surveyedBy: {
+        userId: report.recordedBy.toString(),
+        fullName: user?.fullName || 'Unknown'
+      },
       submittedAt: report.createdAt,
     };
   }

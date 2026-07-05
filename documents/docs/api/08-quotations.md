@@ -152,6 +152,12 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 - **Description:** Soft-deletes a quotation.
 - **Business Rules:**
   - BR-10-05: Cannot delete confirmed quotations.
+- **Request Body:**
+```json
+{
+  "status": "deleted"
+}
+```
 - **Response (200 OK):**
 ```json
 {
@@ -167,6 +173,7 @@ It manages `Quotation` records, which act as versioned proposals attached to an 
 - **Business Rules:**
   - BR-10-06: Transitions the quotation status to `confirmed`.
   - BR-10-07: Automatically updates the parent `Order` status to `confirmed` (if it was `draft`).
+- **Request Body:** None (Empty body)
 - **Response (200 OK):**
 ```json
 {

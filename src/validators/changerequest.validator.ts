@@ -22,6 +22,8 @@ export const createChangeRequestSchema = z.object({
   body: z.object({
     orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(),
     type: z.enum(['add', 'remove', 'replace']),
+    reason: z.string().optional(),
+    estimatedCost: z.number().optional(),
     items: z.array(z.object({
       equipmentItemId: z.number().int().positive(),
       quantity: z.number().int().positive(),

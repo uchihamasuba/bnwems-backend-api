@@ -145,6 +145,8 @@ model Order {
   eventDate     DateTime  @map("event_date") @db.Date
   eventEndDate  DateTime? @map("event_end_date") @db.Date
   eventType     String?   @map("event_type") @db.VarChar(50)
+  eventName     String?   @map("event_name") @db.VarChar(255)
+  notes         String?   @db.Text
   guestCount    Int?      @map("guest_count")
   eventLocation String?   @map("event_location") @db.VarChar(255)
   totalValue    Decimal   @default(0) @map("total_value") @db.Decimal(12, 2)

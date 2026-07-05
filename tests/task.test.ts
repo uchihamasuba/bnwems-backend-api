@@ -160,7 +160,8 @@ describe('Task API (Module 8)', () => {
       prismaMock.workTask.findUnique.mockResolvedValue({
         workTaskId: 2n
       } as any);
-      prismaMock.surveyReport.findFirst.mockResolvedValue({ surveyReportId: 1n } as any);
+      prismaMock.surveyReport.findFirst.mockResolvedValue({ surveyReportId: 1n, recordedBy: 1n, siteCondition: 'Test notes', createdAt: new Date() } as any);
+      prismaMock.internalUser.findUnique.mockResolvedValue({ userId: 1n, fullName: 'Nguyễn Văn A' } as any);
       prismaMock.evidence.findMany.mockResolvedValue([{ id: 'ev1' }] as any);
 
       const res = await request(app)
@@ -168,7 +169,8 @@ describe('Task API (Module 8)', () => {
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.taskId).toBe('2');
+      expect(res.body.data.workTaskId).toBe('2');
+      expect(res.body.data.surveyedBy.fullName).toBe('Nguyễn Văn A');
     });
   });
 

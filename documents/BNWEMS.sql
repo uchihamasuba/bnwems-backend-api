@@ -138,6 +138,8 @@ CREATE TABLE orders (
   event_date     DATE   NOT NULL,
   event_end_date DATE   NULL,
   event_type     VARCHAR(50) NULL,
+  event_name     VARCHAR(255) NULL,
+  notes          TEXT NULL,
   guest_count    INT    NULL,
   event_location VARCHAR(255) NULL,
   total_value    DECIMAL(12,2) NOT NULL DEFAULT 0,

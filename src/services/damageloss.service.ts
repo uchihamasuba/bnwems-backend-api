@@ -19,7 +19,14 @@ class DamageLossService {
       },
     });
 
+    let totalCompensation = 0;
+
     for (const item of reportDetails.items) {
+      const equipment = await prisma.equipment.findUnique({ where: { equipmentItemId: BigInt(item.equipmentItemId) } });
+      const replacementValue = equipment ? Number(equipment.replacementValue) : 0;
+      const compensationAmount = item.type === 'damaged' || item.type === 'lost' ? replacementValue * item.quantity : 0;
+      totalCompensation += compensationAmount;
+
       await prisma.damageLossItem.create({
         data: {
           damageLossId: newReport.damageLossId,
@@ -28,10 +35,16 @@ class DamageLossService {
           damageType: item.type,
           source: item.responsibleParty === 'supplier' ? 'supplier' : 'internal',
           responsibleParty: item.responsibleParty,
-          responsibleUserId: item.responsibleUserId ? BigInt(item.responsibleUserId) : null
+          responsibleUserId: item.responsibleUserId ? BigInt(item.responsibleUserId) : null,
+          compensationAmount: compensationAmount,
         }
       });
     }
+
+    await prisma.damageLossReport.update({
+      where: { damageLossId: newReport.damageLossId },
+      data: { totalCompensation }
+    });
     
     if (evidences && Array.isArray(evidences)) {
       for (const e of evidences) {
@@ -47,6 +60,24 @@ class DamageLossService {
     }
 
     return { id: newReport.damageLossId };
+  }
+
+  public async getDamageLossesByOrder(orderId: string) {
+    const reports = await prisma.damageLossReport.findMany({
+      where: { orderId: BigInt(orderId) },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const items = await prisma.damageLossItem.findMany({
+      where: {
+        damageLossId: { in: reports.map(r => r.damageLossId) }
+      }
+    });
+
+    return reports.map(r => ({
+      ...r,
+      items: items.filter(i => i.damageLossId === r.damageLossId)
+    }));
   }
 }
 

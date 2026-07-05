@@ -106,6 +106,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
   - BR-11-03: System checks if there is an `accepted` quotation. Returns MSG-UC11-04 if missing.
   - BR-11-04: Transitions status to `confirmed`.
   - BR-11-05: System triggers automatic inventory reservation logic (UC 2.13).
+- **Request Body:** None (Empty body)
 - **Response (200 OK):**
 ```json
 {
@@ -143,6 +144,7 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 - **Description:** Reviews all final order data and closes the order.
 - **Business Rules:**
   - BR-11-08: All payments, settlements, and inventory returns must be completed before closure.
+- **Request Body:** None (Empty body)
 - **Response (200 OK):**
 ```json
 {

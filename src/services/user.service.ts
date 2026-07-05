@@ -3,7 +3,7 @@ import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
 
 class UserService {
-  public async getUsers(page: number, limit: number, search?: string, role?: string, status?: string) {
+  public async getUsers(page: number, limit: number, search?: string, roles?: string[], status?: string) {
     const skip = (page - 1) * limit;
     const whereClause: any = {};
 
@@ -13,10 +13,9 @@ class UserService {
         { fullName: { contains: search } },
       ];
     }
-    // role here could be roleName, but API doc specifies role is enum ADMIN, MANAGER, etc.
-    // In our schema, role is stored as Role relation. We need to filter by roleName.
-    if (role) {
-      whereClause.role = { roleName: role };
+    
+    if (roles && roles.length > 0) {
+      whereClause.role = { roleName: { in: roles } };
     }
     if (status) whereClause.status = status;
 

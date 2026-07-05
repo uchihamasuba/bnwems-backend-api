@@ -89,12 +89,14 @@ class ChangeRequestService {
   }
 
   public async createChangeRequest(orderId: string, data: any, userId: string) {
-    const { type, items } = data;
+    const { type, items, reason, estimatedCost } = data;
 
     const newRequest = await prisma.changeRequest.create({
       data: {
         orderId: BigInt(orderId),
         type: type || 'add',
+        reason: reason || null,
+        estimatedCost: estimatedCost || null,
         status: 'pending',
         requestedBy: BigInt(userId),
       },

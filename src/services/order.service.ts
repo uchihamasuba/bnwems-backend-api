@@ -41,19 +41,31 @@ class OrderService {
   }
 
   public async createOrder(data: any, actionUserId: string) {
-    const { customerId, eventStartDate, eventEndDate, eventType, guestCount, venueAddress } = data;
+    const { customerId, eventDate, eventStartDate, eventEndDate, eventType, eventName, notes, guestCount, venueAddress } = data;
 
-    if (new Date(eventStartDate) <= new Date()) {
+    const startDateStr = eventStartDate || eventDate;
+    if (new Date(startDateStr) <= new Date()) {
       throw new AppError('Ngày sự kiện phải ở trong tương lai.', 400, 'MSG-UC11-01');
     }
 
+    // Generate orderNumber
+    const currentYear = new Date().getFullYear();
+    const lastOrder = await prisma.order.findFirst({
+      orderBy: { orderId: 'desc' }
+    });
+    const nextId = lastOrder ? Number(lastOrder.orderId) + 1 : 1;
+    const orderNumber = `ORD-${currentYear}-${nextId.toString().padStart(4, '0')}`;
+
     const newOrder = await prisma.order.create({
       data: {
+        orderNumber,
         customerId: BigInt(customerId),
-        eventDate: new Date(eventStartDate),
+        eventDate: new Date(startDateStr),
         eventEndDate: eventEndDate ? new Date(eventEndDate) : null,
         eventType: eventType || null,
-        guestCount: guestCount || null,
+        eventName: eventName || null,
+        notes: notes || null,
+        guestCount: guestCount ? Number(guestCount) : null,
         eventLocation: venueAddress,
         status: 'draft',
         createdBy: BigInt(actionUserId)
@@ -93,7 +105,72 @@ class OrderService {
     });
   }
 
+  public async updateOrder(id: string, data: any, actionUserId: string) {
+    const order = await prisma.order.findUnique({ where: { orderId: BigInt(id) } });
+    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
+    if (order.status === 'completed' || order.status === 'cancelled') {
+      throw new AppError('Không thể sửa đơn hàng đã hoàn tất hoặc đã hủy.', 400);
+    }
+
+    const { eventType, eventName, notes, eventEndDate, guestCount, venueAddress } = data;
+    const updatedOrder = await prisma.order.update({
+      where: { orderId: BigInt(id) },
+      data: {
+        eventType: eventType !== undefined ? eventType : order.eventType,
+        eventName: eventName !== undefined ? eventName : order.eventName,
+        notes: notes !== undefined ? notes : order.notes,
+        eventEndDate: eventEndDate ? new Date(eventEndDate) : order.eventEndDate,
+        guestCount: guestCount !== undefined ? Number(guestCount) : order.guestCount,
+        eventLocation: venueAddress !== undefined ? venueAddress : order.eventLocation,
+      }
+    });
+
+    return updatedOrder;
+  }
+
+  public async cancelOrder(id: string, reason: string, actionUserId: string) {
+    const order = await prisma.order.findUnique({ where: { orderId: BigInt(id) } });
+    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
+    if (order.status === 'completed' || order.status === 'cancelled') {
+      throw new AppError('Đơn hàng đã hoàn tất hoặc đã hủy.', 400);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { orderId: BigInt(id) },
+        data: { status: 'cancelled' }
+      });
+
+      // Release inventory reservations
+      await tx.inventoryReservation.updateMany({
+        where: { orderId: BigInt(id), status: 'reserved' },
+        data: { status: 'released' }
+      });
+
+      // Log reason
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: BigInt(id),
+          fromStatus: order.status,
+          toStatus: 'cancelled',
+          changedBy: BigInt(actionUserId),
+          note: reason
+        }
+      });
+    });
+
+    return { status: 'cancelled' };
+  }
+
+  public async getOrderStatusHistory(id: string) {
+    return prisma.orderStatusHistory.findMany({
+      where: { orderId: BigInt(id) },
+      orderBy: { changedAt: 'desc' }
+    });
+  }
+
   public async changeEventDate(id: string, newEventDate: string) {
+    // Basic implementation: update the date. Policy and inventory check should be added.
     await prisma.order.update({
       where: { orderId: BigInt(id) },
       data: { eventDate: new Date(newEventDate) },

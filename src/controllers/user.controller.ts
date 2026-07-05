@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { userService } from '../services/user.service';
 
+import { AppError } from '../middlewares/error.middleware';
+
 export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -10,7 +12,21 @@ export const getUsers = async (req: Request, res: Response, next: NextFunction) 
     const role = req.query.role as string;
     const status = req.query.status as string;
 
-    const { users, totalCount } = await userService.getUsers(page, limit, search, role, status);
+    const userObj = (req as AuthRequest).user!;
+    const userRoleName = typeof userObj.role === 'string' ? userObj.role : (userObj.role as any).roleName;
+    let allowedRoles: string[] = [];
+    if (role) allowedRoles.push(role);
+
+    if (userRoleName === 'MANAGER') {
+      if (role && !['LEADER_STAFF', 'TECHNICAL_STAFF'].includes(role)) {
+        return next(new AppError('MANAGER chỉ được xem danh sách LEADER_STAFF hoặc TECHNICAL_STAFF.', 403));
+      }
+      if (!role) {
+        allowedRoles = ['LEADER_STAFF', 'TECHNICAL_STAFF'];
+      }
+    }
+
+    const { users, totalCount } = await userService.getUsers(page, limit, search, allowedRoles, status);
 
     res.status(200).json({
       success: true,

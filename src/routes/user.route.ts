@@ -8,12 +8,13 @@ const router = Router();
 
 // Apply authentication and ADMIN role check to all user management routes
 router.use(authenticate);
-router.use(authorizeRoles('ADMIN'));
+// Do not apply global ADMIN check to allow MANAGER on GET
+// router.use(authorizeRoles('ADMIN'));
 
-router.get('/', validate(getUsersSchema), userController.getUsers);
-router.post('/', validate(createUserSchema), userController.createUser);
-router.put('/:id', validate(updateUserSchema), userController.updateUser);
-router.patch('/:id/status', validate(updateStatusSchema), userController.updateStatus);
-router.post('/:id/reset-password', validate(resetPasswordSchema), userController.resetPassword);
+router.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getUsersSchema), userController.getUsers);
+router.post('/', authorizeRoles('ADMIN'), validate(createUserSchema), userController.createUser);
+router.put('/:id', authorizeRoles('ADMIN'), validate(updateUserSchema), userController.updateUser);
+router.patch('/:id/status', authorizeRoles('ADMIN'), validate(updateStatusSchema), userController.updateStatus);
+router.post('/:id/reset-password', authorizeRoles('ADMIN'), validate(resetPasswordSchema), userController.resetPassword);
 
 export default router;
