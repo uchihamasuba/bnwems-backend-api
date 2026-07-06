@@ -53,7 +53,6 @@ class InventoryService {
         where: { itemId: BigInt(itemId) },
         data: {
           quantityTotal: newTotal,
-          quantityAvailable: newAvailable,
         },
       });
 
@@ -152,7 +151,11 @@ class InventoryService {
       // 2. Update status
       await tx.collectedEquipmentReport.update({
         where: { reportId: BigInt(reportId) },
-        data: { status: ReportStatus.CONFIRMED },
+        data: { 
+          status: ReportStatus.CONFIRMED,
+          confirmedBy: BigInt(actionUserId),
+          confirmedAt: new Date(),
+        },
       });
 
       // 3. Process inventory for each item
@@ -176,7 +179,6 @@ class InventoryService {
         await tx.inventory.update({
           where: { itemId: item.itemId },
           data: {
-            quantityAvailable: (inv.quantityAvailable || 0) + item.goodQuantity,
             quantityDamaged: inv.quantityDamaged + item.damagedQuantity,
             // lostQuantity means it's permanently gone, so quantityTotal drops.
             quantityTotal: inv.quantityTotal - item.lostQuantity,

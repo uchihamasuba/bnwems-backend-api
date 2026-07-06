@@ -48,8 +48,10 @@ class SupplierService {
         serviceType: data.serviceType,
         contactPerson: data.contactPerson,
         phone: data.phone,
+        email: data.email,
         address: data.address,
         rating: data.rating,
+        notes: data.notes,
         createdBy: BigInt(actionUserId),
       },
     });

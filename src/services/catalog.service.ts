@@ -133,7 +133,7 @@ class CatalogService {
 
     return specs.map((s) => ({
       ...s,
-      componentName: s.componentItem?.itemName,
+      componentName: s.componentItem?.itemName || s.componentName,
     }));
   }
 
@@ -259,7 +259,6 @@ class CatalogService {
         data: {
           itemId: newItem.itemId,
           quantityTotal: 0,
-          quantityAvailable: 0,
           quantityReserved: 0,
           quantityDamaged: 0,
         },

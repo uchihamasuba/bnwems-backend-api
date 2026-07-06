@@ -67,7 +67,7 @@ describe('Auth API (Module 1)', () => {
         .post('/api/v1/auth/login')
         .send({ username: 'admin', password: 'correctpass' });
 
-      expect(res.status).toBe(200);
+      if(res.status !== 200) console.log(res.body); expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.token).toBeDefined();
       expect(prismaMock.auditLog.create).toHaveBeenCalled();
@@ -152,8 +152,11 @@ describe('Auth API (Module 1)', () => {
   describe('GET /api/v1/auth/profile', () => {
     it('should return 200 and user profile', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue({
+        userId: 1n,
         username: 'admin',
         fullName: 'Admin User',
+        role: 'ADMIN',
+        status: 'ACTIVE'
       } as any);
       const res = await request(app)
         .get('/api/v1/auth/profile')
@@ -177,7 +180,8 @@ describe('Auth API (Module 1)', () => {
         username: 'admin',
         fullName: 'Updated Admin User',
         avatarUrl: 'http://example.com/avatar.png',
-        role: { roleId: 1n, roleName: 'ADMIN' },
+        role: 'ADMIN',
+        status: 'ACTIVE'
       } as any);
 
       const res = await request(app)

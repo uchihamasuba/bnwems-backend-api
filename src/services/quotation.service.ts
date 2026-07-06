@@ -53,7 +53,6 @@ class QuotationService {
         quantity: i.quantity,
         price: i.price,
         discount: discount,
-        lineTotal: lineTotal,
       };
     });
 

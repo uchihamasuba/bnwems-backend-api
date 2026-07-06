@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { authService } from '../services/auth.service';
+import { BigIntUtils } from '../utils/bigint.util';
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -69,7 +70,7 @@ export const profile = async (req: AuthRequest, res: Response, next: NextFunctio
 
     res.status(200).json({
       success: true,
-      data: user,
+      data: BigIntUtils.toJSON(user),
     });
   } catch (error) {
     next(error);
@@ -86,7 +87,7 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
     res.status(200).json({
       success: true,
       message: 'Cập nhật hồ sơ thành công.',
-      data: updatedUser,
+      data: BigIntUtils.toJSON(updatedUser),
     });
   } catch (error) {
     next(error);

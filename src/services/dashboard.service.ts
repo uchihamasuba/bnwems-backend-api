@@ -1,5 +1,5 @@
 import { prisma } from '../config/database';
-import { ScheduleStatus, SurveyStatus, ReportStatus, OrderStatus } from '@prisma/client';
+import { ScheduleStatus, SurveyStatus, ReportStatus, OrderStatus, TransactionStatus } from '@prisma/client';
 
 class DashboardService {
   public async getAdminDashboard() {
@@ -15,7 +15,7 @@ class DashboardService {
       // Unpaid supplier transactions
       prisma.supplierTransaction.aggregate({
         _sum: { estimatedCost: true },
-        where: { status: 'PENDING' },
+        where: { status: TransactionStatus.PENDING },
       }),
       prisma.order.findMany({
         take: 5,

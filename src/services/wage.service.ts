@@ -41,6 +41,7 @@ class WageService {
       data: {
         status: status as any,
         confirmedBy: BigInt(actionUserId),
+        confirmedAt: new Date(),
       },
     });
   }
