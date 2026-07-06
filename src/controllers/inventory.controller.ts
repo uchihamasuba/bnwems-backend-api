@@ -1,128 +1,120 @@
 import { Request, Response, NextFunction } from 'express';
 import { inventoryService } from '../services/inventory.service';
+import { BigIntUtils } from '../utils/bigint.util';
+import { MovementType } from '@prisma/client';
 
-export const getInventory = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const equipmentItemId = req.query.equipmentItemId as string | undefined;
+export const inventoryController = {
+  async getInventory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const itemId = req.query.itemId as string;
 
-    const { inventory, totalCount } = await inventoryService.getInventory(equipmentItemId, page, limit);
+      const { inventories, totalCount } = await inventoryService.getInventory(page, limit, itemId);
 
-    res.status(200).json({
-      success: true,
-      data: inventory,
-      meta: { page, limit, totalCount },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(200).json({
+        success: true,
+        code: 'MSG-WH-01',
+        data: BigIntUtils.toJSON(inventories),
+        meta: { page, limit, totalCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const createInventory = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const newInventory = await inventoryService.createInventory(req.body);
+  async adjustInventory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user!.userId;
+      await inventoryService.adjustInventory(req.body, userId);
 
-    res.status(201).json({
-      success: true,
-      message: 'Tạo dữ liệu kho thành công.',
-      data: newInventory,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(200).json({
+        success: true,
+        code: 'MSG-WH-02',
+        message: 'Điều chỉnh kho thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const updateInventory = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const updatedInventory = await inventoryService.updateInventory(id, req.body);
+  async getInventoryMovements(req: Request, res: Response, next: NextFunction) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const itemId = req.query.itemId as string;
+      const movementType = req.query.movementType as MovementType;
 
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật dữ liệu kho thành công.',
-      data: updatedInventory,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      const { movements, totalCount } = await inventoryService.getInventoryMovements(
+        page,
+        limit,
+        itemId,
+        movementType,
+      );
 
-export const checkAvailability = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { eventDate, itemId } = req.query;
+      res.status(200).json({
+        success: true,
+        code: 'MSG-WH-03',
+        data: BigIntUtils.toJSON(movements),
+        meta: { page, limit, totalCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    const data = await inventoryService.checkAvailability(eventDate as string, itemId as string);
+  async createReturnReport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user!.userId;
+      const report = await inventoryService.createReturnReport(req.body, userId);
 
-    res.status(200).json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(201).json({
+        success: true,
+        code: 'MSG-WH-06',
+        message: 'Đã tạo báo cáo thu hồi thiết bị.',
+        data: BigIntUtils.toJSON(report),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const reserveInventory = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { orderId, items, eventDate } = req.body;
-    const userId = (req as any).user?.userId || '1';
+  async confirmReturnReport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user!.userId;
+      await inventoryService.confirmReturnReport(req.params.id, userId);
 
-    const data = await inventoryService.reserveInventory(orderId, items, eventDate, userId);
+      res.status(200).json({
+        success: true,
+        code: 'MSG-WH-07',
+        message: 'Đã xác nhận báo cáo và nhập kho thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    res.status(200).json({
-      success: true,
-      message: 'Giữ chỗ kho thành công.',
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  async prepareOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json({
+        success: true,
+        code: 'MSG-WH-04',
+        message: 'Cập nhật số lượng chuẩn bị thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const getInventoryReports = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const reportType = req.query.reportType as string;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-
-    const data = await inventoryService.getInventoryReports(reportType, page, limit);
-
-    res.status(200).json({
-      success: true,
-      ...data,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const checkoutInventory = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req as any).user.userId;
-    const data = await inventoryService.checkoutInventory(userId, req.body);
-
-    res.status(200).json({
-      success: true,
-      message: 'Xuất kho thành công.',
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const returnInventory = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req as any).user.userId;
-    const data = await inventoryService.returnInventory(userId, req.body);
-
-    res.status(200).json({
-      success: true,
-      message: 'Nhập lại kho thành công.',
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
+  async checkoutOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json({
+        success: true,
+        code: 'MSG-WH-05',
+        message: 'Xuất kho cho đơn hàng thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

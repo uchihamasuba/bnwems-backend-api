@@ -5,27 +5,51 @@ import { env } from '../config/env';
 import { AppError } from '../middlewares/error.middleware';
 
 class AuthService {
+  // Maps Prisma Role enum -> frontend roleName string
+  private mapRole(role: string): { roleName: string } {
+    const roleMap: Record<string, string> = {
+      ADMIN: 'Admin',
+      MANAGER: 'Manager',
+      LEADER: 'LEADER_STAFF',
+      TECHNICAL: 'TECHNICAL_STAFF',
+    };
+    return { roleName: roleMap[role] ?? role };
+  }
+
+  // Maps Prisma UserStatus enum -> frontend status string
+  private mapStatus(status: string): string {
+    const statusMap: Record<string, string> = {
+      ACTIVE: 'active',
+      INACTIVE: 'inactive',
+      SUSPENDED: 'locked',
+    };
+    return statusMap[status] ?? status.toLowerCase();
+  }
+
   public async login(username: string, password: string, ipAddress?: string) {
     const user = await prisma.internalUser.findUnique({
       where: { username },
-      include: { role: true }
     });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new AppError('Tên đăng nhập hoặc mật khẩu không hợp lệ.', 401, 'MSG-UC01-02');
     }
 
-    if (user.status !== 'active') {
+    if (user.status !== 'ACTIVE') {
       throw new AppError('Tài khoản bị khóa hoặc không hoạt động.', 403, 'MSG-UC01-03');
     }
 
     const expiresIn = 86400; // 24 hours
-    const token = jwt.sign({
-      userId: user.userId.toString(),
-      role: { roleId: user.role.roleId.toString(), roleName: user.role.roleName }
-    }, env.JWT_SECRET, {
-      expiresIn,
-    });
+    const token = jwt.sign(
+      {
+        userId: user.userId.toString(),
+        role: user.role,
+      },
+      env.JWT_SECRET,
+      {
+        expiresIn,
+      },
+    );
 
     await prisma.auditLog.create({
       data: {
@@ -40,16 +64,13 @@ class AuthService {
       token,
       expiresIn,
       user: {
-        userId: user.userId,
+        userId: user.userId.toString(),
         username: user.username,
         fullName: user.fullName,
         avatarUrl: user.avatarUrl,
         bio: user.bio,
-        role: {
-          roleId: user.role.roleId,
-          roleName: user.role.roleName
-        },
-        status: user.status,
+        role: this.mapRole(user.role),
+        status: this.mapStatus(user.status),
       },
     };
   }
@@ -102,12 +123,7 @@ class AuthService {
         phone: true,
         avatarUrl: true,
         bio: true,
-        role: {
-          select: {
-            roleId: true,
-            roleName: true
-          }
-        },
+        role: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -118,7 +134,12 @@ class AuthService {
       throw new AppError('Không tìm thấy người dùng.', 404);
     }
 
-    return user;
+    return {
+      ...user,
+      userId: user.userId.toString(),
+      role: this.mapRole(user.role),
+      status: this.mapStatus(user.status),
+    };
   }
 
   public async updateProfile(userId: string, data: any) {
@@ -138,24 +159,24 @@ class AuthService {
         phone: true,
         avatarUrl: true,
         bio: true,
-        role: {
-          select: {
-            roleId: true,
-            roleName: true
-          }
-        },
+        role: true,
         status: true,
         createdAt: true,
         updatedAt: true,
-      }
+      },
     });
 
-    return user;
+    return {
+      ...user,
+      userId: user.userId.toString(),
+      role: this.mapRole(user.role),
+      status: this.mapStatus(user.status),
+    };
   }
 
-  public async registerDeviceToken(userId: string, fcmToken: string, platform: string) {
+  public async registerDeviceToken(userId: string, fcmToken: string, platform: any) {
     const existing = await prisma.deviceToken.findUnique({
-      where: { fcmToken }
+      where: { fcmToken },
     });
 
     if (existing) {
@@ -166,7 +187,7 @@ class AuthService {
           platform,
           isActive: true,
           lastUsedAt: new Date(),
-        }
+        },
       });
     } else {
       await prisma.deviceToken.create({
@@ -176,7 +197,7 @@ class AuthService {
           platform,
           isActive: true,
           lastUsedAt: new Date(),
-        }
+        },
       });
     }
   }

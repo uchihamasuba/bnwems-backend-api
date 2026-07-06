@@ -2,24 +2,106 @@ import request from 'supertest';
 import app from '../src/app';
 import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
+import { SurveyStatus } from '@prisma/client';
 
-describe('Survey & Task API', () => {
-  const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+describe('Survey Reports API', () => {
+  const token = generateTestToken({ userId: '1', role: 'ADMIN' });
+  const validId = '1';
 
-
-  
-  it('POST /api/v1/tasks/assign should return 200', async () => {
-    prismaMock.assignment.createMany.mockResolvedValue({ count: 1 } as any);
-    const res = await request(app).post('/api/v1/tasks/assign').set('Authorization', `Bearer ${token}`).send({ workTaskId: '1', assignments: [{ userId: '2', role: 'STAFF' }] });
-    expect([200, 201, 400, 401, 403, 404, 500]).toContain(res.status);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('GET /api/v1/tasks/assigned should exist', async () => { const res = await request(app).get('/api/v1/tasks/assigned').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('GET /api/v1/tasks/:id/pick-list should exist', async () => { const res = await request(app).get('/api/v1/tasks/1/pick-list').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('GET /api/v1/tasks/:id/survey-report should exist', async () => { const res = await request(app).get('/api/v1/tasks/1/survey-report').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('POST /api/v1/tasks/:id/survey-report should exist', async () => { const res = await request(app).post('/api/v1/tasks/1/survey-report').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('PUT /api/v1/tasks/:id/progress should exist', async () => { const res = await request(app).put('/api/v1/tasks/1/progress').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('POST /api/v1/tasks/:id/assignments should exist', async () => { const res = await request(app).post('/api/v1/tasks/1/assignments').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('PUT /api/v1/tasks/:id should exist', async () => { const res = await request(app).put('/api/v1/tasks/1').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
-  it('DELETE /api/v1/tasks/:id should exist', async () => { const res = await request(app).delete('/api/v1/tasks/1').set('Authorization', `Bearer ${token}`); expect(res.status).toBeDefined(); });
+  describe('GET /api/v1/orders/:orderId/survey-reports', () => {
+    it('should return 401 if unauthorized', async () => {
+      const res = await request(app).get(`/api/v1/orders/${validId}/survey-reports`);
+      expect(res.status).toBe(401);
+    });
+
+    it('should return survey reports for order', async () => {
+      prismaMock.surveyReport.findMany.mockResolvedValue([
+        { surveyReportId: 1n, location: 'Hall A' } as any,
+      ]);
+
+      const res = await request(app)
+        .get(`/api/v1/orders/${validId}/survey-reports`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
+    });
+  });
+
+  describe('GET /api/v1/survey-reports/:id', () => {
+    it('should return survey report by id', async () => {
+      prismaMock.surveyReport.findUnique.mockResolvedValue({
+        surveyReportId: 1n,
+        location: 'Hall A',
+      } as any);
+
+      const res = await request(app)
+        .get(`/api/v1/survey-reports/${validId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should return 404 if not found', async () => {
+      prismaMock.surveyReport.findUnique.mockResolvedValue(null);
+
+      const res = await request(app)
+        .get(`/api/v1/survey-reports/${validId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/v1/survey-reports', () => {
+    it('should create survey report', async () => {
+      prismaMock.surveyReport.create.mockResolvedValue({ surveyReportId: 1n } as any);
+
+      const res = await request(app)
+        .post('/api/v1/survey-reports')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          orderId: 1,
+          surveyDate: new Date().toISOString(),
+          location: 'Hall A',
+          area: 100,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should return 400 if validation fails', async () => {
+      const res = await request(app)
+        .post('/api/v1/survey-reports')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          orderId: 1,
+          // missing required location and surveyDate
+        });
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('PUT /api/v1/survey-reports/:id/confirm', () => {
+    it('should confirm survey report', async () => {
+      prismaMock.surveyReport.findUnique.mockResolvedValue({ surveyReportId: 1n } as any);
+      prismaMock.surveyReport.update.mockResolvedValue({ surveyReportId: 1n } as any);
+
+      const res = await request(app)
+        .put(`/api/v1/survey-reports/${validId}/confirm`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: SurveyStatus.CONFIRMED });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
 });

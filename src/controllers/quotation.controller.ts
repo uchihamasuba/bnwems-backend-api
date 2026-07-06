@@ -1,116 +1,106 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthRequest } from '../middlewares/auth.middleware';
 import { quotationService } from '../services/quotation.service';
+import { BigIntUtils } from '../utils/bigint.util';
+import { QuotationStatus } from '@prisma/client';
 
-export const getQuotationsByOrder = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { orderId } = req.params;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+export const quotationController = {
+  async getCustomerQuotations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const customerId = req.params.customerId;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
 
-    const { quotations, totalCount } = await quotationService.getQuotationsByOrder(orderId, page, limit);
+      const { quotations, totalCount } = await quotationService.getCustomerQuotations(
+        customerId,
+        page,
+        limit,
+      );
 
-    res.status(200).json({
-      success: true,
-      data: quotations,
-      meta: { page, limit, totalCount },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(200).json({
+        success: true,
+        code: 'MSG-QO-01',
+        data: BigIntUtils.toJSON(quotations),
+        meta: { page, limit, totalCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const getQuotationById = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const quotation = await quotationService.getQuotationById(id);
+  async getQuotationById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const quotation = await quotationService.getQuotationById(req.params.id);
 
-    res.status(200).json({
-      success: true,
-      data: quotation,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(200).json({
+        success: true,
+        code: 'MSG-QO-02',
+        data: BigIntUtils.toJSON(quotation),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const createQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { orderId } = req.params;
-    const actionUserId = req.user!.userId;
-    const newQuote = await quotationService.createQuotation(orderId, req.body, actionUserId);
+  async createQuotation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const customerId = req.params.customerId;
+      const userId = (req as any).user!.userId;
 
-    res.status(201).json({
-      success: true,
-      message: 'Tạo báo giá thành công.',
-      data: { id: newQuote.quotationId, version: 1 },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      const newQuotation = await quotationService.createQuotation(customerId, req.body, userId);
 
-export const updateQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
+      res.status(201).json({
+        success: true,
+        code: 'MSG-QO-03',
+        message: 'Tạo báo giá thành công.',
+        data: BigIntUtils.toJSON(newQuotation),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    await quotationService.updateQuotation(id, req.body);
+  async updateQuotation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user!.userId;
+      await quotationService.updateQuotation(req.params.id, req.body, userId);
 
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật báo giá thành công.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(200).json({
+        success: true,
+        code: 'MSG-QO-04',
+        message: 'Cập nhật báo giá thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const deleteQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
+  async updateQuotationStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user!.userId;
+      const status = req.body.status as QuotationStatus;
+      await quotationService.updateQuotationStatus(req.params.id, status, userId);
 
-    await quotationService.deleteQuotation(id);
+      res.status(200).json({
+        success: true,
+        code: 'MSG-QO-05',
+        message: 'Cập nhật trạng thái báo giá thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    res.status(200).json({
-      success: true,
-      message: 'Xóa báo giá thành công.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  async deleteQuotation(req: Request, res: Response, next: NextFunction) {
+    try {
+      await quotationService.deleteQuotation(req.params.id);
 
-export const confirmQuotation = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const actionUserId = req.user!.userId;
-
-    await quotationService.confirmQuotation(id, actionUserId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Xác nhận báo giá thành công.',
-      data: { status: 'ACCEPTED' },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateQuotationStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    const actionUserId = req.user!.userId;
-
-    await quotationService.updateQuotationStatus(id, status, actionUserId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật trạng thái báo giá thành công.',
-      data: { status },
-    });
-  } catch (error) {
-    next(error);
-  }
+      res.status(200).json({
+        success: true,
+        code: 'MSG-QO-06',
+        message: 'Xóa báo giá thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

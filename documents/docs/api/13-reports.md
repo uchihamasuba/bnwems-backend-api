@@ -2,12 +2,14 @@
 
 ## Overview
 This module handles **UC 2.7 (Reporting Management)**, **UC 2.8 (Operational Dashboard)**, and **UC 2.15 (Operational Result Verification)**.
-These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staff Wages.
+These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staff Operations.
 
 ## Standard Error Codes (SRS Mapping)
 - `MSG-UC07-01`: Khoảng thời gian báo cáo không hợp lệ.
 - `MSG-UC08-01`: Số liệu thống kê không khả dụng.
 - `MSG-UC15-01`: Kết quả đơn hàng chưa đầy đủ để xác minh.
+
+---
 
 ## 1. Reporting Management (UC 2.7)
 
@@ -25,12 +27,12 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
   "success": true,
   "code": "MSG-RP-01",
   "data": {
-    "totalRevenue": 150000.00,
+    "totalRevenue": 150000000.00,
     "breakdownByMonth": [
-      { "month": "2026-06", "revenue": 25000.00 }
+      { "month": "2026-06", "revenue": 25000000.00 }
     ],
     "topCustomers": [
-      { "customerId": 1, "revenue": 10000.00 }
+      { "customerId": 1, "customerName": "Trần Thị B", "revenue": 10000000.00 }
     ]
   }
 }
@@ -38,7 +40,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 
 ### 2. `GET /api/v1/reports/inventory`
 - **Use Case:** UC 2.7 - View Inventory Reports & Statistics
-- **Description:** Retrieves aggregated reports on inventory usage, damage, and loss. Admin access required.
+- **Description:** Retrieves aggregated reports on inventory usage, damage, and loss based on `InventoryMovement` and `CollectedEquipmentReport`. Admin access required.
 - **Query Parameters:** 
   - `startDate` (string)
   - `endDate` (string)
@@ -51,11 +53,13 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
     "totalDamaged": 10,
     "totalLost": 2,
     "mostUsedItems": [ 
-      { "equipmentItemId": 1, "itemName": "Loa tiêu chuẩn", "usageCount": 50 } 
+      { "itemId": 1, "itemName": "Loa JBL", "usageCount": 50 } 
     ]
   }
 }
 ```
+
+---
 
 ## 2. Operational Dashboards (UC 2.8)
 
@@ -72,7 +76,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
     "totalRevenueMonth": 25000000.00,
     "unpaidSupplierDebt": 2000000.00,
     "recentOrders": [
-      { "orderId": 1, "status": "confirmed" }
+      { "orderId": 1, "orderStatus": "Đã xác nhận" }
     ]
   }
 }
@@ -80,7 +84,7 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
 
 ### 4. `GET /api/v1/dashboard/manager`
 - **Use Case:** UC 2.8 - View Operational Dashboard
-- **Description:** Returns real-time task statuses, active orders, and pending approvals for the Manager.
+- **Description:** Returns real-time task statuses, active orders, and pending alerts for the Manager.
 - **Response (200 OK):**
 ```json
 {
@@ -88,45 +92,48 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
   "code": "MSG-RP-04",
   "data": {
     "ordersInProgress": 5,
-    "pendingChangeRequests": 2,
+    "pendingWarnings": 2,
     "tasksToday": 8,
     "alerts": [
-      { "type": "delayed_task", "workTaskId": 1 }
+      { "type": "warning", "warningId": 1, "content": "Thiếu thiết bị" }
     ]
   }
 }
 ```
 
+---
+
 ## 3. Operational Result Verification (UC 2.15)
 
 ### 5. `GET /api/v1/reports/verification`
 - **Use Case:** UC 2.15 - Operational Result Verification
-- **Description:** Manager pulls a compiled report of an order's operational results (survey, field progress, handover, damage) to verify before final settlement.
+- **Description:** Manager pulls a compiled report of an order's operational results (survey, schedule plans, warnings, damage/loss) to verify before final settlement.
 - **Business Rules:**
-  - BR-15-01: Verifies all task statuses for the order are `completed`. If not, raises `MSG-UC15-01`.
-- **Query Parameters:** `?orderId=order-uuid`
+  - BR-15-01: Verifies all `SchedulePlan` statuses for the order are `Hoàn thành`. If not, raises `MSG-UC15-01`.
+- **Query Parameters:** `?orderId=100`
 - **Response (200 OK):**
 ```json
 {
   "success": true,
   "code": "MSG-RP-05",
   "data": {
-    "orderId": 1,
+    "orderId": 100,
     "tasksCompleted": 5,
     "totalTasks": 5,
-    "handoverStatus": "agreed",
+    "warningsResolved": true,
     "damageLossRecorded": true,
-    "changeRequestsProcessed": true,
     "verificationStatus": "ready_for_settlement"
   }
 }
 ```
 
+---
+
 ## 4. Manager Approvals
 
 ### 6. `GET /api/v1/manager/approvals`
 - **Use Case:** UC 2.8 - View Pending Approvals
-- **Description:** Retrieves a list of pending change requests and survey reports requiring manager approval.
+- **Description:** Retrieves a list of pending items requiring manager approval/resolution (e.g., Unresolved Warnings, Pending Survey Reports, Pending Supplier Transactions).
 - **Response (200 OK):**
 ```json
 {
@@ -134,20 +141,19 @@ These endpoints aggregate data across Orders, Inventory, Supplier Debt, and Staf
   "code": "MSG-RP-06",
   "message": "Pending approvals retrieved successfully",
   "data": {
-    "changeRequests": [
+    "orderWarnings": [
       {
-        "changeRequestId": "1",
-        "orderId": "1",
-        "type": "add",
-        "status": "pending",
+        "warningId": 1,
+        "orderId": 100,
+        "content": "Khách yêu cầu thêm đèn",
         "createdAt": "2026-06-22T10:00:00Z"
       }
     ],
     "surveyReports": [
       {
-        "surveyReportId": "1",
-        "orderId": "1",
-        "status": "submitted",
+        "surveyId": 1,
+        "orderId": 100,
+        "status": "Cần xem xét",
         "createdAt": "2026-06-22T10:00:00Z"
       }
     ]

@@ -1,22 +1,45 @@
 import { Router } from 'express';
-import * as quotationController from '../controllers/quotation.controller';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
-
-export const nestedQuotationRouter = Router({ mergeParams: true });
-nestedQuotationRouter.use(authenticate);
-nestedQuotationRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
-
+import { quotationController } from '../controllers/quotation.controller';
 import { validate } from '../middlewares/validate.middleware';
-import { getQuotationsByOrderSchema, getQuotationByIdSchema, createQuotationSchema, updateQuotationSchema, deleteQuotationSchema, confirmQuotationSchema, updateQuotationStatusSchema } from '../validators/quotation.validator';
+import {
+  verifyToken as protect,
+  authorizeRoles as restrictTo,
+} from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
+import {
+  getQuotationByIdSchema,
+  createQuotationSchema,
+  updateQuotationSchema,
+  updateQuotationStatusSchema,
+  deleteQuotationSchema,
+} from '../validators/quotation.validator';
 
-nestedQuotationRouter.get('/', validate(getQuotationsByOrderSchema), quotationController.getQuotationsByOrder);
-nestedQuotationRouter.post('/', validate(createQuotationSchema), quotationController.createQuotation);
+const router = Router();
 
-export const quotationRouter = Router();
-quotationRouter.use(authenticate);
-quotationRouter.use(authorizeRoles('ADMIN', 'MANAGER'));
-quotationRouter.get('/:id', validate(getQuotationByIdSchema), quotationController.getQuotationById);
-quotationRouter.put('/:id', validate(updateQuotationSchema), quotationController.updateQuotation);
-quotationRouter.delete('/:id', validate(deleteQuotationSchema), quotationController.deleteQuotation);
-quotationRouter.put('/:id/confirm', validate(confirmQuotationSchema), quotationController.confirmQuotation);
-quotationRouter.patch('/:id/status', validate(updateQuotationStatusSchema), quotationController.updateQuotationStatus);
+router.get('/:id', protect, validate(getQuotationByIdSchema), quotationController.getQuotationById);
+
+router.put(
+  '/:id',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(updateQuotationSchema),
+  quotationController.updateQuotation,
+);
+
+router.patch(
+  '/:id/status',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(updateQuotationStatusSchema),
+  quotationController.updateQuotationStatus,
+);
+
+router.delete(
+  '/:id',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(deleteQuotationSchema),
+  quotationController.deleteQuotation,
+);
+
+export default router;

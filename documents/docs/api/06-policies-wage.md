@@ -1,8 +1,8 @@
-﻿# Master Data & Policies: Policy, Attendance, and Wage Management
+# Master Data & Policies: Policy, Attendance, and Wage Management
 
 ## Overview
 This module handles **UC 2.6 (Policy Configuration)**, **UC 2.29 (Attendance & Task Completion)**, and **UC 2.17 (Staff Wage Confirmation)**.
-It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `WageSummary`.
+It manages `BusinessPolicy` records, staff `Attendance`, and order-based `WageRecord`.
 
 ## Standard Error Codes (SRS Mapping)
 - `MSG-UC06-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
@@ -10,13 +10,15 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - `MSG-UC29-01`: Vị trí nằm ngoài phạm vi chấm công.
 - `MSG-UC17-01`: Các vấn đề điểm danh chưa được giải quyết ngăn cản việc xác nhận lương.
 
-## 1. Policy & Wage Rule Configuration (UC 2.6)
+---
+
+## 1. Policy Configuration (UC 2.6)
 
 ### 1. `GET /api/v1/policies`
 - **Use Case:** UC 2.6 - View Policy List
-- **Description:** Retrieves the list of configured business policies. Admin access required.
+- **Description:** Retrieves the list of configured business policies. Admin/Manager access required.
 - **Query Parameters:**
-  - `policyType` (enum, optional) - DEPOSIT, REFUND, CANCELLATION, etc.
+  - `policyType` (enum, optional) - Đặt cọc, Hủy đơn, Bồi thường, Phụ phí, Lương
   - `isActive` (boolean, optional)
 - **Response (200 OK):**
 ```json
@@ -26,11 +28,13 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
   "data": [
     {
       "policyId": 1,
-      "policyType": "deposit",
-      "name": "Chính sách đặt cọc tiêu chuẩn",
-      "rules": { "percentage": 50 },
-      "isActive": true,
-      "createdAt": "2026-06-22T10:00:00Z"
+      "policyCode": "POL-001",
+      "policyName": "Lương Thi công Decor",
+      "policyType": "Lương",
+      "description": "Lương theo ca cho nhân sự thi công decor",
+      "policyValue": 300000.00,
+      "unit": "VNĐ",
+      "isActive": true
     }
   ],
   "meta": { "totalCount": 10 }
@@ -41,14 +45,16 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 - **Use Case:** UC 2.6 - Create Policy
 - **Description:** Creates a new business policy. Admin access required.
 - **Business Rules:**
-  - BR-06-01: Rule constraints (e.g. percentages) must be between 0 and 100.
-  - BR-06-02: Log to `AuditLog`.
+  - BR-06-01: Policy value and unit must match logically (e.g. max 100 for %).
 - **Request Body:**
 ```json
 {
-  "policyType": "cancellation",
-  "name": "Hủy trước 7 ngày",
-  "rules": { "refundPercentage": 100, "daysBeforeEvent": 7 }
+  "policyCode": "POL-002",
+  "policyName": "Quy định cọc đơn hàng",
+  "policyType": "Đặt cọc",
+  "policyValue": 50.00,
+  "unit": "%",
+  "description": "Yêu cầu đặt cọc 50% trước ngày sự kiện"
 }
 ```
 - **Response (201 Created):**
@@ -63,12 +69,12 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 ### 3. `PUT /api/v1/policies/:id`
 - **Use Case:** UC 2.6 - Update Policy
 - **Description:** Updates an existing policy. Admin access required.
-- **Business Rules:**
-  - BR-06-03: Active orders use the policy that was in effect at the time of order confirmation.
 - **Request Body:**
 ```json
 {
-  "rules": { "refundPercentage": 80, "daysBeforeEvent": 7 }
+  "policyValue": 60.00,
+  "unit": "%",
+  "isActive": true
 }
 ```
 - **Response (200 OK):**
@@ -80,20 +86,19 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 }
 ```
 
+---
+
 ## 2. Attendance & Task Completion (UC 2.29)
 
 ### 4. `POST /api/v1/attendance/check-in`
 - **Use Case:** UC 2.29 - Check-in Attendance
-- **Description:** Allows staff to check in for their assigned work session.
-- **Business Rules:**
-  - BR-29-01: System verifies that current time is within allowed schedule buffer.
-  - BR-29-02: Optional GPS location verification against task location.
+- **Description:** Allows staff to check in for their assigned `SchedulePlan`. Usually involves uploading an evidence photo.
 - **Request Body:**
 ```json
 {
-  "assignmentId": 1,
-  "checkInTime": "2026-06-22T08:00:00Z",
-  "locationCoordinates": "10.762622, 106.660172"
+  "planId": 10,
+  "checkInEvidenceId": 50,
+  "checkInAt": "2026-06-22T08:00:00Z"
 }
 ```
 - **Response (200 OK):**
@@ -101,20 +106,18 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 {
   "success": true,
   "code": "MSG-PO-04",
-  "message": "Chấm công thành công."
+  "message": "Chấm công vào ca thành công."
 }
 ```
 
-### 5. `PUT /api/v1/attendance/:id/confirm`
-- **Use Case:** UC 2.29 - Confirm Technical Staff Attendance & Work Completion
-- **Description:** Leader staff confirms the attendance and task completion of technical staff.
-- **Business Rules:**
-  - BR-29-03: Changes attendance status to `confirmed` or `rejected`.
+### 5. `PUT /api/v1/attendance/:id/check-out`
+- **Use Case:** UC 2.29 - Check-out Attendance
+- **Description:** Records check-out time.
 - **Request Body:**
 ```json
 {
-  "status": "confirmed",
-  "checkOutTime": "2026-06-22T17:00:00Z"
+  "checkOutAt": "2026-06-22T17:00:00Z",
+  "note": "Hoàn thành nhiệm vụ"
 }
 ```
 - **Response (200 OK):**
@@ -122,19 +125,21 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 {
   "success": true,
   "code": "MSG-PO-05",
-  "message": "Xác nhận điểm danh thành công."
+  "message": "Chấm công ra ca thành công."
 }
 ```
 
+---
+
 ## 3. Staff Wage Confirmation (UC 2.17)
 
-### 6. `GET /api/v1/wages/summary`
+### 6. `GET /api/v1/wages`
 - **Use Case:** UC 2.17 - Monitor Staff Wage Data
-- **Description:** Retrieves wage summaries for staff by period. Manager access required.
+- **Description:** Retrieves order-based wage records for staff.
 - **Query Parameters:**
-  - `period` (string, format YYYY-MM)
-  - `userId` (string, optional)
-  - `status` (enum, optional) - draft, confirmed, paid
+  - `userId` (optional)
+  - `orderId` (optional)
+  - `status` (enum, optional) - Nháp, Chờ duyệt, Đã xác nhận, Đã thanh toán
 - **Response (200 OK):**
 ```json
 {
@@ -142,31 +147,30 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
   "code": "MSG-PO-06",
   "data": [
     {
-      "wageSummaryId": 1,
-      "userId": 1,
-      "wagePeriod": "2026-06",
-      "totalSessions": 5,
-      "grossAmount": 1500000.00,
-      "totalDeduction": 50000.00,
-      "totalWage": 1450000.00,
-      "status": "draft",
-      "updatedAt": "2026-06-22T10:00:00Z"
+      "wageId": 1,
+      "wageCode": "WAG-001",
+      "orderId": 100,
+      "userId": 5,
+      "wageRole": "Thi công Decor",
+      "shifts": 2,
+      "wageRate": 300000.00,
+      "totalWage": 600000.00,
+      "status": "Chờ duyệt",
+      "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
   "meta": { "page": 1, "limit": 20, "totalCount": 10 }
 }
 ```
 
-### 7. `POST /api/v1/wages/summary/:id/confirm`
+### 7. `POST /api/v1/wages/:id/confirm`
 - **Use Case:** UC 2.17 - Confirm Staff Work and Wage
-- **Description:** Confirms the wage summary for a staff member after verifying attendance and deductions.
-- **Business Rules:**
-  - BR-17-01: Manager confirms the system-calculated `totalWage`.
-  - BR-17-02: Wage cannot be confirmed if there are pending attendances for the period.
+- **Description:** Manager confirms the wage record for an order.
 - **Request Body:**
 ```json
 {
-  "status": "confirmed"
+  "status": "Đã xác nhận",
+  "notes": "Duyệt lương thi công"
 }
 ```
 - **Response (200 OK):**
@@ -174,6 +178,6 @@ It manages `BusinessPolicy` records, staff `Attendance`, and their monthly `Wage
 {
   "success": true,
   "code": "MSG-PO-07",
-  "message": "Xác nhận tổng kết lương thành công."
+  "message": "Xác nhận lương thành công."
 }
 ```

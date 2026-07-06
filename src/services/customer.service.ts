@@ -5,10 +5,10 @@ class CustomerService {
   public async getCustomers(page: number, limit: number, search?: string) {
     const skip = (page - 1) * limit;
     const whereClause: any = {};
-    
+
     if (search) {
       whereClause.OR = [
-        { fullName: { contains: search } },
+        { customerName: { contains: search } },
         { phone: { contains: search } },
         { email: { contains: search } },
       ];
@@ -34,15 +34,22 @@ class CustomerService {
   }
 
   public async createCustomer(data: any, actionUserId: string) {
-    const { fullName, phone, email, address } = data;
+    const { customerName, phone, email, address } = data;
 
-    const existing = await prisma.customer.findUnique({ where: { phone } });
+    const existing = await prisma.customer.findFirst({ where: { phone } });
     if (existing) {
       throw new AppError('Số điện thoại đã tồn tại.', 400, 'MSG-UC09-05');
     }
 
     const newCustomer = await prisma.customer.create({
-      data: { fullName, phone, email, address },
+      data: {
+        customerCode: 'CUS' + Date.now(),
+        creator: { connect: { userId: BigInt(actionUserId) } },
+        customerName,
+        phone,
+        email,
+        address,
+      },
     });
 
     await prisma.auditLog.create({
@@ -58,11 +65,15 @@ class CustomerService {
   }
 
   public async updateCustomer(id: string, data: any, actionUserId: string) {
-    const { fullName, email, address } = data;
+    const { customerName, email, address } = data;
 
     const updatedCustomer = await prisma.customer.update({
       where: { customerId: BigInt(id) },
-      data: { fullName, email, address },
+      data: {
+        customerName,
+        email,
+        address,
+      },
     });
 
     await prisma.auditLog.create({

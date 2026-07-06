@@ -1,17 +1,25 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
+import { OrderStatus, PaymentStatus, DepositStatus, SettlementStatus } from '@prisma/client';
 
 class OrderService {
-  public async getOrders(page: number, limit: number, search?: string, status?: string, startDate?: string, endDate?: string) {
-    const skip = (page - 1) * limit;
+  // ============================================================================
+  // ORDERS
+  // ============================================================================
 
+  public async getOrders(
+    page: number,
+    limit: number,
+    orderStatus?: OrderStatus,
+    paymentStatus?: PaymentStatus,
+    search?: string,
+  ) {
+    const skip = (page - 1) * limit;
     const whereClause: any = {};
-    if (search) whereClause.orderNumber = { contains: search };
-    if (status) whereClause.status = status;
-    if (startDate || endDate) {
-      whereClause.eventDate = {};
-      if (startDate) whereClause.eventDate.gte = new Date(startDate);
-      if (endDate) whereClause.eventDate.lte = new Date(endDate);
+    if (orderStatus) whereClause.orderStatus = orderStatus;
+    if (paymentStatus) whereClause.paymentStatus = paymentStatus;
+    if (search) {
+      whereClause.OR = [{ orderCode: { contains: search } }, { eventName: { contains: search } }];
     }
 
     const [orders, totalCount] = await Promise.all([
@@ -30,321 +38,299 @@ class OrderService {
   public async getOrderById(id: string) {
     const order = await prisma.order.findUnique({
       where: { orderId: BigInt(id) },
+      include: {
+        orderItems: {
+          include: {
+            item: { select: { itemName: true } },
+          },
+        },
+        orderWarnings: true,
+        deposits: true,
+        settlements: true,
+      },
     });
-
     if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
-    
-    // Manual join to avoid relation naming issues if not mapped properly in schema
-    const customer = await prisma.customer.findUnique({ where: { customerId: order.customerId } });
-    
-    return { ...order, customer };
+
+    return order;
   }
 
   public async createOrder(data: any, actionUserId: string) {
-    const { customerId, eventDate, eventStartDate, eventEndDate, eventType, eventName, notes, guestCount, venueAddress } = data;
+    const {
+      customerId,
+      quotationId,
+      policyId,
+      eventName,
+      eventType,
+      eventDate,
+      location,
+      guestCount,
+      items,
+      notes,
+    } = data;
 
-    const startDateStr = eventStartDate || eventDate;
-    if (new Date(startDateStr) <= new Date()) {
-      throw new AppError('Ngày sự kiện phải ở trong tương lai.', 400, 'MSG-UC11-01');
-    }
-
-    // Generate orderNumber
-    const currentYear = new Date().getFullYear();
-    const lastOrder = await prisma.order.findFirst({
-      orderBy: { orderId: 'desc' }
+    let totalAmount = 0;
+    const orderItems = items.map((i: any) => {
+      const subtotal = i.quantity * i.unitPrice;
+      totalAmount += subtotal;
+      return {
+        itemId: BigInt(i.itemId),
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        source: i.source,
+        notes: i.notes,
+      };
     });
-    const nextId = lastOrder ? Number(lastOrder.orderId) + 1 : 1;
-    const orderNumber = `ORD-${currentYear}-${nextId.toString().padStart(4, '0')}`;
 
-    const newOrder = await prisma.order.create({
+    const orderCode = 'ORD-' + Date.now();
+
+    return await prisma.order.create({
       data: {
-        orderNumber,
+        orderCode,
         customerId: BigInt(customerId),
-        eventDate: new Date(startDateStr),
-        eventEndDate: eventEndDate ? new Date(eventEndDate) : null,
-        eventType: eventType || null,
-        eventName: eventName || null,
-        notes: notes || null,
-        guestCount: guestCount ? Number(guestCount) : null,
-        eventLocation: venueAddress,
-        status: 'draft',
-        createdBy: BigInt(actionUserId)
+        quotationId: quotationId ? BigInt(quotationId) : null,
+        policyId: policyId ? BigInt(policyId) : null,
+        eventName,
+        eventType,
+        eventDate: new Date(eventDate),
+        location,
+        guestCount,
+        totalAmount,
+        notes,
+        createdBy: BigInt(actionUserId),
+        orderItems: {
+          create: orderItems,
+        },
       },
     });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: BigInt(actionUserId),
-        action: 'CREATE_ORDER',
-        entityType: 'Order',
-        entityId: newOrder.orderId,
-      },
-    });
-
-    return { id: newOrder.orderId };
   }
 
-  public async confirmOrder(id: string) {
-    const order = await prisma.order.findUnique({
-      where: { orderId: BigInt(id) },
-    });
-    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
-
-    const quote = await prisma.quotation.findFirst({
-      where: { orderId: BigInt(id) },
-      orderBy: { version: 'desc' }
-    });
-
-    if (!quote || quote.status !== 'confirmed') {
-      throw new AppError('Không thể xác nhận đơn hàng khi chưa có báo giá được chấp nhận.', 400, 'MSG-UC11-04');
-    }
-
-    await prisma.order.update({
-      where: { orderId: BigInt(id) },
-      data: { status: 'confirmed' },
-    });
-  }
-
-  public async updateOrder(id: string, data: any, actionUserId: string) {
+  public async updateOrderStatus(
+    id: string,
+    orderStatus: OrderStatus,
+    cancelReason?: string,
+    notes?: string,
+  ) {
     const order = await prisma.order.findUnique({ where: { orderId: BigInt(id) } });
     if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
-    if (order.status === 'completed' || order.status === 'cancelled') {
-      throw new AppError('Không thể sửa đơn hàng đã hoàn tất hoặc đã hủy.', 400);
-    }
 
-    const { eventType, eventName, notes, eventEndDate, guestCount, venueAddress } = data;
-    const updatedOrder = await prisma.order.update({
+    return await prisma.order.update({
       where: { orderId: BigInt(id) },
-      data: {
-        eventType: eventType !== undefined ? eventType : order.eventType,
-        eventName: eventName !== undefined ? eventName : order.eventName,
-        notes: notes !== undefined ? notes : order.notes,
-        eventEndDate: eventEndDate ? new Date(eventEndDate) : order.eventEndDate,
-        guestCount: guestCount !== undefined ? Number(guestCount) : order.guestCount,
-        eventLocation: venueAddress !== undefined ? venueAddress : order.eventLocation,
-      }
+      data: { orderStatus, cancelReason, notes },
     });
-
-    return updatedOrder;
   }
 
-  public async cancelOrder(id: string, reason: string, actionUserId: string) {
+  public async updateOrderItems(id: string, itemsData: any[]) {
     const order = await prisma.order.findUnique({ where: { orderId: BigInt(id) } });
     if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
-    if (order.status === 'completed' || order.status === 'cancelled') {
-      throw new AppError('Đơn hàng đã hoàn tất hoặc đã hủy.', 400);
-    }
+
+    let totalAmount = 0;
+    const orderItems = itemsData.map((i: any) => {
+      const subtotal = i.quantity * i.unitPrice;
+      totalAmount += subtotal;
+      return {
+        itemId: BigInt(i.itemId),
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        source: i.source,
+        notes: i.notes,
+      };
+    });
 
     await prisma.$transaction(async (tx) => {
+      await tx.orderItem.deleteMany({ where: { orderId: BigInt(id) } });
       await tx.order.update({
         where: { orderId: BigInt(id) },
-        data: { status: 'cancelled' }
-      });
-
-      // Release inventory reservations
-      await tx.inventoryReservation.updateMany({
-        where: { orderId: BigInt(id), status: 'reserved' },
-        data: { status: 'released' }
-      });
-
-      // Log reason
-      await tx.orderStatusHistory.create({
         data: {
-          orderId: BigInt(id),
-          fromStatus: order.status,
-          toStatus: 'cancelled',
-          changedBy: BigInt(actionUserId),
-          note: reason
-        }
+          totalAmount,
+          orderItems: {
+            create: orderItems,
+          },
+        },
       });
     });
 
-    return { status: 'cancelled' };
+    return { success: true };
   }
 
-  public async getOrderStatusHistory(id: string) {
-    return prisma.orderStatusHistory.findMany({
-      where: { orderId: BigInt(id) },
-      orderBy: { changedAt: 'desc' }
+  // ============================================================================
+  // ORDER WARNINGS
+  // ============================================================================
+
+  public async getOrderWarnings(orderId: string) {
+    return await prisma.orderWarning.findMany({
+      where: { orderId: BigInt(orderId) },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  public async changeEventDate(id: string, newEventDate: string) {
-    // Basic implementation: update the date. Policy and inventory check should be added.
-    await prisma.order.update({
-      where: { orderId: BigInt(id) },
-      data: { eventDate: new Date(newEventDate) },
+  public async createOrderWarning(orderId: string, content: string) {
+    return await prisma.orderWarning.create({
+      data: {
+        orderId: BigInt(orderId),
+        content,
+      },
     });
   }
 
-  public async closeOrder(id: string) {
-    await prisma.order.update({
-      where: { orderId: BigInt(id) },
-      data: { status: 'completed' },
+  public async resolveOrderWarning(warningId: string, actionUserId: string) {
+    const warning = await prisma.orderWarning.findUnique({
+      where: { warningId: BigInt(warningId) },
+    });
+    if (!warning) throw new AppError('Không tìm thấy cảnh báo.', 404);
+
+    return await prisma.orderWarning.update({
+      where: { warningId: BigInt(warningId) },
+      data: {
+        isResolved: true,
+        resolvedBy: BigInt(actionUserId),
+        resolvedAt: new Date(),
+      },
     });
   }
 
-  public async getFieldProgress() {
-    const orders = await prisma.order.findMany({
-      where: { status: { in: ['confirmed', 'in_progress'] } },
+  // ============================================================================
+  // DEPOSITS
+  // ============================================================================
+
+  public async getOrderDeposits(orderId: string) {
+    return await prisma.deposit.findMany({
+      where: { orderId: BigInt(orderId) },
+      orderBy: { createdAt: 'desc' },
     });
-    
-    // Map order progress manually as relations might be named differently
-    const data = await Promise.all(orders.map(async (o) => {
-      const task = await prisma.workTask.findFirst({
-        where: { orderId: o.orderId },
-        orderBy: { updatedAt: 'desc' }
+  }
+
+  public async createOrderDeposit(
+    orderId: string,
+    amount: number,
+    paymentMethod: string | undefined,
+    notes: string | undefined,
+    actionUserId: string,
+  ) {
+    const depositCode = 'DEP-' + Date.now();
+    return await prisma.deposit.create({
+      data: {
+        depositCode,
+        orderId: BigInt(orderId),
+        amount,
+        paymentMethod,
+        notes,
+        status: DepositStatus.PENDING,
+        requestedBy: BigInt(actionUserId),
+      },
+    });
+  }
+
+  public async updateDepositStatus(
+    depositId: string,
+    status: DepositStatus,
+    notes: string | undefined,
+    actionUserId: string,
+  ) {
+    const deposit = await prisma.deposit.findUnique({ where: { depositId: BigInt(depositId) } });
+    if (!deposit) throw new AppError('Không tìm thấy khoản cọc.', 404);
+
+    let updateData: any = { status, notes };
+    if (status === DepositStatus.SUCCESS) {
+      updateData.approvedBy = BigInt(actionUserId);
+      updateData.approvedAt = new Date();
+      updateData.paymentDate = new Date();
+    }
+
+    const updatedDeposit = await prisma.deposit.update({
+      where: { depositId: BigInt(depositId) },
+      data: updateData,
+    });
+
+    if (status === DepositStatus.SUCCESS) {
+      // Update order payment status
+      await prisma.order.update({
+        where: { orderId: deposit.orderId },
+        data: { paymentStatus: PaymentStatus.DEPOSITED },
       });
-      return {
-        orderId: o.orderId,
-        currentTask: task ? task.taskCategory : null,
-        status: task ? task.status : null,
-        lastUpdate: task ? task.updatedAt : null,
-      };
-    }));
+    }
 
-    return data;
+    return updatedDeposit;
   }
 
-  public async getOrderEvidences(id: string) {
-    const evidences = await prisma.evidence.findMany({
-      where: { orderId: BigInt(id) },
-      orderBy: { uploadedAt: 'desc' },
+  // ============================================================================
+  // SETTLEMENTS
+  // ============================================================================
+
+  public async getOrderSettlement(orderId: string) {
+    const settlement = await prisma.settlement.findFirst({
+      where: { orderId: BigInt(orderId) },
+      orderBy: { settlementId: 'desc' },
     });
-    return evidences;
+    return settlement;
   }
 
-  public async getMobileSummary(id: string) {
-    const order = await prisma.order.findUnique({
-      where: { orderId: BigInt(id) },
-    });
+  public async createOrderSettlement(orderId: string, data: any, actionUserId: string) {
+    const order = await prisma.order.findUnique({ where: { orderId: BigInt(orderId) } });
     if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
 
-    const customer = await prisma.customer.findUnique({
-      where: { customerId: order.customerId },
+    // Sum deposits
+    const deposits = await prisma.deposit.aggregate({
+      where: { orderId: BigInt(orderId), status: DepositStatus.SUCCESS },
+      _sum: { amount: true },
     });
+    const depositAmount = deposits._sum.amount || 0;
 
-    const tasks = await prisma.workTask.findMany({
-      where: { orderId: BigInt(id) },
-    });
+    const { additionalFee = 0, compensation = 0, discount = 0, paymentMethod, notes } = data;
 
-    const payments = await prisma.payment.findMany({
-      where: { orderId: BigInt(id) },
-    });
+    // Final amount = totalAmount - depositAmount + additionalFee - compensation - discount
+    // Wait, compensation is usually charged to the customer? Or to the supplier?
+    // Let's just follow BR-30-01: finalAmount = totalAmount - depositAmount + additionalFee - deductionAmount (discount)
+    // Actually:
+    // finalAmount = (order.totalAmount + additionalFee + compensation) - depositAmount - discount;
+    const baseTotal = Number(order.totalAmount);
+    const finalAmount = baseTotal + additionalFee + compensation - Number(depositAmount) - discount;
 
-    const changeRequests = await prisma.changeRequest.findMany({
-      where: { orderId: BigInt(id) },
-    });
-
-    const handovers = await prisma.handoverRecord.findMany({
-      where: { orderId: BigInt(id) },
-    });
-
-    return {
-      order: {
-        ...order,
-        orderId: order.orderId.toString(),
-        customerId: order.customerId.toString(),
-        createdBy: order.createdBy?.toString(),
+    return await prisma.settlement.create({
+      data: {
+        orderId: BigInt(orderId),
+        additionalFee,
+        compensation,
+        discount,
+        finalAmount,
+        paymentMethod,
+        status: SettlementStatus.DRAFT,
+        requestedBy: BigInt(actionUserId),
+        requestedAt: new Date(),
       },
-      customer: {
-        ...customer,
-        customerId: customer?.customerId.toString(),
-      },
-      tasks: tasks.map(t => ({
-        ...t,
-        workTaskId: t.workTaskId.toString(),
-        orderId: t.orderId.toString(),
-        createdBy: t.createdBy?.toString(),
-      })),
-      payments: payments.map(p => ({
-        ...p,
-        paymentId: p.paymentId.toString(),
-        orderId: p.orderId.toString(),
-        paymentRequestId: p.paymentRequestId?.toString(),
-        confirmedBy: p.confirmedBy?.toString(),
-      })),
-      changeRequests: changeRequests.map(c => ({
-        ...c,
-        changeRequestId: c.changeRequestId.toString(),
-        orderId: c.orderId.toString(),
-        requestedBy: c.requestedBy.toString(),
-        approvedBy: c.approvedBy?.toString(),
-        reconciledBy: c.reconciledBy?.toString(),
-      })),
-      handovers: handovers.map(h => ({
-        ...h,
-        handoverId: h.handoverId.toString(),
-        orderId: h.orderId.toString(),
-        recordedBy: h.recordedBy.toString(),
-      })),
-    };
+    });
   }
 
-  public async getWorkflowTimeline(id: string) {
-    const orderId = BigInt(id);
+  public async confirmSettlement(
+    settlementId: string,
+    status: SettlementStatus,
+    notes: string | undefined,
+    actionUserId: string,
+  ) {
+    const settlement = await prisma.settlement.findUnique({
+      where: { settlementId: BigInt(settlementId) },
+    });
+    if (!settlement) throw new AppError('Không tìm thấy quyết toán.', 404);
 
-    const auditLogs = await prisma.auditLog.findMany({
-      where: { entityType: 'Order', entityId: orderId },
-      orderBy: { createdAt: 'asc' },
+    let updateData: any = { status };
+    if (status === SettlementStatus.CONFIRMED) {
+      updateData.confirmedBy = BigInt(actionUserId);
+      updateData.confirmedAt = new Date();
+      updateData.paidAt = new Date();
+    }
+
+    const updatedSettlement = await prisma.settlement.update({
+      where: { settlementId: BigInt(settlementId) },
+      data: updateData,
     });
 
-    const tasks = await prisma.workTask.findMany({
-      where: { orderId },
-      orderBy: { updatedAt: 'asc' },
-    });
-
-    const payments = await prisma.payment.findMany({
-      where: { orderId },
-      orderBy: { paidAt: 'asc' },
-    });
-
-    const changeRequests = await prisma.changeRequest.findMany({
-      where: { orderId },
-      orderBy: { updatedAt: 'asc' },
-    });
-
-    const timeline: any[] = [];
-
-    auditLogs.forEach(log => {
-      timeline.push({
-        type: 'AUDIT',
-        title: log.action,
-        timestamp: log.createdAt,
-        user: log.userId?.toString(),
+    if (status === SettlementStatus.CONFIRMED) {
+      await prisma.order.update({
+        where: { orderId: settlement.orderId },
+        data: { paymentStatus: PaymentStatus.PAID },
       });
-    });
+    }
 
-    tasks.forEach(task => {
-      timeline.push({
-        type: 'TASK',
-        title: `Task ${task.taskCategory} - ${task.status}`,
-        timestamp: task.updatedAt,
-        details: task.workTaskId.toString(),
-      });
-    });
-
-    payments.forEach(payment => {
-      timeline.push({
-        type: 'PAYMENT',
-        title: `Payment ${payment.status}`,
-        timestamp: payment.paidAt,
-        amount: payment.amount,
-      });
-    });
-
-    changeRequests.forEach(cr => {
-      timeline.push({
-        type: 'CHANGE_REQUEST',
-        title: `Change Request - ${cr.status}`,
-        timestamp: cr.updatedAt,
-        details: cr.type,
-      });
-    });
-
-    timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-    return timeline;
+    return updatedSettlement;
   }
 }
 

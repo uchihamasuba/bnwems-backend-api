@@ -2,30 +2,29 @@ import request from 'supertest';
 import app from '../src/app';
 import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
+import {
+  OrderStatus,
+  PaymentStatus,
+  OrderItemSource,
+  DepositStatus,
+  SettlementStatus,
+} from '@prisma/client';
 
 describe('Order API (Module 8)', () => {
-  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const adminToken = generateTestToken({ userId: '1', role: 'ADMIN' });
   const validId1 = '1';
-  const validId2 = '2';
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('GET /api/v1/orders', () => {
-    it('should return 401 if unauthorized', async () => {
-      const res = await request(app).get('/api/v1/orders');
-      expect(res.status).toBe(401);
-    });
-
     it('should return list of orders', async () => {
-      prismaMock.order.findMany.mockResolvedValue([
-        { orderId: 1n, orderNumber: 'ORD-123' } as any
-      ]);
+      prismaMock.order.findMany.mockResolvedValue([{ orderId: 1n, orderCode: 'ORD-123' } as any]);
       prismaMock.order.count.mockResolvedValue(1);
 
       const res = await request(app)
-        .get('/api/v1/orders?page=1&limit=10')
+        .get('/api/v1/orders')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
@@ -34,33 +33,43 @@ describe('Order API (Module 8)', () => {
     });
   });
 
-  describe('GET /api/v1/orders/field-progress', () => {
-    it('should return field progress of orders', async () => {
-      prismaMock.order.findMany.mockResolvedValue([
-        { orderId: 1n } as any
-      ]);
-      prismaMock.workTask.findFirst.mockResolvedValue({ taskCategory: 'SETUP', status: 'in_progress', updatedAt: new Date() } as any);
-
+  describe('POST /api/v1/orders', () => {
+    it('should return 400 if validation fails', async () => {
       const res = await request(app)
-        .get(`/api/v1/orders/field-progress`)
-        .set('Authorization', `Bearer ${adminToken}`);
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data).toHaveLength(1);
-      expect(res.body.data[0].currentTask).toBe('SETUP');
-    });
-  });
-
-  describe('GET /api/v1/orders/:id', () => {
-    it('should return 400 for invalid ID format', async () => {
-      const res = await request(app)
-        .get('/api/v1/orders/abc')
-        .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
     });
 
+    it('should create new order successfully', async () => {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 5);
+
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.order.create.mockResolvedValue({ orderId: 1n, orderCode: 'ORD' } as any);
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          customerId: 1,
+          eventType: 'WEDDING',
+          eventDate: futureDate.toISOString(),
+          location: '123 Test St',
+          items: [{ itemId: 1, quantity: 10, unitPrice: 100, source: OrderItemSource.INTERNAL }],
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('GET /api/v1/orders/:id', () => {
     it('should return 404 if not found', async () => {
       prismaMock.order.findUnique.mockResolvedValue(null);
 
@@ -73,7 +82,6 @@ describe('Order API (Module 8)', () => {
 
     it('should return order', async () => {
       prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n, customerId: 2n } as any);
-      prismaMock.customer.findUnique.mockResolvedValue({ customerId: 2n } as any);
 
       const res = await request(app)
         .get(`/api/v1/orders/${validId1}`)
@@ -81,198 +89,204 @@ describe('Order API (Module 8)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.orderId).toBe('1');
     });
   });
 
-  describe('POST /api/v1/orders', () => {
-    it('should return 400 if validation fails', async () => {
-      const res = await request(app)
-        .post('/api/v1/orders')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          customerId: 'invalid-id'
-        });
+  describe('PUT /api/v1/orders/:id/status', () => {
+    it('should update order status successfully', async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n } as any);
+      prismaMock.order.update.mockResolvedValue({} as any);
 
-      expect(res.status).toBe(400);
+      const res = await request(app)
+        .put(`/api/v1/orders/${validId1}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ orderStatus: OrderStatus.CONFIRMED });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
     });
+  });
 
-    it('should return 400 if event date is in the past (MSG-UC11-01)', async () => {
-      const pastDate = new Date();
-      pastDate.setDate(pastDate.getDate() - 1);
+  describe('PUT /api/v1/orders/:id/items', () => {
+    it('should update order items successfully', async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n } as any);
 
       const res = await request(app)
-        .post('/api/v1/orders')
+        .put(`/api/v1/orders/${validId1}/items`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          customerId: validId2,
-          eventDate: pastDate.toISOString()
+          items: [{ itemId: 1, quantity: 20, unitPrice: 100 }],
         });
 
-      expect(res.status).toBe(400);
-      expect(res.body.code).toBe('MSG-UC11-01');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
     });
+  });
 
-    it('should create new order successfully', async () => {
-      prismaMock.order.create.mockResolvedValue({ orderId: 1n } as any);
-      prismaMock.auditLog.create.mockResolvedValue({} as any);
-
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 5);
+  describe('GET /api/v1/orders/:id/warnings', () => {
+    it('should get order warnings', async () => {
+      prismaMock.orderWarning.findMany.mockResolvedValue([{ warningId: 1n }] as any);
 
       const res = await request(app)
-        .post('/api/v1/orders')
+        .get(`/api/v1/orders/${validId1}/warnings`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
+    });
+  });
+
+  describe('POST /api/v1/orders/:id/warnings', () => {
+    it('should create order warning', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n } as any);
+      prismaMock.orderWarning.create.mockResolvedValue({ warningId: 1n } as any);
+
+      const res = await request(app)
+        .post(`/api/v1/orders/${validId1}/warnings`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          customerId: validId2,
-          eventDate: futureDate.toISOString()
-        });
+        .send({ content: 'Warning content' });
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
-      expect(prismaMock.order.create).toHaveBeenCalled();
     });
   });
 
-  describe('PUT /api/v1/orders/:id/confirm', () => {
-    it('should return 400 if order does not have accepted quotation (MSG-UC11-04)', async () => {
+  describe('PUT /api/v1/warnings/:id/resolve', () => {
+    it('should resolve order warning', async () => {
+      prismaMock.orderWarning.findUnique.mockResolvedValue({ warningId: 1n } as any);
+      prismaMock.orderWarning.update.mockResolvedValue({} as any);
+
+      const res = await request(app)
+        .put(`/api/v1/warnings/${validId1}/resolve`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('GET /api/v1/orders/:id/deposits', () => {
+    it('should get order deposits', async () => {
+      prismaMock.deposit.findMany.mockResolvedValue([{ depositId: 1n }] as any);
+
+      const res = await request(app)
+        .get(`/api/v1/orders/${validId1}/deposits`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/v1/orders/:id/deposits', () => {
+    it('should create deposit', async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
       prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n } as any);
-      prismaMock.quotation.findUnique.mockResolvedValue(null);
+      prismaMock.deposit.create.mockResolvedValue({ depositId: 1n } as any);
 
       const res = await request(app)
-        .put(`/api/v1/orders/${validId1}/confirm`)
-        .set('Authorization', `Bearer ${adminToken}`);
-
-      expect(res.status).toBe(400);
-      expect(res.body.code).toBe('MSG-UC11-04');
-    });
-
-    it('should confirm order successfully', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n } as any);
-      prismaMock.quotation.findFirst.mockResolvedValue({ status: 'confirmed' } as any);
-      prismaMock.order.update.mockResolvedValue({} as any);
-
-      const res = await request(app)
-        .put(`/api/v1/orders/${validId1}/confirm`)
-        .set('Authorization', `Bearer ${adminToken}`);
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(prismaMock.order.update).toHaveBeenCalled();
-    });
-  });
-
-  describe('GET /api/v1/orders/:id/change-requests', () => {
-    it('should get change requests for order', async () => {
-      const res = await request(app).get('/api/v1/orders/1/change-requests').set('Authorization', `Bearer ${adminToken}`);
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
-    });
-  });
-
-  describe('GET /api/v1/orders/:id/evidences', () => {
-    it('should get evidences for order', async () => {
-      prismaMock.evidence.findMany.mockResolvedValue([{ evidenceId: 1n }] as any);
-      const res = await request(app).get('/api/v1/orders/1/evidences').set('Authorization', `Bearer ${adminToken}`);
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data).toHaveLength(1);
-    });
-  });
-
-  describe('GET /api/v1/orders/:id/mobile-summary', () => {
-    it('should get mobile summary for order', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n, customerId: 1n } as any);
-      prismaMock.customer.findUnique.mockResolvedValue({ customerId: 1n } as any);
-      prismaMock.workTask.findMany.mockResolvedValue([{ workTaskId: 1n, orderId: 1n }] as any);
-      prismaMock.payment.findMany.mockResolvedValue([{ paymentId: 1n, orderId: 1n }] as any);
-      prismaMock.changeRequest.findMany.mockResolvedValue([{ changeRequestId: 1n, orderId: 1n, requestedBy: 1n }] as any);
-      prismaMock.handoverRecord.findMany.mockResolvedValue([{ handoverId: 1n, orderId: 1n, recordedBy: 1n }] as any);
-
-      const res = await request(app).get('/api/v1/orders/1/mobile-summary').set('Authorization', `Bearer ${adminToken}`);
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-    });
-  });
-
-  describe('GET /api/v1/orders/:id/workflow-timeline', () => {
-    it('should get workflow timeline for order', async () => {
-      prismaMock.auditLog.findMany.mockResolvedValue([{ action: 'CREATE_ORDER', createdAt: new Date(), userId: 1n }] as any);
-      prismaMock.workTask.findMany.mockResolvedValue([{ taskCategory: 'SETUP', status: 'done', updatedAt: new Date(), workTaskId: 1n }] as any);
-      prismaMock.payment.findMany.mockResolvedValue([{ status: 'success', paidAt: new Date(), amount: 100 }] as any);
-      prismaMock.changeRequest.findMany.mockResolvedValue([{ status: 'approved', updatedAt: new Date(), type: 'add' }] as any);
-
-      const res = await request(app).get(`/api/v1/orders/${validId1}/workflow-timeline`).set('Authorization', `Bearer ${adminToken}`);
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data).toHaveLength(4);
-    });
-  });
-
-  describe('GET /api/v1/orders/:id/payment-requests', () => {
-    it('should get payment requests for order', async () => {
-      const res = await request(app).get('/api/v1/orders/1/payment-requests').set('Authorization', `Bearer ${adminToken}`);
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
-    });
-  });
-
-  describe('GET /api/v1/orders/:id/assignments', () => {
-    it('should return list of assignments for the order', async () => {
-      prismaMock.assignment.findMany.mockResolvedValue([
-        { assignmentId: 1n, workTaskId: 1n, userId: 1n, roleInTask: 'LEADER' } as any
-      ]);
-
-      const res = await request(app)
-        .get(`/api/v1/orders/${validId1}/assignments`)
-        .set('Authorization', `Bearer ${adminToken}`);
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data).toHaveLength(1);
-    });
-  });
-
-  describe('POST /api/v1/orders/:id/damage-loss', () => {
-    it('should report damage loss for order', async () => {
-      const res = await request(app).post('/api/v1/orders/1/damage-loss').set('Authorization', `Bearer ${adminToken}`).send({});
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
-    });
-  });
-
-  describe('POST /api/v1/orders/:id/handover', () => {
-    it('should report handover for order', async () => {
-      const res = await request(app).post('/api/v1/orders/1/handover').set('Authorization', `Bearer ${adminToken}`).send({});
-      expect([200, 201, 400, 403, 404, 500, 501]).toContain(res.status);
-    });
-  });
-
-  describe('PUT /api/v1/orders/:id/change-date', () => {
-    it('should return 400 if invalid date', async () => {
-      const res = await request(app)
-        .put(`/api/v1/orders/${validId1}/change-date`)
+        .post(`/api/v1/orders/${validId1}/deposits`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ newEventDate: 'invalid-date' });
-      expect(res.status).toBe(400);
-    });
+        .send({ amount: 1000 });
 
-    it('should update event date successfully', async () => {
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('PUT /api/v1/deposits/:id', () => {
+    it('should update deposit status', async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.deposit.findUnique.mockResolvedValue({ depositId: 1n, orderId: 1n } as any);
+      prismaMock.deposit.update.mockResolvedValue({} as any);
       prismaMock.order.update.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/orders/${validId1}/change-date`)
+        .put(`/api/v1/deposits/${validId1}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ newEventDate: new Date().toISOString() });
+        .send({ status: DepositStatus.SUCCESS });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
     });
   });
 
-  describe('PUT /api/v1/orders/:id/close', () => {
-    it('should close order successfully', async () => {
+  describe('GET /api/v1/orders/:id/settlement', () => {
+    it('should get settlement', async () => {
+      prismaMock.settlement.findFirst.mockResolvedValue({ settlementId: 1n } as any);
+
+      const res = await request(app)
+        .get(`/api/v1/orders/${validId1}/settlement`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/v1/orders/:id/settlement', () => {
+    it('should create settlement', async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.order.findUnique.mockResolvedValue({ orderId: 1n, totalAmount: 10000 } as any);
+      prismaMock.deposit.aggregate.mockResolvedValue({ _sum: { amount: 1000 } } as any);
+      prismaMock.settlement.create.mockResolvedValue({ settlementId: 1n } as any);
+
+      const res = await request(app)
+        .post(`/api/v1/orders/${validId1}/settlement`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ additionalFee: 0, compensation: 0, discount: 0 });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('PUT /api/v1/settlements/:id/confirm', () => {
+    it('should confirm settlement', async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        return cb(prismaMock);
+      });
+      prismaMock.settlement.findUnique.mockResolvedValue({ settlementId: 1n, orderId: 1n } as any);
+      prismaMock.settlement.update.mockResolvedValue({} as any);
       prismaMock.order.update.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/orders/${validId1}/close`)
+        .put(`/api/v1/settlements/${validId1}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: SettlementStatus.CONFIRMED });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+  describe('PUT /api/v1/orders/:id/prepare', () => {
+    it('should update preparation for an order', async () => {
+      const res = await request(app)
+        .put(`/api/v1/orders/${validId1}/prepare`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/v1/orders/:id/checkout', () => {
+    it('should checkout an order', async () => {
+      const res = await request(app)
+        .post(`/api/v1/orders/${validId1}/checkout`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);

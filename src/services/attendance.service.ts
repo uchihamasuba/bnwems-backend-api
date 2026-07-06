@@ -1,28 +1,43 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
 
 class AttendanceService {
-  public async checkIn(assignmentId: string, checkInTime: string, userId: string) {
-    // In a real app, verify location bounds to throw MSG-UC29-01 if needed.
-    
-    const newAttendance = await prisma.attendance.create({
+  public async checkIn(data: any, actionUserId: string) {
+    const { planId, checkInEvidenceId, checkInAt } = data;
+
+    // Verify plan
+    const plan = await prisma.schedulePlan.findUnique({ where: { planId: BigInt(planId) } });
+    if (!plan) throw new AppError('Không tìm thấy phân công.', 404);
+    if (plan.assignedTo !== BigInt(actionUserId)) {
+      throw new AppError('Không thể chấm công cho người khác.', 403);
+    }
+
+    return await prisma.attendance.create({
       data: {
-        assignmentId: BigInt(assignmentId),
-        checkIn: new Date(checkInTime),
-        completionStatus: 'pending',
+        planId: BigInt(planId),
+        userId: BigInt(actionUserId),
+        checkInAt: new Date(checkInAt),
+        checkInEvidenceId: checkInEvidenceId ? BigInt(checkInEvidenceId) : null,
       },
     });
-
-    return newAttendance;
   }
 
-  public async confirmAttendance(id: string, status: string, actionUserId: string, checkOutTime?: string) {
-    await prisma.attendance.update({
-      where: { attendanceId: BigInt(id) },
+  public async checkOut(attendanceId: string, data: any, actionUserId: string) {
+    const { checkOutAt, note } = data;
+
+    const attendance = await prisma.attendance.findUnique({
+      where: { attendanceId: BigInt(attendanceId) },
+    });
+    if (!attendance) throw new AppError('Không tìm thấy bản ghi chấm công.', 404);
+    if (attendance.userId !== BigInt(actionUserId)) {
+      throw new AppError('Không thể chấm công cho người khác.', 403);
+    }
+
+    return await prisma.attendance.update({
+      where: { attendanceId: BigInt(attendanceId) },
       data: {
-        completionStatus: status.toLowerCase(),
-        checkOut: checkOutTime ? new Date(checkOutTime) : undefined,
-        confirmedBy: BigInt(actionUserId),
-        confirmedAt: new Date()
+        checkOutAt: new Date(checkOutAt),
+        note,
       },
     });
   }

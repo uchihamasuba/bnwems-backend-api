@@ -2,7 +2,7 @@
 
 ## Overview
 This module handles **UC 2.16 (Supplier Transaction & Debt Management)** and **UC 2.24 (Supplier Item Receiving & Return Support)**.
-It manages external partners, their transactions (`SupplierTransaction`), receiving/returns, and financial payments (`SupplierPayment`).
+It manages external partners, their transactions (`SupplierTransaction`), and links to field operations for item receiving/returns.
 
 ## Standard Error Codes (SRS Mapping)
 - `MSG-UC16-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
@@ -10,6 +10,8 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - `MSG-UC16-03`: Bạn không có quyền thực hiện thao tác này.
 - `MSG-UC24-01`: Số lượng hàng nhận không khớp với thỏa thuận giao dịch.
 - `MSG-UC24-02`: Thiếu bằng chứng cho việc trả lại hàng nhà cung cấp.
+
+---
 
 ## 1. Supplier Master Data (UC 2.16)
 
@@ -19,8 +21,8 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 - **Query Parameters:**
   - `page` (number, default 1)
   - `limit` (number, default 20)
-  - `search` (string, optional) - searches by name
-  - `status` (enum, optional) - active, inactive
+  - `search` (string, optional) - searches by name or code
+  - `status` (enum, optional) - Hoạt động, Ngừng hoạt động
 - **Response (200 OK):**
 ```json
 {
@@ -29,11 +31,13 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
   "data": [
     {
       "supplierId": 1,
-      "name": "Công ty TNHH AudioVisual Pro",
+      "supplierCode": "SUP-001",
+      "supplierName": "Công ty TNHH AudioVisual Pro",
+      "serviceType": "Cung cấp âm thanh ánh sáng",
       "contactPerson": "Nguyễn Văn A",
-      "phone": "+123456789",
-      "address": "123 Đường Nguyễn Trãi",
-      "status": "active"
+      "phone": "0901234567",
+      "rating": 5,
+      "status": "Hoạt động"
     }
   ],
   "meta": { "page": 1, "limit": 20, "totalCount": 15 }
@@ -43,15 +47,18 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 ### 2. `POST /api/v1/suppliers`
 - **Description:** Creates a new supplier record. Manager access required.
 - **Business Rules:**
-  - BR-16-01: Supplier name must be unique.
+  - BR-16-01: Supplier code must be unique.
   - BR-16-02: Log to `AuditLog`.
 - **Request Body:**
 ```json
 {
-  "name": "Công ty TNHH AudioVisual Pro",
+  "supplierCode": "SUP-001",
+  "supplierName": "Công ty TNHH AudioVisual Pro",
+  "serviceType": "Cung cấp âm thanh ánh sáng",
   "contactPerson": "Nguyễn Văn A",
-  "phone": "+123456789",
-  "address": "123 Đường Nguyễn Trãi"
+  "phone": "0901234567",
+  "address": "123 Đường Nguyễn Trãi",
+  "rating": 5
 }
 ```
 - **Response (201 Created):**
@@ -63,27 +70,52 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 }
 ```
 
-## 2. Supplier Transactions (UC 2.16, UC 2.24)
+### 3. `PUT /api/v1/suppliers/:id`
+- **Description:** Updates supplier information.
+- **Request Body:**
+```json
+{
+  "supplierName": "Công ty TNHH AudioVisual Pro (Updated)",
+  "serviceType": "Cung cấp âm thanh ánh sáng",
+  "contactPerson": "Nguyễn Văn B",
+  "phone": "0901234568",
+  "address": "456 Đường Nguyễn Trãi",
+  "rating": 4
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SP-02-UPDATED",
+  "message": "Cập nhật nhà cung cấp thành công."
+}
+```
 
-### 3. `POST /api/v1/supplier-transactions`
+---
+
+## 2. Supplier Transactions (UC 2.16)
+
+### 4. `POST /api/v1/supplier-transactions`
 - **Use Case:** UC 2.16 - Create Supplier Rental/Purchase Order
-- **Description:** Creates a transaction to rent or purchase items from a supplier for an order.
+- **Description:** Creates a transaction to rent or purchase items from a supplier for a specific order.
 - **Business Rules:**
-  - BR-16-03: `totalCost` must equal the sum of item costs.
+  - BR-16-03: System automatically calculates `estimatedCost` based on the items.
 - **Request Body:**
 ```json
 {
   "supplierId": 1,
-  "orderId": 1,
-  "type": "rental",
-  "totalCost": 500000.00,
-  "expectedDelivery": "2026-06-25",
+  "orderId": 100,
+  "transactionType": "Thuê",
+  "serviceTitle": "Thuê bổ sung màn hình LED",
+  "depositAmount": 1000000.00,
   "items": [
     {
-      "equipmentItemId": 46,
-      "description": "Thuê phông cưới cao cấp",
-      "quantity": 1,
-      "unitCost": 500000.00
+      "itemId": 46,
+      "itemName": "Màn hình LED P3",
+      "quantity": 10,
+      "unitCost": 500000.00,
+      "notes": "Bao gồm thi công"
     }
   ]
 }
@@ -94,32 +126,112 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
   "success": true,
   "code": "MSG-SP-03",
   "message": "Tạo giao dịch nhà cung cấp thành công.",
-  "data": { "supplierTransactionId": 1, "status": "draft" }
+  "data": { "transactionId": 1, "status": "Chờ duyệt" }
 }
 ```
 
-### 4. `GET /api/v1/supplier-transactions/:id`
-- **Use Case:** UC 2.16 - View Supplier Transaction Details
-- **Description:** Retrieves the detailed information of a specific supplier transaction, including its items and payment status.
+### 5. `GET /api/v1/supplier-transactions`
+- **Use Case:** UC 2.16 - Monitor Supplier Debt & Transactions
+- **Description:** Retrieves paginated transactions for monitoring.
+- **Query Parameters:**
+  - `supplierId` (number, optional)
+  - `paymentStatus` (enum, optional) - Chưa thanh toán, Đã cọc, Đã thanh toán
+  - `status` (enum, optional) - Chờ duyệt, Đã duyệt, Đang thực hiện, Hoàn thành, Đã hủy
 - **Response (200 OK):**
 ```json
 {
   "success": true,
   "code": "MSG-SP-04",
+  "data": [
+    {
+      "transactionId": 1,
+      "transactionCode": "STX-001",
+      "supplierName": "Công ty TNHH AudioVisual Pro",
+      "transactionType": "Thuê",
+      "estimatedCost": 5000000.00,
+      "depositAmount": 1000000.00,
+      "paymentStatus": "Đã cọc",
+      "status": "Đang thực hiện",
+      "createdAt": "2026-06-22T10:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "totalCount": 5 }
+}
+```
+
+### 6. `GET /api/v1/supplier-transactions/:id`
+- **Use Case:** View Transaction Details
+- **Description:** Retrieves transaction details including items and their `receivedQuantity`.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SP-04-DETAIL",
   "data": {
-    "supplierTransactionId": 1,
-    "status": "draft"
+    "transactionId": 1,
+    "transactionCode": "STX-001",
+    "supplierId": 1,
+    "orderId": 100,
+    "transactionType": "Thuê",
+    "serviceTitle": "Thuê bổ sung màn hình LED",
+    "estimatedCost": 5000000.00,
+    "depositAmount": 1000000.00,
+    "paymentStatus": "Đã cọc",
+    "status": "Đang thực hiện",
+    "items": [
+      {
+        "stItemId": 1,
+        "itemId": 46,
+        "itemName": "Màn hình LED P3",
+        "quantity": 10,
+        "receivedQuantity": 0,
+        "unitCost": 500000.00,
+        "notes": "Bao gồm thi công"
+      }
+    ]
   }
 }
 ```
 
-### 5. `PUT /api/v1/supplier-transactions/:id/status`
-- **Use Case:** UC 2.16 - Update Supplier Transaction Status
-- **Description:** Manually overrides or updates the status of a supplier transaction (e.g., cancelled).
+### 7. `PATCH /api/v1/supplier-transactions/:id/status`
+- **Use Case:** Approve/Cancel Transaction
+- **Description:** Updates transaction status.
 - **Request Body:**
 ```json
 {
-  "status": "cancelled"
+  "status": "Đã duyệt",
+  "notes": "Duyệt thuê màn LED"
+}
+```
+
+### 8. `PATCH /api/v1/supplier-transactions/:id/payment-status`
+- **Use Case:** Update Transaction Payment Status
+- **Description:** Updates the payment status (e.g., from Unpaid to Deposited or Paid).
+- **Request Body:**
+```json
+{
+  "paymentStatus": "Đã thanh toán"
+}
+```
+
+---
+
+## 3. Supplier Receiving & Return (Integration with CollectedEquipmentReport)
+
+*Note: Receiving and returning items from/to suppliers is now primarily handled through the `CollectedEquipmentReport` (UC 2.24). When a report of type `Nhà cung cấp` is submitted, it links to a `SupplierTransaction` and automatically updates the `receivedQuantity` and `status` of the transaction.*
+
+### 9. `POST /api/v1/supplier-transactions/:id/receive` (Legacy / Direct Endpoint)
+- **Use Case:** UC 2.24 - Direct Receiving
+- **Description:** Alternatively, a direct endpoint to mark items as received by updating the `receivedQuantity` of `SupplierTransactionItem`.
+- **Request Body:**
+```json
+{
+  "items": [
+    {
+      "stItemId": 10,
+      "receivedQuantity": 10
+    }
+  ]
 }
 ```
 - **Response (200 OK):**
@@ -127,100 +239,6 @@ It manages external partners, their transactions (`SupplierTransaction`), receiv
 {
   "success": true,
   "code": "MSG-SP-05",
-  "message": "Cập nhật trạng thái giao dịch nhà cung cấp thành công."
-}
-```
-
-### 6. `PUT /api/v1/supplier-transactions/:id/receive`
-- **Use Case:** UC 2.24 - Supplier Item Receiving Support
-- **Description:** Records the receipt of equipment/materials from a supplier.
-- **Business Rules:**
-  - BR-24-01: Validates received quantities against original transaction details.
-  - BR-24-02: Changes transaction status to `received`.
-- **Request Body:**
-```json
-{
-  "items": [{ "equipmentItemId": 46, "quantityReceived": 1 }]
-}
-```
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "code": "MSG-SP-06",
-  "message": "Đã nhận và ghi nhận thiết bị/vật tư."
-}
-```
-
-### 7. `PUT /api/v1/supplier-transactions/:id/return`
-- **Use Case:** UC 2.24 - Supplier Item Return Support
-- **Description:** Records the return of rented equipment to a supplier.
-- **Business Rules:**
-  - BR-24-03: Validates return quantities against received quantities.
-  - BR-24-04: Changes status to `returned`.
-- **Request Body:**
-```json
-{
-  "items": [{ "equipmentItemId": 46, "quantityReturned": 1 }]
-}
-```
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "code": "MSG-SP-07",
-  "message": "Trả lại thiết bị/vật tư cho nhà cung cấp thành công."
-}
-```
-
-## 3. Supplier Payment Management (UC 2.16)
-
-### 8. `GET /api/v1/supplier-transactions`
-- **Use Case:** UC 2.16 - Monitor Supplier Debt
-- **Description:** Retrieves supplier transactions to monitor payments and debts.
-- **Query Parameters:**
-  - `paymentStatus` (enum, optional) - unpaid, partial, paid
-  - `supplierId` (string, optional)
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "code": "MSG-SP-08",
-  "data": [
-    {
-      "supplierTransactionId": 1,
-      "supplierId": 1,
-      "orderId": 1,
-      "totalCost": 500000.00,
-      "paidAmount": 0.00,
-      "paymentStatus": "unpaid",
-      "status": "received",
-      "updatedAt": "2026-06-22T10:00:00Z"
-    }
-  ],
-  "meta": { "page": 1, "limit": 20, "totalCount": 5 }
-}
-```
-
-### 9. `POST /api/v1/supplier-transactions/:id/payments`
-- **Use Case:** UC 2.16 - Record Supplier Payment
-- **Description:** Records a payment made to a supplier, increasing the `paidAmount`.
-- **Business Rules:**
-  - BR-16-05: Payment amount cannot exceed the remaining `totalCost` - `paidAmount`.
-  - BR-16-06: Automatically updates `paymentStatus` to `partial` or `paid`.
-- **Request Body:**
-```json
-{
-  "amount": 500000.00,
-  "paidAt": "2026-06-25T10:00:00Z",
-  "note": "BankTx-12345"
-}
-```
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "code": "MSG-SP-09",
-  "message": "Ghi nhận thanh toán thành công."
+  "message": "Đã cập nhật số lượng nhận hàng từ nhà cung cấp."
 }
 ```

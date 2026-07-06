@@ -80,7 +80,7 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
   try {
     const userId = req.user!.userId;
     const updateData = req.body;
-    
+
     const updatedUser = await authService.updateProfile(userId, updateData);
 
     res.status(200).json({
@@ -97,7 +97,7 @@ export const registerDeviceToken = async (req: AuthRequest, res: Response, next:
   try {
     const userId = req.user!.userId;
     const { deviceToken, deviceType } = req.body;
-    
+
     await authService.registerDeviceToken(userId, deviceToken, deviceType);
 
     res.status(200).json({

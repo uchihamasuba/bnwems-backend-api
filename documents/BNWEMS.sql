@@ -1,643 +1,59 @@
--- =============================================================================
--- BNWEMS — SCHEMA CHUẨN HÓA (3NF) — 40 bảng
--- MySQL 8.0+ / InnoDB / utf8mb4 — tiền DECIMAL(12,2), khóa BIGINT AUTO_INCREMENT
--- =============================================================================
-CREATE DATABASE IF NOT EXISTS BNWEMS CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE BNWEMS;
-SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
+-- =====================================================================
+-- WEMS DATABASE v2 — ĐÃ ĐỐI CHIẾU VỚI 2 APP (Manager App + Admin App)
+-- MySQL 8.x / InnoDB / utf8mb4 — chạy tuần tự từ trên xuống
+-- Nguồn: ERD + Use Case UC-01..90 + code TSX của 2 app AI Studio
+--
+-- (v6.1) Bỏ pick_lists/pick_list_items: pick list sinh từ order_items
+-- (thêm prepared_qty, prepared_by để tick tiến độ soạn từng dòng).
+-- (v6) Cập nhật theo ERD mới: Deposit thay Payment; work_tasks là DANH MỤC
+-- đầu công việc, schedule_plans là chi tiết giao việc (ai/ngày/địa điểm);
+-- attendances gắn với việc được giao; evidences là kho minh chứng Firebase,
+-- các bảng deposits/settlements/schedule_plans(bàn giao)/attendances(check-in)
+-- trỏ evidence_id về evidences; inventory KHÔNG có cột location.
+-- (v4) Doanh nghiệp CHỈ CÓ 1 KHO duy nhất => KHÔNG có bảng warehouses;
+-- tồn kho quản lý trực tiếp trên inventory (mỗi thiết bị 1 dòng, cột location
+-- là vị trí kệ trong kho). Danh mục & thiết bị theo danh sách thực tế của
+-- doanh nghiệp (đồ cưới hỏi/nhà rạp); địa bàn hoạt động: Hà Nội.
+-- Nguyên tắc (v3): TOÀN BỘ DỮ LIỆU LƯU TRONG DATABASE DÙNG TIẾNG VIỆT.
+--  * Mọi ENUM và giá trị seed đều là tiếng Việt (trừ định danh kỹ thuật:
+--    username, email, URL Firebase, FCM token, platform android/ios/web,
+--    và các mã hiển thị DH-/BG-/EQ-/KS-... vốn là mã định danh).
+--  * LƯU Ý: App Admin hiện so sánh vài chuỗi tiếng Anh trong code
+--    (vd 'Admin', 'Suspended', 'Active', 'Deposit'); khi nối DB này,
+--    frontend cần đổi các literal đó sang giá trị tiếng Việt tương ứng
+--    hoặc map ở tầng API.
+--  * Mỗi thực thể app hiển thị mã (DH-, BG-, KS-, PL-, NCC-...) có cột *_code.
+--  * Các bảng bắt buộc giữ nguyên: internal_users(avatar_url,bio),
+--    device_tokens, notifications, notification_recipients.
+--  * Bảng cho Staff app (chưa có UI): collected_equipment_reports — giữ theo Use Case.
+-- =====================================================================
 
-DROP TABLE IF EXISTS audit_logs;
-DROP TABLE IF EXISTS evidence;
-DROP TABLE IF EXISTS device_tokens;
-DROP TABLE IF EXISTS notifications;
-DROP TABLE IF EXISTS damage_loss_items;
-DROP TABLE IF EXISTS damage_loss_reports;
-DROP TABLE IF EXISTS handover_records;
-DROP TABLE IF EXISTS change_request_items;
-DROP TABLE IF EXISTS change_requests;
-DROP TABLE IF EXISTS survey_reports;
-DROP TABLE IF EXISTS supplier_payments;
-DROP TABLE IF EXISTS supplier_transaction_items;
-DROP TABLE IF EXISTS supplier_transactions;
-DROP TABLE IF EXISTS inventory_report_items;
-DROP TABLE IF EXISTS inventory_reports;
-DROP TABLE IF EXISTS inventory_reservation_items;
-DROP TABLE IF EXISTS inventory_reservations;
-DROP TABLE IF EXISTS inventory;
-DROP TABLE IF EXISTS wage_summaries;
-DROP TABLE IF EXISTS wage_rules;
-DROP TABLE IF EXISTS staff_availability;
-DROP TABLE IF EXISTS attendance;
-DROP TABLE IF EXISTS task_progress_updates;
-DROP TABLE IF EXISTS assignments;
-DROP TABLE IF EXISTS work_tasks;
-DROP TABLE IF EXISTS schedules;
-DROP TABLE IF EXISTS settlement_lines;
-DROP TABLE IF EXISTS settlements;
-DROP TABLE IF EXISTS order_status_history;
-DROP TABLE IF EXISTS payments;
-DROP TABLE IF EXISTS payment_requests;
-DROP TABLE IF EXISTS company_bank_accounts;
-DROP TABLE IF EXISTS quotation_items;
-DROP TABLE IF EXISTS quotations;
-DROP TABLE IF EXISTS order_items;
-DROP TABLE IF EXISTS orders;
-DROP TABLE IF EXISTS equipment;
-DROP TABLE IF EXISTS business_policies;
-DROP TABLE IF EXISTS suppliers;
-DROP TABLE IF EXISTS customers;
-DROP TABLE IF EXISTS internal_users;
-DROP TABLE IF EXISTS roles;
-SET FOREIGN_KEY_CHECKS = 1;
+DROP DATABASE IF EXISTS bnwems;
+CREATE DATABASE bnwems DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE bnwems;
 
--- 1. USER & ROLE -------------------------------------------------------------
-CREATE TABLE roles (
-  role_id     BIGINT NOT NULL AUTO_INCREMENT,
-  role_name   VARCHAR(50)  NOT NULL,
-  description VARCHAR(255) NULL,
-  PRIMARY KEY (role_id), UNIQUE KEY uq_roles_name (role_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- ============ NHÓM NGƯỜI DÙNG ============
 
+-- [v2] status thêm 'Suspended' theo UserManagementView; role đúng 4 giá trị app dùng
 CREATE TABLE internal_users (
   user_id       BIGINT NOT NULL AUTO_INCREMENT,
-  role_id       BIGINT NOT NULL,
-  username      VARCHAR(100) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
+  username      VARCHAR(100) NOT NULL COMMENT 'Tên đăng nhập (LoginView)',
+  password_hash VARCHAR(255) NOT NULL COMMENT 'Mật khẩu đã băm',
   full_name     VARCHAR(150) NOT NULL,
   email         VARCHAR(150) NULL,
   phone         VARCHAR(20)  NULL,
-  avatar_url    VARCHAR(500) NULL,   -- URL ảnh đại diện (Firebase)
-  bio           VARCHAR(255) NULL,   -- mô tả ngắn về nhân viên
-  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  address       VARCHAR(255) NULL,
+  role          ENUM('Quản trị viên','Quản lý','Trưởng nhóm','Nhân viên kỹ thuật') NOT NULL
+                COMMENT '4 vai trò: Admin/Manager/Leader Staff/Technical Staff',
+  status        ENUM('Hoạt động','Ngừng hoạt động','Tạm khóa') NOT NULL DEFAULT 'Hoạt động'
+                COMMENT 'Tạm khóa = Suspended trên UserManagementView',
+  avatar_url    VARCHAR(500) NULL COMMENT 'Lưu URL ảnh đại diện từ Firebase',
+  bio           VARCHAR(255) NULL COMMENT 'Mô tả ngắn gọn về nhân viên',
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
-  UNIQUE KEY uq_users_username (username), UNIQUE KEY uq_users_email (email),
-  CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles (role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 2. CUSTOMER / SUPPLIER / POLICY -------------------------------------------
-CREATE TABLE customers (
-  customer_id BIGINT NOT NULL AUTO_INCREMENT,
-  full_name   VARCHAR(150) NOT NULL,
-  phone       VARCHAR(20)  NULL,
-  email       VARCHAR(150) NULL,
-  address     VARCHAR(255) NULL,
-  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (customer_id), UNIQUE KEY uq_customers_phone (phone)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE suppliers (
-  supplier_id    BIGINT NOT NULL AUTO_INCREMENT,
-  name           VARCHAR(150) NOT NULL,
-  contact_person VARCHAR(150) NULL,
-  phone          VARCHAR(20)  NULL,
-  address        VARCHAR(255) NULL,
-  status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  PRIMARY KEY (supplier_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE business_policies (
-  policy_id      BIGINT NOT NULL AUTO_INCREMENT,
-  policy_type    ENUM('deposit','cancellation','compensation','additional_fee','wage') NOT NULL,
-  name           VARCHAR(150) NOT NULL,
-  config         JSON NOT NULL,
-  effective_from DATE NOT NULL,
-  effective_to   DATE NULL,
-  status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  created_by     BIGINT NOT NULL,
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (policy_id),
-  CONSTRAINT fk_policy_creator FOREIGN KEY (created_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 3. EQUIPMENT (đổi tên từ catalog_items, giá lưu trên cột) -------------------
-CREATE TABLE equipment (
-  equipment_item_id BIGINT NOT NULL AUTO_INCREMENT,
-  code              VARCHAR(50)  NOT NULL,
-  name              VARCHAR(150) NOT NULL,
-  category          VARCHAR(100) NULL,
-  unit              VARCHAR(30)  NULL,
-  rental_price      DECIMAL(12,2) NOT NULL DEFAULT 0,  -- giá thuê hiện hành
-  cost_price        DECIMAL(12,2) NOT NULL DEFAULT 0,  -- giá vốn
-  replacement_value DECIMAL(12,2) NOT NULL DEFAULT 0,  -- giá đền bù
-  status            ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (equipment_item_id), UNIQUE KEY uq_equipment_code (code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 4. ORDER & QUOTATION -------------------------------------------------------
-CREATE TABLE orders (
-  order_id       BIGINT NOT NULL AUTO_INCREMENT,
-  order_number   VARCHAR(30) NULL,
-  customer_id    BIGINT NOT NULL,
-  event_date     DATE   NOT NULL,
-  event_end_date DATE   NULL,
-  event_type     VARCHAR(50) NULL,
-  event_name     VARCHAR(255) NULL,
-  notes          TEXT NULL,
-  guest_count    INT    NULL,
-  event_location VARCHAR(255) NULL,
-  total_value    DECIMAL(12,2) NOT NULL DEFAULT 0,
-  status         ENUM('draft','confirmed','deposit_paid','in_progress','settlement_pending','completed','cancelled') NOT NULL DEFAULT 'draft',
-  revenue_status ENUM('pending','recognized') NOT NULL DEFAULT 'pending',
-  recognized_at  DATETIME NULL,
-  created_by     BIGINT NOT NULL,
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (order_id), UNIQUE KEY uq_orders_number (order_number),
-  CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
-  CONSTRAINT fk_orders_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE order_items (
-  id                BIGINT NOT NULL AUTO_INCREMENT,
-  order_id          BIGINT NOT NULL,
-  equipment_item_id BIGINT NOT NULL,
-  quantity          INT NOT NULL,
-  unit_price        DECIMAL(12,2) NOT NULL,
-  source            ENUM('internal','supplier') NOT NULL DEFAULT 'internal',
-  PRIMARY KEY (id), KEY idx_oitem_order (order_id),
-  CONSTRAINT fk_oitem_order     FOREIGN KEY (order_id)          REFERENCES orders (order_id) ON DELETE CASCADE,
-  CONSTRAINT fk_oitem_equipment FOREIGN KEY (equipment_item_id) REFERENCES equipment (equipment_item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE quotations (
-  quotation_id BIGINT NOT NULL AUTO_INCREMENT,
-  customer_id  BIGINT NOT NULL,
-  order_id     BIGINT NOT NULL,
-  version      INT NOT NULL DEFAULT 1,
-  subtotal     DECIMAL(12,2) NOT NULL DEFAULT 0,
-  tax          DECIMAL(12,2) NOT NULL DEFAULT 0,
-  discount     DECIMAL(12,2) NOT NULL DEFAULT 0,
-  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-  status       ENUM('draft','confirmed','deleted') NOT NULL DEFAULT 'draft',
-  created_by   BIGINT NOT NULL,
-  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (quotation_id), KEY idx_quotation_order (order_id),
-  CONSTRAINT fk_quotation_customer FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
-  CONSTRAINT fk_quotation_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id),
-  CONSTRAINT fk_quotation_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE quotation_items (
-  id                BIGINT NOT NULL AUTO_INCREMENT,
-  quotation_id      BIGINT NOT NULL,
-  equipment_item_id BIGINT NOT NULL,
-  quantity          INT NOT NULL,
-  unit_price        DECIMAL(12,2) NOT NULL,
-  line_total        DECIMAL(12,2) NOT NULL,
-  PRIMARY KEY (id), KEY idx_qitem_quotation (quotation_id),
-  CONSTRAINT fk_qitem_quotation FOREIGN KEY (quotation_id)      REFERENCES quotations (quotation_id) ON DELETE CASCADE,
-  CONSTRAINT fk_qitem_equipment FOREIGN KEY (equipment_item_id) REFERENCES equipment (equipment_item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 5. PAYMENT & SETTLEMENT ----------------------------------------------------
-CREATE TABLE company_bank_accounts (
-  bank_account_id BIGINT NOT NULL AUTO_INCREMENT,
-  bank_code      VARCHAR(20)  NOT NULL,
-  account_number VARCHAR(30)  NOT NULL,
-  account_name   VARCHAR(150) NOT NULL,
-  is_default     BOOLEAN NOT NULL DEFAULT FALSE,
-  status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  PRIMARY KEY (bank_account_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE payment_requests (
-  payment_request_id BIGINT NOT NULL AUTO_INCREMENT,
-  order_id        BIGINT NOT NULL,
-  payment_type    ENUM('deposit','final') NOT NULL,
-  amount          DECIMAL(12,2) NOT NULL,
-  method_hint     ENUM('cash','bank_transfer') NULL,
-  bank_account_id BIGINT NULL,
-  transfer_code   VARCHAR(50)  NULL,
-  qr_url          VARCHAR(500) NULL,
-  due_date        DATE NULL,
-  status          ENUM('pending','partially_paid','paid','cancelled') NOT NULL DEFAULT 'pending',
-  submitted_by    BIGINT NULL,
-  submitted_at    DATETIME NULL,
-  review_note     VARCHAR(255) NULL,
-  created_by      BIGINT NOT NULL,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (payment_request_id), UNIQUE KEY uq_preq_transfer (transfer_code),
-  CONSTRAINT fk_preq_order     FOREIGN KEY (order_id)        REFERENCES orders (order_id),
-  CONSTRAINT fk_preq_bank      FOREIGN KEY (bank_account_id) REFERENCES company_bank_accounts (bank_account_id),
-  CONSTRAINT fk_preq_submitter FOREIGN KEY (submitted_by)    REFERENCES internal_users (user_id),
-  CONSTRAINT fk_preq_creator   FOREIGN KEY (created_by)      REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE payments (
-  payment_id         BIGINT NOT NULL AUTO_INCREMENT,
-  payment_request_id BIGINT NOT NULL,
-  order_id           BIGINT NOT NULL,
-  amount             DECIMAL(12,2) NOT NULL,
-  method             ENUM('cash','bank_transfer') NOT NULL,
-  status             ENUM('pending','success','failed') NOT NULL DEFAULT 'pending',
-  paid_at            DATETIME NULL,
-  submitted_by       BIGINT NULL,
-  submitted_at       DATETIME NULL,
-  review_note        VARCHAR(255) NULL,
-  confirmed_by       BIGINT NULL,
-  confirmed_at       DATETIME NULL,
-  created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (payment_id), KEY idx_pay_order (order_id),
-  CONSTRAINT fk_pay_request   FOREIGN KEY (payment_request_id) REFERENCES payment_requests (payment_request_id),
-  CONSTRAINT fk_pay_order     FOREIGN KEY (order_id)           REFERENCES orders (order_id),
-  CONSTRAINT fk_pay_submitter FOREIGN KEY (submitted_by)       REFERENCES internal_users (user_id),
-  CONSTRAINT fk_pay_confirmer FOREIGN KEY (confirmed_by)       REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE settlements (
-  settlement_id     BIGINT NOT NULL AUTO_INCREMENT,
-  order_id          BIGINT NOT NULL,
-  original_value    DECIMAL(12,2) NOT NULL,
-  change_adjustment DECIMAL(12,2) NOT NULL DEFAULT 0,
-  additional_fee    DECIMAL(12,2) NOT NULL DEFAULT 0,
-  compensation      DECIMAL(12,2) NOT NULL DEFAULT 0,
-  discount          DECIMAL(12,2) NOT NULL DEFAULT 0,
-  total_amount      DECIMAL(12,2) NOT NULL DEFAULT 0,  -- hóa đơn cuối
-  total_paid        DECIMAL(12,2) NOT NULL DEFAULT 0,
-  remaining_amount  DECIMAL(12,2) NOT NULL DEFAULT 0,  -- còn phải thu
-  payment_method    ENUM('cash','bank_transfer') NULL,
-  recorded_by       BIGINT NULL,
-  status            ENUM('draft','recorded','confirmed') NOT NULL DEFAULT 'draft',
-  confirmed_by      BIGINT NULL,
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (settlement_id), UNIQUE KEY uq_settlement_order (order_id),
-  CONSTRAINT fk_settle_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
-  CONSTRAINT fk_settle_recorder  FOREIGN KEY (recorded_by)  REFERENCES internal_users (user_id),
-  CONSTRAINT fk_settle_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE settlement_lines (
-  id              BIGINT NOT NULL AUTO_INCREMENT,
-  settlement_id   BIGINT NOT NULL,
-  line_type       ENUM('original','change','additional_fee','compensation','deposit','payment') NOT NULL,
-  amount          DECIMAL(12,2) NOT NULL,
-  note            VARCHAR(255) NULL,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id), KEY idx_sline_settle (settlement_id),
-  CONSTRAINT fk_sline_settle FOREIGN KEY (settlement_id) REFERENCES settlements (settlement_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 6. SCHEDULE (gộp plan + activities) ----------------------------------------
-CREATE TABLE schedules (
-  schedule_id   BIGINT NOT NULL AUTO_INCREMENT,
-  order_id      BIGINT NOT NULL,
-  activity_type ENUM('survey','preparation','transport','execution','collection','return') NOT NULL,
-  planned_date  DATE     NOT NULL,
-  planned_start DATETIME NULL,
-  planned_end   DATETIME NULL,
-  location      VARCHAR(255) NULL,
-  note          TEXT NULL,
-  status        ENUM('planned','done','cancelled') NOT NULL DEFAULT 'planned',
-  created_by    BIGINT NOT NULL,
-  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (schedule_id), KEY idx_sched_order (order_id),
-  CONSTRAINT fk_sched_order   FOREIGN KEY (order_id)   REFERENCES orders (order_id),
-  CONSTRAINT fk_sched_creator FOREIGN KEY (created_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 7. TASK & ATTENDANCE -------------------------------------------------------
-CREATE TABLE work_tasks (
-  work_task_id  BIGINT NOT NULL AUTO_INCREMENT,
-  order_id      BIGINT NOT NULL,
-  schedule_id   BIGINT NULL,
-  task_category ENUM('survey','operation') NOT NULL DEFAULT 'operation',
-  title         VARCHAR(200) NOT NULL,
-  description   TEXT NULL,
-  status        ENUM('draft','assigned','in_progress','done') NOT NULL DEFAULT 'draft',
-  progress_percent INT NOT NULL DEFAULT 0,
-  created_by    BIGINT NOT NULL,
-  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (work_task_id), KEY idx_task_order (order_id),
-  CONSTRAINT fk_task_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id),
-  CONSTRAINT fk_task_schedule FOREIGN KEY (schedule_id) REFERENCES schedules (schedule_id),
-  CONSTRAINT fk_task_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE assignments (
-  assignment_id BIGINT NOT NULL AUTO_INCREMENT,
-  work_task_id  BIGINT NOT NULL,
-  user_id       BIGINT NOT NULL,
-  role_in_task  ENUM('leader','technical') NOT NULL,
-  field_status  ENUM('pending','ready','in_setup','completed') NOT NULL DEFAULT 'pending',
-  assigned_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (assignment_id), UNIQUE KEY uq_assign (work_task_id, user_id),
-  CONSTRAINT fk_assign_task FOREIGN KEY (work_task_id) REFERENCES work_tasks (work_task_id) ON DELETE CASCADE,
-  CONSTRAINT fk_assign_user FOREIGN KEY (user_id)      REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE task_progress_updates (
-  id              BIGINT NOT NULL AUTO_INCREMENT,
-  work_task_id    BIGINT NOT NULL,
-  updated_by      BIGINT NOT NULL,
-  step            ENUM('preparation','checkout','transport','installation','handover','collection','return') NULL,
-  progress_status VARCHAR(50) NOT NULL,
-  note            TEXT NULL,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id), KEY idx_tpu_task (work_task_id),
-  CONSTRAINT fk_tpu_task FOREIGN KEY (work_task_id) REFERENCES work_tasks (work_task_id) ON DELETE CASCADE,
-  CONSTRAINT fk_tpu_user FOREIGN KEY (updated_by)   REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE attendance (
-  attendance_id     BIGINT NOT NULL AUTO_INCREMENT,
-  assignment_id     BIGINT NOT NULL,
-  check_in          DATETIME NULL,
-  check_out         DATETIME NULL,
-  completion_status ENUM('pending','completed') NOT NULL DEFAULT 'pending',
-  confirmed_by      BIGINT NULL,
-  confirmed_at      DATETIME NULL,
-  PRIMARY KEY (attendance_id), KEY idx_att_assign (assignment_id),
-  CONSTRAINT fk_att_assignment FOREIGN KEY (assignment_id) REFERENCES assignments (assignment_id) ON DELETE CASCADE,
-  CONSTRAINT fk_att_confirmer  FOREIGN KEY (confirmed_by)  REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE staff_availability (
-  id        BIGINT NOT NULL AUTO_INCREMENT,
-  user_id   BIGINT NOT NULL,
-  work_date DATE NOT NULL,
-  status    ENUM('available','unavailable') NOT NULL DEFAULT 'available',
-  note      VARCHAR(255) NULL,
-  PRIMARY KEY (id), UNIQUE KEY uq_avail (user_id, work_date),
-  CONSTRAINT fk_avail_user FOREIGN KEY (user_id) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 8. WAGE (rút gọn) ----------------------------------------------------------
-CREATE TABLE wage_rules (
-  wage_rule_id     BIGINT NOT NULL AUTO_INCREMENT,
-  role_in_task     ENUM('leader','technical') NOT NULL,
-  rate_per_session DECIMAL(12,2) NOT NULL,
-  effective_from   DATE NOT NULL,
-  effective_to     DATE NULL,
-  status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  PRIMARY KEY (wage_rule_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE wage_summaries (
-  wage_summary_id BIGINT NOT NULL AUTO_INCREMENT,
-  user_id         BIGINT NOT NULL,
-  order_id        BIGINT NULL,
-  period          VARCHAR(20) NULL,
-  total_sessions  INT NOT NULL DEFAULT 0,
-  gross_amount    DECIMAL(12,2) NOT NULL DEFAULT 0,
-  total_deduction DECIMAL(12,2) NOT NULL DEFAULT 0,
-  total_wage      DECIMAL(12,2) NOT NULL DEFAULT 0,
-  status          ENUM('draft','confirmed','settled') NOT NULL DEFAULT 'draft',
-  confirmed_by    BIGINT NULL,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (wage_summary_id), KEY idx_wage_user (user_id),
-  CONSTRAINT fk_wage_user      FOREIGN KEY (user_id)      REFERENCES internal_users (user_id),
-  CONSTRAINT fk_wage_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
-  CONSTRAINT fk_wage_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 9. INVENTORY (1 kho — bỏ warehouse) ----------------------------------------
-CREATE TABLE inventory (
-  inventory_id       BIGINT NOT NULL AUTO_INCREMENT,
-  equipment_item_id  BIGINT NOT NULL,
-  total_quantity     INT NOT NULL DEFAULT 0,
-  available_quantity INT NOT NULL DEFAULT 0,
-  reserved_quantity  INT NOT NULL DEFAULT 0,
-  damaged_quantity   INT NOT NULL DEFAULT 0,   -- hỏng hóc/bảo trì ghi nhận tại đây
-  PRIMARY KEY (inventory_id), UNIQUE KEY uq_inv_equipment (equipment_item_id),
-  CONSTRAINT fk_inv_equipment FOREIGN KEY (equipment_item_id) REFERENCES equipment (equipment_item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE inventory_reservations (
-  reservation_id BIGINT NOT NULL AUTO_INCREMENT,
-  order_id       BIGINT NOT NULL,
-  event_date     DATE NOT NULL,
-  status         ENUM('reserved','released','fulfilled') NOT NULL DEFAULT 'reserved',
-  created_by     BIGINT NOT NULL,
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (reservation_id), KEY idx_resv_order (order_id),
-  CONSTRAINT fk_resv_order   FOREIGN KEY (order_id)   REFERENCES orders (order_id),
-  CONSTRAINT fk_resv_creator FOREIGN KEY (created_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE inventory_reservation_items (
-  id                BIGINT NOT NULL AUTO_INCREMENT,
-  reservation_id    BIGINT NOT NULL,
-  equipment_item_id BIGINT NOT NULL,
-  reserved_quantity INT NOT NULL,
-  PRIMARY KEY (id), KEY idx_rsvitem_resv (reservation_id),
-  CONSTRAINT fk_rsvitem_resv      FOREIGN KEY (reservation_id)    REFERENCES inventory_reservations (reservation_id) ON DELETE CASCADE,
-  CONSTRAINT fk_rsvitem_equipment FOREIGN KEY (equipment_item_id) REFERENCES equipment (equipment_item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE inventory_reports (
-  inventory_report_id BIGINT NOT NULL AUTO_INCREMENT,
-  order_id     BIGINT NOT NULL,
-  report_type  ENUM('checkout','collection','return') NOT NULL,
-  recorded_by  BIGINT NOT NULL,
-  confirmed_by BIGINT NULL,
-  status       ENUM('submitted','confirmed') NOT NULL DEFAULT 'submitted',
-  note         TEXT NULL,
-  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (inventory_report_id), KEY idx_invrep_order (order_id),
-  CONSTRAINT fk_invrep_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
-  CONSTRAINT fk_invrep_recorder  FOREIGN KEY (recorded_by)  REFERENCES internal_users (user_id),
-  CONSTRAINT fk_invrep_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE inventory_report_items (
-  id                  BIGINT NOT NULL AUTO_INCREMENT,
-  inventory_report_id BIGINT NOT NULL,
-  equipment_item_id   BIGINT NOT NULL,
-  expected_quantity   INT NULL,
-  quantity            INT NOT NULL,
-  condition_status    ENUM('good','damaged','lost') NOT NULL DEFAULT 'good',
-  PRIMARY KEY (id), KEY idx_invrepitem_report (inventory_report_id),
-  CONSTRAINT fk_invrepitem_report    FOREIGN KEY (inventory_report_id) REFERENCES inventory_reports (inventory_report_id) ON DELETE CASCADE,
-  CONSTRAINT fk_invrepitem_equipment FOREIGN KEY (equipment_item_id)   REFERENCES equipment (equipment_item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 10. SUPPLIER (gộp công nợ vào giao dịch) -----------------------------------
-CREATE TABLE supplier_transactions (
-  supplier_transaction_id BIGINT NOT NULL AUTO_INCREMENT,
-  supplier_id       BIGINT NOT NULL,
-  order_id          BIGINT NOT NULL,
-  type              ENUM('rental','purchase') NOT NULL,
-  total_cost        DECIMAL(12,2) NOT NULL DEFAULT 0,  -- tổng cần trả
-  paid_amount       DECIMAL(12,2) NOT NULL DEFAULT 0,  -- đã trả
-  payment_status    ENUM('unpaid','partial','paid') NOT NULL DEFAULT 'unpaid',
-  expected_delivery DATE NULL,
-  status            ENUM('draft','confirmed','received','returned') NOT NULL DEFAULT 'draft',
-  created_by        BIGINT NOT NULL,
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (supplier_transaction_id), KEY idx_st_supplier (supplier_id), KEY idx_st_order (order_id),
-  CONSTRAINT fk_st_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id),
-  CONSTRAINT fk_st_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id),
-  CONSTRAINT fk_st_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE supplier_transaction_items (
-  id                      BIGINT NOT NULL AUTO_INCREMENT,
-  supplier_transaction_id BIGINT NOT NULL,
-  equipment_item_id       BIGINT NULL,
-  description             VARCHAR(255) NULL,
-  quantity                INT NOT NULL,
-  quantity_received       INT NOT NULL DEFAULT 0,
-  quantity_returned       INT NOT NULL DEFAULT 0,
-  unit_cost               DECIMAL(12,2) NOT NULL,
-  PRIMARY KEY (id), KEY idx_stitem_trans (supplier_transaction_id),
-  CONSTRAINT fk_stitem_trans     FOREIGN KEY (supplier_transaction_id) REFERENCES supplier_transactions (supplier_transaction_id) ON DELETE CASCADE,
-  CONSTRAINT fk_stitem_equipment FOREIGN KEY (equipment_item_id)       REFERENCES equipment (equipment_item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE supplier_payments (
-  payment_id              BIGINT NOT NULL AUTO_INCREMENT,
-  supplier_transaction_id BIGINT NOT NULL,
-  amount                  DECIMAL(12,2) NOT NULL,
-  paid_at                 DATETIME NOT NULL,
-  recorded_by             BIGINT NOT NULL,
-  note                    VARCHAR(255) NULL,
-  PRIMARY KEY (payment_id), KEY idx_spay_trans (supplier_transaction_id),
-  CONSTRAINT fk_spay_trans    FOREIGN KEY (supplier_transaction_id) REFERENCES supplier_transactions (supplier_transaction_id),
-  CONSTRAINT fk_spay_recorder FOREIGN KEY (recorded_by)             REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 11. FIELD OPERATION --------------------------------------------------------
-CREATE TABLE survey_reports (
-  survey_report_id BIGINT NOT NULL AUTO_INCREMENT,
-  order_id         BIGINT NOT NULL,
-  work_task_id     BIGINT NULL,
-  site_address     VARCHAR(255) NULL,
-  site_condition   TEXT NULL,
-  feasibility_note TEXT NULL,
-  area_sqm         DECIMAL(10,2) NULL,
-  has_power        BOOLEAN NULL,
-  ground_type      VARCHAR(100) NULL,
-  access_note      TEXT NULL,
-  recorded_by      BIGINT NOT NULL,
-  reviewed_by      BIGINT NULL,
-  reviewed_at      DATETIME NULL,
-  review_note      TEXT NULL,
-  status           ENUM('submitted','needs_revision','confirmed') NOT NULL DEFAULT 'submitted',
-  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (survey_report_id), KEY idx_survey_order (order_id),
-  CONSTRAINT fk_survey_order    FOREIGN KEY (order_id)     REFERENCES orders (order_id),
-  CONSTRAINT fk_survey_task     FOREIGN KEY (work_task_id) REFERENCES work_tasks (work_task_id),
-  CONSTRAINT fk_survey_recorder FOREIGN KEY (recorded_by)  REFERENCES internal_users (user_id),
-  CONSTRAINT fk_survey_reviewer FOREIGN KEY (reviewed_by)  REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE change_requests (
-  change_request_id BIGINT NOT NULL AUTO_INCREMENT,
-  order_id          BIGINT NOT NULL,
-  requested_by      BIGINT NOT NULL,
-  type              ENUM('add','remove','replace') NOT NULL,
-  reason            TEXT NULL,
-  note_from_leader  TEXT NULL,
-  estimated_cost    DECIMAL(12,2) NULL,
-  status            ENUM('pending','approved','rejected','executed_pending_review','reconciled') NOT NULL DEFAULT 'pending',
-  executed_at       DATETIME NULL,
-  approved_by       BIGINT NULL,
-  reconciled_by     BIGINT NULL,
-  reconciled_at     DATETIME NULL,
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (change_request_id), KEY idx_cr_order (order_id),
-  CONSTRAINT fk_cr_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
-  CONSTRAINT fk_cr_requester FOREIGN KEY (requested_by) REFERENCES internal_users (user_id),
-  CONSTRAINT fk_cr_approver  FOREIGN KEY (approved_by)  REFERENCES internal_users (user_id),
-  CONSTRAINT fk_cr_reconciler FOREIGN KEY (reconciled_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE change_request_items (
-  id                BIGINT NOT NULL AUTO_INCREMENT,
-  change_request_id BIGINT NOT NULL,
-  equipment_item_id BIGINT NOT NULL,
-  quantity          INT NOT NULL,
-  action            ENUM('add','remove','replace') NOT NULL,
-  note              VARCHAR(255) NULL,
-  PRIMARY KEY (id), KEY idx_cri_request (change_request_id),
-  CONSTRAINT fk_cri_request   FOREIGN KEY (change_request_id) REFERENCES change_requests (change_request_id) ON DELETE CASCADE,
-  CONSTRAINT fk_cri_equipment FOREIGN KEY (equipment_item_id) REFERENCES equipment (equipment_item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE handover_records (
-  handover_id  BIGINT NOT NULL AUTO_INCREMENT,
-  order_id     BIGINT NOT NULL,
-  recorded_by  BIGINT NOT NULL,
-  confirmed_by BIGINT NULL,
-  status       ENUM('submitted','confirmed') NOT NULL DEFAULT 'submitted',
-  note         TEXT NULL,
-  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (handover_id), KEY idx_ho_order (order_id),
-  CONSTRAINT fk_ho_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
-  CONSTRAINT fk_ho_recorder  FOREIGN KEY (recorded_by)  REFERENCES internal_users (user_id),
-  CONSTRAINT fk_ho_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE damage_loss_reports (
-  damage_loss_id     BIGINT NOT NULL AUTO_INCREMENT,
-  order_id           BIGINT NOT NULL,
-  recorded_by        BIGINT NOT NULL,
-  confirmed_by       BIGINT NULL,
-  total_compensation DECIMAL(12,2) NOT NULL DEFAULT 0,
-  status             ENUM('submitted','confirmed') NOT NULL DEFAULT 'submitted',
-  created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (damage_loss_id), KEY idx_dl_order (order_id),
-  CONSTRAINT fk_dl_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
-  CONSTRAINT fk_dl_recorder  FOREIGN KEY (recorded_by)  REFERENCES internal_users (user_id),
-  CONSTRAINT fk_dl_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE damage_loss_items (
-  id                           BIGINT NOT NULL AUTO_INCREMENT,
-  damage_loss_id               BIGINT NOT NULL,
-  equipment_item_id            BIGINT NOT NULL,
-  quantity                     INT NOT NULL,
-  damage_type                  ENUM('damaged','lost') NOT NULL,
-  source                       ENUM('internal','supplier') NOT NULL DEFAULT 'internal',
-  supplier_transaction_item_id BIGINT NULL,
-  compensation_amount          DECIMAL(12,2) NOT NULL DEFAULT 0,
-  responsible_party            VARCHAR(20) NULL,
-  responsible_user_id          BIGINT NULL,
-  PRIMARY KEY (id), KEY idx_dli_report (damage_loss_id),
-  CONSTRAINT fk_dli_report    FOREIGN KEY (damage_loss_id)               REFERENCES damage_loss_reports (damage_loss_id) ON DELETE CASCADE,
-  CONSTRAINT fk_dli_equipment FOREIGN KEY (equipment_item_id)            REFERENCES equipment (equipment_item_id),
-  CONSTRAINT fk_dli_stitem    FOREIGN KEY (supplier_transaction_item_id) REFERENCES supplier_transaction_items (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 12. SYSTEM -----------------------------------------------------------------
-CREATE TABLE notifications (
-  notification_id BIGINT NOT NULL AUTO_INCREMENT,
-  user_id         BIGINT NOT NULL,
-  type            VARCHAR(50)  NOT NULL,
-  title           VARCHAR(200) NOT NULL,
-  content         TEXT NULL,
-  priority        ENUM('normal','high','urgent') NOT NULL DEFAULT 'normal',
-  target_screen   VARCHAR(50) NULL,
-  target_ref_type VARCHAR(50) NULL,
-  target_ref_id   BIGINT NULL,
-  is_read         BOOLEAN NOT NULL DEFAULT FALSE,
-  push_status     ENUM('pending','sent','failed','skipped') NOT NULL DEFAULT 'pending',
-  push_sent_at    DATETIME NULL,
-  fcm_message_id  VARCHAR(255) NULL,
-  push_error      VARCHAR(255) NULL,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (notification_id), KEY idx_notif_user (user_id),
-  CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES internal_users (user_id)
+  UNIQUE KEY uq_user_username (username),
+  UNIQUE KEY uq_user_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE device_tokens (
@@ -650,271 +66,1089 @@ CREATE TABLE device_tokens (
   last_used_at DATETIME NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (device_token_id), UNIQUE KEY uq_devtoken (fcm_token), KEY idx_devtoken_user (user_id),
+  PRIMARY KEY (device_token_id),
+  UNIQUE KEY uq_devtoken (fcm_token),
+  KEY idx_devtoken_user (user_id),
   CONSTRAINT fk_devtoken_user FOREIGN KEY (user_id) REFERENCES internal_users (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE evidence (
-  evidence_id      BIGINT NOT NULL AUTO_INCREMENT,
-  ref_type         VARCHAR(50) NOT NULL,
-  ref_id           BIGINT NOT NULL,
-  order_id         BIGINT NULL,
-  storage_provider VARCHAR(30) NOT NULL DEFAULT 'firebase',
-  storage_path     VARCHAR(500) NULL,
-  file_url         VARCHAR(500) NOT NULL,
-  thumbnail_url    VARCHAR(500) NULL,
-  file_name        VARCHAR(255) NULL,
-  file_size        BIGINT NULL,
-  file_type        VARCHAR(50) NULL,
-  uploaded_by      BIGINT NOT NULL,
-  uploaded_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (evidence_id), KEY idx_evidence_ref (ref_type, ref_id), KEY idx_evidence_order (order_id),
-  CONSTRAINT fk_evidence_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id),
-  CONSTRAINT fk_evidence_uploader FOREIGN KEY (uploaded_by) REFERENCES internal_users (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE audit_logs (
   log_id      BIGINT NOT NULL AUTO_INCREMENT,
   user_id     BIGINT NULL,
   action      VARCHAR(100) NOT NULL,
-  entity_type VARCHAR(50)  NOT NULL,
+  entity_type VARCHAR(50) NULL,
   entity_id   BIGINT NULL,
   old_value   JSON NULL,
   new_value   JSON NULL,
+  ip_address  VARCHAR(45) NULL,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (log_id), KEY idx_audit_entity (entity_type, entity_id),
+  PRIMARY KEY (log_id),
+  KEY idx_audit_user (user_id),
+  KEY idx_audit_entity (entity_type, entity_id),
+  KEY idx_audit_time (created_at),
   CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES internal_users (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE order_status_history (
-  history_id  BIGINT NOT NULL AUTO_INCREMENT,
-  order_id    BIGINT NOT NULL,
-  from_status VARCHAR(50) NULL,
-  to_status   VARCHAR(50) NOT NULL,
-  changed_by  BIGINT NULL,
-  changed_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  note        TEXT NULL,
-  PRIMARY KEY (history_id), KEY idx_osh_order (order_id),
-  CONSTRAINT fk_osh_order FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE
+-- ============ MINH CHỨNG (Evidence — User uploads Evidence theo ERD) ============
+-- Bảng lưu các minh chứng được upload lên Firebase. Các bảng nghiệp vụ
+-- (deposits: đặt cọc, settlements: quyết toán, schedule_plans: bàn giao,
+-- attendances: check-in) có cột evidence_id trỏ về đây.
+CREATE TABLE evidences (
+  evidence_id BIGINT NOT NULL AUTO_INCREMENT,
+  file_url    VARCHAR(500) NOT NULL COMMENT 'URL minh chứng trên Firebase Storage',
+  description VARCHAR(255) NULL COMMENT 'Mô tả minh chứng',
+  uploaded_by BIGINT NOT NULL COMMENT 'Người upload (User uploads Evidence)',
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (evidence_id),
+  KEY idx_evidence_uploader (uploaded_by),
+  CONSTRAINT fk_evidence_uploader FOREIGN KEY (uploaded_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='Kho minh chứng: ảnh giao dịch (đặt cọc, quyết toán, bàn giao) và ảnh check-in';
+
+-- ============ NHÓM THÔNG BÁO (Topbar NotificationItem: title, content, type, time, read) ============
+
+CREATE TABLE notifications (
+  notification_id   BIGINT NOT NULL AUTO_INCREMENT,
+  title             VARCHAR(255) NOT NULL,
+  content           TEXT NULL,
+  notification_type ENUM('Hệ thống','Tồn kho','Chính sách','Người dùng','Báo cáo','Đơn hàng','Công việc','Lịch trình','Thanh toán','Khảo sát','Lương','Nhà cung cấp','Khác')
+                    NOT NULL DEFAULT 'Hệ thống'
+                    COMMENT 'Map sang badge Topbar Admin: Tồn kho=Inventory, Chính sách=Policy, Người dùng=User, Báo cáo=Report',
+  ref_type          VARCHAR(50) NULL,
+  ref_id            BIGINT NULL,
+  created_by        BIGINT NULL,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Map sang trường time của app',
+  PRIMARY KEY (notification_id),
+  KEY idx_notif_type (notification_type),
+  KEY idx_notif_ref (ref_type, ref_id),
+  CONSTRAINT fk_notif_creator FOREIGN KEY (created_by) REFERENCES internal_users (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
--- =============================================================================
--- SEED — khớp schema 40 bảng. 3 đơn: 1 hoàn tất, 2 thi công, 3 xác nhận.
--- Tài khoản: admin/Admin@123 · manager01/Manager@123 · leader01..02/Leader@123 · tech01..02/Tech@123
--- =============================================================================
-USE BNWEMS;
-SET NAMES utf8mb4;
 
-INSERT INTO roles (role_id, role_name, description) VALUES
-  (1,'Admin','Quản trị hệ thống'),(2,'Manager','Điều hành & quyết toán'),
-  (3,'Leader Staff','Trưởng nhóm hiện trường'),(4,'Technical Staff','Nhân viên kỹ thuật');
+CREATE TABLE notification_recipients (
+  recipient_id    BIGINT NOT NULL AUTO_INCREMENT,
+  notification_id BIGINT NOT NULL,
+  user_id         BIGINT NOT NULL,
+  is_read         BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Map sang trường read của app',
+  sent_at         DATETIME NULL,
+  read_at         DATETIME NULL,
+  push_status     ENUM('Chờ gửi','Đã gửi','Thất bại') NOT NULL DEFAULT 'Chờ gửi',
+  PRIMARY KEY (recipient_id),
+  UNIQUE KEY uq_notif_user (notification_id, user_id),
+  KEY idx_nr_user_unread (user_id, is_read),
+  CONSTRAINT fk_nr_notification FOREIGN KEY (notification_id)
+    REFERENCES notifications (notification_id) ON DELETE CASCADE,
+  CONSTRAINT fk_nr_user FOREIGN KEY (user_id) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO internal_users (user_id, role_id, username, password_hash, full_name, email, phone, avatar_url, bio) VALUES
-  (1,1,'admin',    '$2b$10$l.QBcxMNBEFLd9Hx9TtLd.UgHf6vbeeJTnn1IE5AROMsgjCuLr7.q','Quản trị viên','admin@company.vn','0900000001','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/avatars%2Fuser_1.jpg?alt=media','Quản trị hệ thống, cấu hình & phân quyền.'),
-  (2,2,'manager01','$2b$10$VEImidEYNZ9H9W2JGYgBk.tT9NCEa1CiCzIoE5Oyw/hkguaFOMmSG','Nguyễn Văn Quản','manager@company.vn','0900000002','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/avatars%2Fuser_2.jpg?alt=media','Điều hành đơn hàng & quyết toán, 5 năm kinh nghiệm sự kiện.'),
-  (3,3,'leader01', '$2b$10$Ye4P1qRrfUXSWQYnbWhVV.IzcmMZvWgiRvBb2bSys1gKbrxw/ivIa','Trần Văn Trưởng','leader1@company.vn','0900000003','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/avatars%2Fuser_3.jpg?alt=media','Trưởng nhóm hiện trường, chuyên lắp đặt nhà rạp.'),
-  (4,3,'leader02', '$2b$10$5feKO5nKzYVCTIUA8bS6zOZpcd5.ZhvIo9Om1aZs7Xpy9CgfhlhRW','Lê Thị Nhóm','leader2@company.vn','0900000004','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/avatars%2Fuser_4.jpg?alt=media','Trưởng nhóm trang trí, tỉ mỉ với chi tiết hoa & gallery.'),
-  (5,4,'tech01',   '$2b$10$ExRltfVE5JUQqWI4ECoqTuhm8Q1cWcBh.weAtor3sW4OTFWuN2Cw2','Phạm Văn Kỹ','tech1@company.vn','0900000005','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/avatars%2Fuser_5.jpg?alt=media','Kỹ thuật âm thanh – ánh sáng.'),
-  (6,4,'tech02',   '$2b$10$jPNycqf9mSsvBGrkmZozs.ftBKTTj5OLMf1ezWB6s76q9b.ZlgiPG','Hoàng Văn Thuật','tech2@company.vn','0900000006','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/avatars%2Fuser_6.jpg?alt=media','Kỹ thuật lắp dựng khung & vận chuyển.');
+-- ============ NHÓM KHÁCH HÀNG & CHÍNH SÁCH ============
 
-INSERT INTO customers (customer_id, full_name, phone, email, address) VALUES
-  (1,'Trần Thị Hoa','0933333331','hoa@gmail.com','Cầu Giấy, Hà Nội'),
-  (2,'Công ty TNHH Sự Kiện XYZ','0933333332','xyz@company.vn','Đống Đa, Hà Nội'),
-  (3,'Nguyễn Văn Phúc','0933333333','phuc@gmail.com','Hà Đông, Hà Nội');
+-- [v2] thêm customer_code; status tiếng Việt theo CustomersView
+CREATE TABLE customers (
+  customer_id   BIGINT NOT NULL AUTO_INCREMENT,
+  customer_code VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị KH-001 trên app',
+  customer_name VARCHAR(150) NOT NULL COMMENT 'Trường name của app',
+  phone         VARCHAR(20)  NOT NULL,
+  email         VARCHAR(150) NULL,
+  address       VARCHAR(255) NULL,
+  notes         VARCHAR(500) NULL COMMENT 'Trường notes của app',
+  status        ENUM('Hoạt động','Ngừng hoạt động') NOT NULL DEFAULT 'Hoạt động',
+  created_by    BIGINT NOT NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (customer_id),
+  UNIQUE KEY uq_customer_code (customer_code),
+  KEY idx_customer_phone (phone),
+  CONSTRAINT fk_customer_creator FOREIGN KEY (created_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='ordersCount & lastOrderDate của app là giá trị TÍNH từ orders, không lưu cột';
 
-INSERT INTO suppliers (supplier_id, name, contact_person, phone, address) VALUES
-  (1,'Cho thuê thiết bị Minh Anh','Anh Minh','0911111111','Hà Nội'),
-  (2,'Hoa tươi Phương Nam','Chị Nam','0922222222','Hà Nội');
+-- [v2] theo PoliciesView: code, name, description, policy_value, unit(Ngày/%/VNĐ), updated_by
+CREATE TABLE business_policies (
+  policy_id    BIGINT NOT NULL AUTO_INCREMENT,
+  policy_code  VARCHAR(30) NOT NULL COMMENT 'Trường code của app',
+  policy_name  VARCHAR(200) NOT NULL,
+  policy_type  ENUM('Đặt cọc','Hủy đơn','Bồi thường','Phụ phí','Lương') NOT NULL
+               COMMENT 'Phân loại nghiệp vụ theo UC-21',
+  description  TEXT NULL,
+  policy_value DECIMAL(15,2) NOT NULL COMMENT 'Trường policy_value của app',
+  unit         ENUM('Ngày','%','VNĐ') NOT NULL COMMENT 'Đơn vị giá trị, đúng 3 option của app',
+  is_active    BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_by   BIGINT NULL COMMENT 'Trường updated_by của app',
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (policy_id),
+  UNIQUE KEY uq_policy_code (policy_code),
+  KEY idx_policy_type_active (policy_type, is_active),
+  CONSTRAINT fk_policy_updater FOREIGN KEY (updated_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO business_policies (policy_id, policy_type, name, config, effective_from, created_by) VALUES
-  (1,'deposit','Cọc 30%','{"deposit_percent":30}','2026-01-01',1),
-  (2,'cancellation','Hủy theo mốc','{"before_7d":0,"within_7d":50,"within_2d":100}','2026-01-01',1),
-  (3,'compensation','Đền bù giá thay thế','{"basis":"replacement_value","rate":100}','2026-01-01',1),
-  (4,'additional_fee','Phụ phí phát sinh','{"overtime_per_hour":100000}','2026-01-01',1);
+-- ============ NHÓM THIẾT BỊ & KHO (1 kho duy nhất — không có bảng warehouses) ============
 
-INSERT INTO equipment (equipment_item_id, code, name, category, unit, rental_price, replacement_value) VALUES
-  (1,'TBL-001','Bàn loại to','Bàn','cái',50000,800000),(2,'TBL-002','Bàn loại nhỏ','Bàn','cái',40000,600000),
-  (3,'CHR-001','Ghế đẩu','Ghế','cái',8000,120000),(4,'CHR-002','Ghế inox (y nốc)','Ghế','cái',10000,180000),
-  (5,'CHR-003','Ghế Tiffany tiệc cưới','Ghế','cái',25000,450000),(6,'TXT-001','Khăn bàn màu đỏ','Khăn bàn','cái',15000,150000),
-  (7,'TXT-002','Khăn bàn màu vàng','Khăn bàn','cái',15000,150000),(8,'TXT-003','Khăn bàn màu trắng','Khăn bàn','cái',15000,150000),
-  (9,'TXT-004','Áo ghế','Phụ kiện vải','cái',8000,80000),(10,'TXT-005','Nơ ghế','Phụ kiện vải','cái',3000,30000),
-  (11,'TXT-006','Runner (dải trải bàn)','Phụ kiện vải','cái',10000,90000),(12,'TENT-001','Thanh sắt 2,5m','Khung nhà rạp','thanh',15000,250000),
-  (13,'TENT-002','Thanh sắt 3m','Khung nhà rạp','thanh',18000,300000),(14,'TENT-003','Thanh sắt 4m','Khung nhà rạp','thanh',22000,400000),
-  (15,'TENT-004','Cột chống','Khung nhà rạp','cái',10000,200000),(16,'TENT-005','Mẩu sắt nối','Khung nhà rạp','cái',2000,30000),
-  (17,'TENT-006','Bạt trắng','Khung nhà rạp','tấm',50000,1200000),(18,'TENT-007','Rèm quây xung quanh','Khung nhà rạp','tấm',40000,800000),
-  (19,'TENT-008','Quây trần nhà','Khung nhà rạp','tấm',60000,1500000),(20,'TENT-009','Đèn nhấp nháy','Khung nhà rạp','bộ',30000,250000),
-  (21,'TENT-010','Đèn chùm','Khung nhà rạp','cái',80000,1500000),(22,'TENT-011','Đèn chạy dọc 20m','Khung nhà rạp','dây',50000,600000),
-  (23,'TENT-012','Quạt công nghiệp','Khung nhà rạp','cái',70000,1800000),(24,'TENT-013','Quạt hơi nước','Khung nhà rạp','cái',100000,3500000),
-  (25,'TENT-014','Thảm cỏ','Khung nhà rạp','cuộn',40000,700000),(26,'TENT-015','Thảm đỏ','Khung nhà rạp','cuộn',45000,800000),
-  (27,'GATE-001','Khung cổng hình tròn','Cổng hoa','cái',150000,2000000),(28,'GATE-002','Khung cổng hình vuông','Cổng hoa','cái',150000,2000000),
-  (29,'GATE-003','Khung cổng hình lục giác','Cổng hoa','cái',160000,2200000),(30,'GATE-004','Cổng vòm bằng sắt','Cổng hoa','cái',200000,2500000),
-  (31,'GATE-005','Cổng vòm bằng nhựa','Cổng hoa','cái',180000,2000000),(32,'FLR-001','Hoa giả cụm - trắng','Hoa giả','cụm',30000,200000),
-  (33,'FLR-002','Hoa giả cụm - hồng','Hoa giả','cụm',30000,200000),(34,'FLR-003','Hoa giả cụm - đỏ','Hoa giả','cụm',30000,200000),
-  (35,'FLR-004','Hoa giả cụm - pastel','Hoa giả','cụm',30000,200000),(36,'FLR-005','Hoa giả cụm - sen đá','Hoa giả','cụm',35000,220000),
-  (37,'FLR-006','Hoa giả dải dài - đa màu','Hoa giả','dải',50000,350000),(38,'GAL-001','Khay bánh cupcake','Phụ kiện gallery','cái',40000,300000),
-  (39,'GAL-002','Khung ảnh trang trí','Phụ kiện gallery','cái',25000,200000),(40,'GAL-003','Hòm tiền mừng - hình ngôi nhà','Phụ kiện gallery','cái',50000,400000),
-  (41,'GAL-004','Hòm tiền mừng - hình hòm thư','Phụ kiện gallery','cái',50000,400000),(42,'GAL-005','Hòm tiền mừng - mica','Phụ kiện gallery','cái',60000,500000),
-  (43,'GAL-006','Bình hoa thủy tinh - nhỏ','Phụ kiện gallery','cái',20000,150000),(44,'GAL-007','Bình hoa thủy tinh - vừa','Phụ kiện gallery','cái',30000,250000),
-  (45,'GAL-008','Bình hoa thủy tinh - lớn','Phụ kiện gallery','cái',40000,400000),(46,'BDR-001','Chữ trên phông','Phông cưới hỏi','bộ',200000,1500000),
-  (47,'BDR-002','Đèn sân khấu','Phông cưới hỏi','cái',100000,2000000),(48,'BDR-003','Trap (khung sân khấu)','Phông cưới hỏi','bộ',300000,5000000),
-  (49,'BDR-004','Phông quây','Phông cưới hỏi','tấm',150000,1500000),(50,'AUD-001','Hệ thống loa đài','Âm thanh','bộ',500000,15000000);
+-- [v5 — theo sơ đồ] Phân cấp danh mục 3 tầng:
+--   item_categories (loại)  ->  item_types (chi tiết loại)  ->  items (item)
+--   item_type_specs (thông tin từng loại): mô tả cấu thành của một chi tiết loại,
+--   VD chi tiết loại "Bàn ghế chavari" = 1 bàn chavari + 6 ghế lớn (chavari).
+--   inventory chỉ nối với items, KHÔNG chứa thông tin danh mục (đúng ghi chú sơ đồ).
 
-INSERT INTO company_bank_accounts (bank_account_id, bank_code, account_number, account_name, is_default) VALUES
-  (1,'MB','0900000000000','CONG TY SU KIEN ABC',TRUE);
+-- ===== Bảng LOẠI (vd: Bàn ghế, Cổng hoa, Ấm chén...) =====
+CREATE TABLE item_categories (
+  category_id   BIGINT NOT NULL AUTO_INCREMENT,
+  category_name VARCHAR(100) NOT NULL COMMENT 'Tên loại: Bàn ghế, Cổng hoa, Ấm chén...',
+  description   VARCHAR(255) NULL,
+  PRIMARY KEY (category_id),
+  UNIQUE KEY uq_category_name (category_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LOẠI thiết bị (tầng 1 theo sơ đồ)';
 
-INSERT INTO wage_rules (wage_rule_id, role_in_task, rate_per_session, effective_from) VALUES
-  (1,'leader',500000,'2026-01-01'),(2,'technical',350000,'2026-01-01');
+-- ===== Bảng CHI TIẾT LOẠI (vd: Bàn ghế chavari, Bàn ghế nhỏ thuộc loại Bàn ghế;
+--       Cổng hoa vàng, Cổng hoa hồng thuộc loại Cổng hoa) =====
+CREATE TABLE item_types (
+  type_id     BIGINT NOT NULL AUTO_INCREMENT,
+  category_id BIGINT NOT NULL COMMENT 'Thuộc loại nào',
+  type_name   VARCHAR(150) NOT NULL COMMENT 'Tên chi tiết loại: Bàn ghế chavari, Cổng hoa vàng...',
+  description VARCHAR(255) NULL,
+  PRIMARY KEY (type_id),
+  UNIQUE KEY uq_type_name (category_id, type_name),
+  KEY idx_type_category (category_id),
+  CONSTRAINT fk_type_category FOREIGN KEY (category_id) REFERENCES item_categories (category_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CHI TIẾT LOẠI (tầng 2 theo sơ đồ)';
 
-INSERT INTO orders (order_id, order_number, customer_id, event_date, event_end_date, event_type, guest_count, event_location, total_value, status, revenue_status, recognized_at, created_by) VALUES
-  (1,'DH-2026-0001',1,'2026-05-10','2026-05-11','wedding',300,'Trung tâm tiệc cưới Sao Mai',50000000,'completed','recognized','2026-05-31 18:00:00',2),
-  (2,'DH-2026-0002',2,'2026-06-20',NULL,'corporate',150,'Hội trường công ty XYZ',30000000,'in_progress','pending',NULL,2),
-  (3,'DH-2026-0003',3,'2026-07-15',NULL,'birthday',50,'Nhà văn hóa Hà Đông',18000000,'confirmed','pending',NULL,2);
+-- ===== Bảng ITEM (đơn vị cho thuê thực tế, gắn với chi tiết loại) =====
+CREATE TABLE items (
+  item_id      BIGINT NOT NULL AUTO_INCREMENT,
+  item_code    VARCHAR(30) NOT NULL COMMENT 'Mã thiết bị, VD GHE-CHIAVARI',
+  item_name    VARCHAR(200) NOT NULL,
+  type_id      BIGINT NOT NULL COMMENT 'Thuộc chi tiết loại nào',
+  description  TEXT NULL,
+  unit         VARCHAR(50) NOT NULL DEFAULT 'Cái',
+  rental_price DECIMAL(15,2) NOT NULL DEFAULT 0,
+  price_valid_from DATE NULL COMMENT 'Giá hiệu lực từ',
+  price_valid_to   DATE NULL COMMENT 'Giá hiệu lực đến',
+  image_url    VARCHAR(500) NULL COMMENT 'URL ảnh minh họa thiết bị từ Firebase',
+  status       ENUM('Đang hoạt động','Ngừng hoạt động','Bảo trì') NOT NULL DEFAULT 'Đang hoạt động',
+  created_by   BIGINT NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (item_id),
+  UNIQUE KEY uq_item_code (item_code),
+  KEY idx_item_type (type_id),
+  CONSTRAINT fk_item_type    FOREIGN KEY (type_id)    REFERENCES item_types (type_id),
+  CONSTRAINT fk_item_creator FOREIGN KEY (created_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='ITEM cho thuê (tầng 3); loại của item suy ra qua item_types -> item_categories';
 
-INSERT INTO order_items (id, order_id, equipment_item_id, quantity, unit_price, source) VALUES
-  (1,1,1,20,50000,'internal'),(2,1,5,200,25000,'internal'),(3,1,8,20,15000,'internal'),
-  (4,1,27,1,150000,'internal'),(5,1,50,1,500000,'internal'),(6,1,46,1,200000,'supplier'),
-  (7,2,2,15,40000,'internal'),(8,2,4,150,10000,'internal'),(9,2,50,1,500000,'internal'),
-  (10,3,2,10,40000,'internal'),(11,3,3,80,8000,'internal'),(12,3,27,1,150000,'internal');
+-- ===== Bảng THÔNG TIN TỪNG LOẠI (cấu thành của một chi tiết loại; "có thể là 1" dòng) =====
+CREATE TABLE item_type_specs (
+  spec_id           BIGINT NOT NULL AUTO_INCREMENT,
+  type_id           BIGINT NOT NULL COMMENT 'Chi tiết loại được mô tả',
+  component_item_id BIGINT NULL COMMENT 'Item cấu thành (nếu là thiết bị có trong danh mục)',
+  component_name    VARCHAR(200) NOT NULL COMMENT 'Tên thành phần, VD: bàn chavari, ghế lớn (chavari)',
+  quantity          INT NOT NULL DEFAULT 1 COMMENT 'Số lượng thành phần, VD 1 bàn + 6 ghế',
+  note              VARCHAR(255) NULL,
+  PRIMARY KEY (spec_id),
+  KEY idx_spec_type (type_id),
+  CONSTRAINT fk_spec_type FOREIGN KEY (type_id) REFERENCES item_types (type_id) ON DELETE CASCADE,
+  CONSTRAINT fk_spec_component FOREIGN KEY (component_item_id) REFERENCES items (item_id),
+  CONSTRAINT chk_spec_qty CHECK (quantity > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='THÔNG TIN TỪNG LOẠI: VD Bàn ghế chavari = 1 bàn chavari + 6 ghế lớn';
 
-INSERT INTO quotations (quotation_id, customer_id, order_id, subtotal, tax, discount, total_amount, status, created_by) VALUES
-  (1,1,1,50000000,0,0,50000000,'confirmed',2),(2,2,2,30000000,0,0,30000000,'confirmed',2),(3,3,3,18000000,0,0,18000000,'confirmed',2);
+-- inventory KHÔNG có phần danh mục (đúng sơ đồ) — chỉ nối items qua item_id
+CREATE TABLE inventory (
+  inventory_id      BIGINT NOT NULL AUTO_INCREMENT,
+  item_id           BIGINT NOT NULL,
+  quantity_total    INT NOT NULL DEFAULT 0,
+  quantity_damaged  INT NOT NULL DEFAULT 0,
+  quantity_reserved INT NOT NULL DEFAULT 0 COMMENT 'Sinh tự động từ đơn hàng (UC-13)',
+  quantity_available INT GENERATED ALWAYS AS (quantity_total - quantity_damaged - quantity_reserved) STORED
+                    COMMENT 'Tự tính = total - damaged - reserved',
+  updated_by        BIGINT NULL,
+  updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    COMMENT 'Map sang last_updated của app',
+  PRIMARY KEY (inventory_id),
+  -- Doanh nghiệp chỉ có 1 kho nên mỗi thiết bị đúng 1 dòng tồn kho:
+  UNIQUE KEY uq_inventory_item (item_id),
+  CONSTRAINT fk_inventory_item FOREIGN KEY (item_id) REFERENCES items (item_id),
+  CONSTRAINT fk_inventory_updater FOREIGN KEY (updated_by) REFERENCES internal_users (user_id),
+  CONSTRAINT chk_inventory_qty CHECK (quantity_total >= 0 AND quantity_damaged >= 0 AND quantity_reserved >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO quotation_items (id, quotation_id, equipment_item_id, quantity, unit_price, line_total) VALUES
-  (1,1,1,20,50000,1000000),(2,1,5,200,25000,5000000),(3,1,8,20,15000,300000),
-  (4,2,2,15,40000,600000),(5,2,4,150,10000,1500000),(6,3,2,10,40000,400000),(7,3,3,80,8000,640000);
+-- ============ NHÓM BÁO GIÁ (QuotationsView) ============
 
-INSERT INTO payment_requests (payment_request_id, order_id, payment_type, amount, method_hint, bank_account_id, transfer_code, status, created_by) VALUES
-  (1,1,'deposit',15000000,'bank_transfer',1,'DH1COC','paid',2),
-  (2,1,'final',38500000,'bank_transfer',1,'DH1CK','paid',2),
-  (3,2,'deposit',9000000,'bank_transfer',1,'DH2COC','paid',2),
-  (4,3,'deposit',5400000,'bank_transfer',1,'DH3COC','pending',2);
+-- [v2] thêm quotation_code, version, subtotal, discount_total; status tiếng Việt
+CREATE TABLE quotations (
+  quotation_id   BIGINT NOT NULL AUTO_INCREMENT,
+  quotation_code VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị BG-2026-001',
+  customer_id    BIGINT NOT NULL,
+  version        VARCHAR(10) NOT NULL DEFAULT 'v1.0' COMMENT 'Trường version của app',
+  subtotal       DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT 'Tổng trước giảm giá',
+  discount_total DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT 'Trường discountTotal của app',
+  total_amount   DECIMAL(15,2) NOT NULL DEFAULT 0,
+  status         ENUM('Nháp','Đã duyệt','Từ chối') NOT NULL DEFAULT 'Nháp'
+                 COMMENT 'Đúng 3 trạng thái QuotationsView lọc',
+  notes          VARCHAR(500) NULL,
+  created_by     BIGINT NOT NULL,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Map sang createdAt của app',
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (quotation_id),
+  UNIQUE KEY uq_quotation_code (quotation_code),
+  KEY idx_quotation_customer (customer_id),
+  KEY idx_quotation_status (status),
+  CONSTRAINT fk_quotation_customer FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
+  CONSTRAINT fk_quotation_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO payments (payment_id, payment_request_id, order_id, amount, method, status, paid_at, confirmed_by, confirmed_at) VALUES
-  (1,1,1,15000000,'bank_transfer','success','2026-04-20 09:30:00',2,'2026-04-20 09:45:00'),
-  (2,2,1,38500000,'bank_transfer','success','2026-05-10 20:00:00',2,'2026-05-10 20:15:00'),
-  (3,3,2,9000000,'bank_transfer','success','2026-06-01 08:30:00',2,'2026-06-01 08:45:00');
+-- [v2] item_id nullable + snapshot name/category/unit + discount theo dòng (QuotationItem của app)
+CREATE TABLE quotation_items (
+  quotation_item_id BIGINT NOT NULL AUTO_INCREMENT,
+  quotation_id BIGINT NOT NULL,
+  item_id      BIGINT NULL COMMENT 'FK items; NULL nếu là mục nhập tay',
+  item_name    VARCHAR(200) NOT NULL COMMENT 'Snapshot trường name',
+  category     VARCHAR(100) NULL COMMENT 'Snapshot trường category',
+  unit         VARCHAR(50) NOT NULL DEFAULT 'Cái',
+  quantity     INT NOT NULL,
+  price        DECIMAL(15,2) NOT NULL COMMENT 'Trường price của app',
+  discount     DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT 'Giảm giá theo dòng',
+  line_total   DECIMAL(15,2) GENERATED ALWAYS AS (quantity * price - discount) STORED,
+  PRIMARY KEY (quotation_item_id),
+  KEY idx_qitem_quotation (quotation_id),
+  CONSTRAINT fk_qitem_quotation FOREIGN KEY (quotation_id) REFERENCES quotations (quotation_id) ON DELETE CASCADE,
+  CONSTRAINT fk_qitem_item      FOREIGN KEY (item_id)      REFERENCES items (item_id),
+  CONSTRAINT chk_qitem_qty CHECK (quantity > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO settlements (settlement_id, order_id, original_value, change_adjustment, additional_fee, compensation, total_amount, total_paid, remaining_amount, payment_method, recorded_by, status, confirmed_by) VALUES
-  (1,1,50000000,2000000,500000,1000000,53500000,53500000,0,'bank_transfer',3,'confirmed',2);
+-- ============ NHÓM ĐƠN HÀNG (OrdersView + OrderAuditView) ============
 
-INSERT INTO schedules (schedule_id, order_id, activity_type, planned_date, location, status, created_by) VALUES
-  (1,1,'survey','2026-04-15','TT tiệc cưới Sao Mai','done',2),
-  (2,1,'preparation','2026-05-09','Kho chính','done',2),
-  (3,1,'execution','2026-05-09','TT tiệc cưới Sao Mai','done',2),
-  (4,1,'collection','2026-05-11','TT tiệc cưới Sao Mai','done',2),
-  (5,2,'survey','2026-05-25','Hội trường XYZ','done',2),
-  (6,2,'preparation','2026-06-19','Kho chính','planned',2),
-  (7,3,'survey','2026-07-01','Nhà văn hóa Hà Đông','planned',2);
+-- [v2] thêm event_type/event_name/guest_count/payment_status; status tiếng Việt đúng app
+CREATE TABLE orders (
+  order_id       BIGINT NOT NULL AUTO_INCREMENT,
+  order_code     VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị DH-2026-001',
+  customer_id    BIGINT NOT NULL,
+  quotation_id   BIGINT NULL COMMENT 'Báo giá gắn với đơn (app link 2 chiều qua cột này)',
+  policy_id      BIGINT NULL,
+  event_type     VARCHAR(100) NOT NULL COMMENT 'Tiệc Cưới Trọn Gói / Hội Nghị Khách Hàng... (option app)',
+  event_name     VARCHAR(200) NULL COMMENT 'Trường eventName của app',
+  event_date     DATE NOT NULL COMMENT 'Trường eventDate của app',
+  location       VARCHAR(255) NOT NULL,
+  guest_count    INT NULL COMMENT 'Trường guestCount của app',
+  total_amount   DECIMAL(15,2) NOT NULL DEFAULT 0,
+  payment_status ENUM('Chưa thanh toán','Đã cọc','Đã thanh toán') NOT NULL DEFAULT 'Chưa thanh toán'
+                 COMMENT 'Trường paymentStatus hiển thị trên OrdersView/OrderAuditView',
+  order_status   ENUM('Mới','Đã xác nhận','Đang thực hiện','Hoàn thành','Đã hủy') NOT NULL DEFAULT 'Mới'
+                 COMMENT 'Trường orderStatus của app (UC-40)',
+  cancel_reason  VARCHAR(500) NULL,
+  notes          VARCHAR(500) NULL,
+  created_by     BIGINT NOT NULL COMMENT 'Manager tạo — map managerName trên OrderAuditView',
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (order_id),
+  UNIQUE KEY uq_order_code (order_code),
+  KEY idx_order_customer (customer_id),
+  KEY idx_order_status (order_status),
+  KEY idx_order_event_date (event_date),
+  CONSTRAINT fk_order_customer  FOREIGN KEY (customer_id)  REFERENCES customers (customer_id),
+  CONSTRAINT fk_order_quotation FOREIGN KEY (quotation_id) REFERENCES quotations (quotation_id),
+  CONSTRAINT fk_order_policy    FOREIGN KEY (policy_id)    REFERENCES business_policies (policy_id),
+  CONSTRAINT fk_order_creator   FOREIGN KEY (created_by)   REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO work_tasks (work_task_id, order_id, schedule_id, task_category, title, status, created_by) VALUES
-  (1,1,1,'survey','Khảo sát địa điểm đơn 1','done',2),
-  (2,2,5,'survey','Khảo sát địa điểm đơn 2','done',2),
-  (3,3,7,'survey','Khảo sát địa điểm đơn 3','assigned',2),
-  (4,1,2,'operation','Chuẩn bị & xuất kho đơn 1','done',2),
-  (5,1,3,'operation','Thi công lắp đặt đơn 1','done',2),
-  (6,1,4,'operation','Thu hồi đơn 1','done',2),
-  (7,2,6,'operation','Chuẩn bị & xuất kho đơn 2','in_progress',2);
+CREATE TABLE order_items (
+  order_item_id BIGINT NOT NULL AUTO_INCREMENT,
+  order_id     BIGINT NOT NULL,
+  item_id      BIGINT NOT NULL,
+  quantity     INT NOT NULL,
+  unit_price   DECIMAL(15,2) NOT NULL,
+  subtotal     DECIMAL(15,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
+  source       ENUM('Kho nội bộ','Nhà cung cấp') NOT NULL DEFAULT 'Kho nội bộ',
+  prepared_qty INT NOT NULL DEFAULT 0 COMMENT 'Số lượng đã soạn tại kho — thay cho pick list (UC-57, 75)',
+  prepared_by  BIGINT NULL COMMENT 'Nhân viên soạn hàng dòng này',
+  notes        VARCHAR(255) NULL,
+  PRIMARY KEY (order_item_id),
+  UNIQUE KEY uq_order_item (order_id, item_id),
+  CONSTRAINT fk_oitem_order FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE,
+  CONSTRAINT fk_oitem_item  FOREIGN KEY (item_id)  REFERENCES items (item_id),
+  CONSTRAINT fk_oitem_preparer FOREIGN KEY (prepared_by) REFERENCES internal_users (user_id),
+  CONSTRAINT chk_oitem_qty CHECK (quantity > 0 AND prepared_qty >= 0 AND prepared_qty <= quantity)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='Pick list = query order_items (source=Kho nội bộ) của đơn, gắn với schedule_plans đầu việc Chuẩn bị';
 
-INSERT INTO assignments (assignment_id, work_task_id, user_id, role_in_task) VALUES
-  (1,1,3,'leader'),(2,1,5,'technical'),(3,4,3,'leader'),(4,4,5,'technical'),
-  (5,5,3,'leader'),(6,5,6,'technical'),(7,6,3,'leader'),(8,2,4,'leader'),(9,7,4,'leader');
+-- [v2] BẢNG MỚI: cảnh báo đơn hàng — OrderAuditView có warnings[] và cho phép "resolve"
+CREATE TABLE order_warnings (
+  warning_id  BIGINT NOT NULL AUTO_INCREMENT,
+  order_id    BIGINT NOT NULL,
+  content     VARCHAR(500) NOT NULL COMMENT 'Nội dung cảnh báo rủi ro',
+  is_resolved BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Admin xóa bỏ cảnh báo trên OrderAuditView',
+  resolved_by BIGINT NULL,
+  resolved_at DATETIME NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (warning_id),
+  KEY idx_warning_order (order_id, is_resolved),
+  CONSTRAINT fk_warning_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id) ON DELETE CASCADE,
+  CONSTRAINT fk_warning_resolver FOREIGN KEY (resolved_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO task_progress_updates (id, work_task_id, updated_by, step, progress_status, note, created_at) VALUES
-  (1,5,3,'transport','transport','Đã vận chuyển tới địa điểm','2026-05-09 15:00:00'),
-  (2,5,3,'installation','installation','Lắp xong khung rạp','2026-05-09 20:00:00'),
-  (3,5,3,'handover','done','Hoàn tất bàn giao','2026-05-10 10:00:00'),
-  (4,7,4,'transport','transport','Đang vận chuyển','2026-06-19 14:00:00');
+-- ============ NHÓM ĐẦU VIỆC & LỊCH TRÌNH & CHẤM CÔNG ============
 
-INSERT INTO attendance (attendance_id, assignment_id, check_in, check_out, completion_status, confirmed_by, confirmed_at) VALUES
-  (1,3,'2026-05-08 08:00:00','2026-05-08 12:00:00','completed',3,'2026-05-08 12:10:00'),
-  (2,4,'2026-05-08 08:00:00','2026-05-08 12:00:00','completed',3,'2026-05-08 12:10:00'),
-  (3,5,'2026-05-09 08:00:00','2026-05-10 11:00:00','completed',3,'2026-05-10 11:10:00'),
-  (4,6,'2026-05-09 08:00:00','2026-05-10 11:00:00','completed',3,'2026-05-10 11:10:00'),
-  (5,7,'2026-05-11 08:00:00','2026-05-11 12:00:00','completed',3,'2026-05-11 12:10:00');
+-- [v6 — theo yêu cầu] WORK_TASKS là DANH MỤC các đầu công việc
+-- (Khảo sát, Giám sát, Thi công, Thu hồi...). Chi tiết giao việc nằm ở schedule_plans.
+CREATE TABLE work_tasks (
+  task_id     BIGINT NOT NULL AUTO_INCREMENT,
+  task_code   VARCHAR(20) NOT NULL,
+  task_name   VARCHAR(150) NOT NULL COMMENT 'Đầu công việc: Khảo sát, Giám sát, Thi công, Thu hồi...',
+  description VARCHAR(255) NULL,
+  is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+  PRIMARY KEY (task_id),
+  UNIQUE KEY uq_task_code (task_code),
+  UNIQUE KEY uq_task_name (task_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='DANH MỤC đầu công việc (Order has Work Task thông qua schedule_plans)';
 
-INSERT INTO staff_availability (id, user_id, work_date, status, note) VALUES
-  (1,3,'2026-05-09','available',NULL),(2,5,'2026-05-09','available',NULL),
-  (3,6,'2026-05-09','available',NULL),(4,4,'2026-05-09','unavailable','Nghỉ phép'),(5,4,'2026-06-19','available',NULL);
+-- [v6] SCHEDULE_PLANS: chi tiết đầu việc — giao cho AI, NGÀY nào, ở đâu, trạng thái;
+-- có evidence_id lưu ảnh minh chứng BÀN GIAO/hoàn thành đầu việc (đẩy vào evidences).
+CREATE TABLE schedule_plans (
+  plan_id     BIGINT NOT NULL AUTO_INCREMENT,
+  plan_code   VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị SP-001',
+  order_id    BIGINT NOT NULL COMMENT 'Đơn hàng (Schedule Plan planned by Order)',
+  task_id     BIGINT NOT NULL COMMENT 'Đầu công việc từ danh mục work_tasks',
+  assigned_to BIGINT NOT NULL COMMENT 'Đầu việc giao cho ai (User performs Schedule Plan)',
+  start_time  DATETIME NOT NULL COMMENT 'Ngày giờ thực hiện',
+  end_time    DATETIME NULL,
+  location    VARCHAR(255) NULL,
+  status      ENUM('Chờ xử lý','Đã xác nhận','Đang thực hiện','Hoàn thành','Đã hủy') NOT NULL DEFAULT 'Chờ xử lý',
+  evidence_id BIGINT NULL COMMENT 'Ảnh minh chứng bàn giao/hoàn thành đầu việc (lưu ở evidences)',
+  notes       VARCHAR(500) NULL,
+  created_by  BIGINT NOT NULL COMMENT 'Manager tạo lịch',
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (plan_id),
+  UNIQUE KEY uq_plan_code (plan_code),
+  KEY idx_plan_order (order_id),
+  KEY idx_plan_assignee (assigned_to),
+  KEY idx_plan_time (start_time),
+  CONSTRAINT fk_plan_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id),
+  CONSTRAINT fk_plan_task     FOREIGN KEY (task_id)     REFERENCES work_tasks (task_id),
+  CONSTRAINT fk_plan_assignee FOREIGN KEY (assigned_to) REFERENCES internal_users (user_id),
+  CONSTRAINT fk_plan_evidence FOREIGN KEY (evidence_id) REFERENCES evidences (evidence_id),
+  CONSTRAINT fk_plan_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='Chi tiết giao đầu việc: ai làm, ngày nào, ở đâu, trạng thái, minh chứng bàn giao';
 
-INSERT INTO wage_summaries (wage_summary_id, user_id, order_id, period, total_sessions, gross_amount, total_deduction, total_wage, status, confirmed_by) VALUES
-  (1,3,1,'2026-05',2,1000000,0,1000000,'settled',2),
-  (2,5,1,'2026-05',2,700000,50000,650000,'settled',2),
-  (3,6,1,'2026-05',1,350000,0,350000,'settled',2);
+-- [v6] ATTENDANCES: check-in/check-out GẮN VỚI VIỆC ĐƯỢC GIAO (schedule_plans);
+-- ảnh check-in lưu ở evidences qua check_in_evidence_id (User mark Attendance theo ERD).
+CREATE TABLE attendances (
+  attendance_id        BIGINT NOT NULL AUTO_INCREMENT,
+  plan_id              BIGINT NOT NULL COMMENT 'Việc được giao (schedule_plans)',
+  user_id              BIGINT NOT NULL COMMENT 'Nhân viên chấm công',
+  check_in_at          DATETIME NULL,
+  check_in_evidence_id BIGINT NULL COMMENT 'Ảnh check-in — đẩy vào evidences để lưu Firebase (UC-85)',
+  check_out_at         DATETIME NULL COMMENT 'UC-86',
+  note                 VARCHAR(255) NULL,
+  created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (attendance_id),
+  UNIQUE KEY uq_attendance (plan_id, user_id),
+  KEY idx_att_user (user_id),
+  CONSTRAINT fk_att_plan     FOREIGN KEY (plan_id) REFERENCES schedule_plans (plan_id),
+  CONSTRAINT fk_att_user     FOREIGN KEY (user_id) REFERENCES internal_users (user_id),
+  CONSTRAINT fk_att_evidence FOREIGN KEY (check_in_evidence_id) REFERENCES evidences (evidence_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='Chấm công theo việc được giao — đầu vào tính lương (Wage Summary)';
 
-INSERT INTO inventory (equipment_item_id, total_quantity, available_quantity, damaged_quantity) VALUES
-  (1,100,100,0),(2,100,100,0),(3,500,500,0),(4,300,300,0),(5,200,200,0),(6,200,200,0),(7,200,200,0),(8,200,200,0),
-  (9,500,500,0),(10,500,500,0),(11,150,150,0),(12,300,300,0),(13,300,300,0),(14,200,200,0),(15,200,200,0),(16,1000,1000,0),
-  (17,50,50,0),(18,80,80,0),(19,40,40,0),(20,100,100,0),(21,30,30,0),(22,40,40,0),(23,30,30,0),(24,15,13,2),
-  (25,50,50,0),(26,40,40,0),(27,10,10,0),(28,10,10,0),(29,8,8,0),(30,6,6,0),(31,6,6,0),(32,100,100,0),
-  (33,100,100,0),(34,100,100,0),(35,100,100,0),(36,80,80,0),(37,60,60,0),(38,30,30,0),(39,50,50,0),(40,15,15,0),
-  (41,15,15,0),(42,20,20,0),(43,60,60,0),(44,50,50,0),(45,40,40,0),(46,20,20,0),(47,40,40,0),(48,10,10,0),(49,20,20,0),(50,10,10,0);
+-- ============ NHÓM KHẢO SÁT (SurveyView) ============
 
-INSERT INTO inventory_reservations (reservation_id, order_id, event_date, status, created_by) VALUES
-  (1,1,'2026-05-10','fulfilled',2),(2,2,'2026-06-20','reserved',2),(3,3,'2026-07-15','reserved',2);
+-- [v2] thêm report_code + các trường đo đạc hiện trường của app
+CREATE TABLE survey_reports (
+  survey_id    BIGINT NOT NULL AUTO_INCREMENT,
+  report_code  VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị KS-001',
+  order_id     BIGINT NOT NULL,
+  plan_id      BIGINT NULL COMMENT 'Đầu việc Khảo sát liên quan (schedule_plans)',
+  evidence_id  BIGINT NULL COMMENT 'Ảnh hiện trường chính (lưu ở evidences)',
+  survey_date  DATE NOT NULL COMMENT 'Trường surveyDate',
+  location     VARCHAR(255) NOT NULL COMMENT 'Trường location',
+  area         DECIMAL(10,2) NULL COMMENT 'Diện tích m2 (trường area)',
+  length       DECIMAL(10,2) NULL COMMENT 'Chiều dài m (trường length)',
+  width        DECIMAL(10,2) NULL COMMENT 'Chiều rộng m (trường width)',
+  entrance     VARCHAR(255) NULL COMMENT 'Lối vào/bốc dỡ (trường entrance)',
+  site_constraints    TEXT NULL COMMENT 'Ràng buộc hiện trường (trường siteConstraints)',
+  additional_requests TEXT NULL COMMENT 'Yêu cầu phát sinh (trường additionalRequests)',
+  proposed_items      TEXT NULL COMMENT 'Thiết bị đề xuất (trường proposedItems)',
+  notes        VARCHAR(500) NULL,
+  status       ENUM('Nháp','Cần xem xét','Đã nộp','Đã xác nhận') NOT NULL DEFAULT 'Nháp'
+               COMMENT '3 trạng thái SurveyView + Đã xác nhận khi Manager confirm (UC-55)',
+  reported_by  BIGINT NOT NULL,
+  confirmed_by BIGINT NULL,
+  confirmed_at DATETIME NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (survey_id),
+  UNIQUE KEY uq_report_code (report_code),
+  KEY idx_survey_order (order_id),
+  CONSTRAINT fk_survey_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
+  CONSTRAINT fk_survey_plan      FOREIGN KEY (plan_id)      REFERENCES schedule_plans (plan_id),
+  CONSTRAINT fk_survey_evidence  FOREIGN KEY (evidence_id)  REFERENCES evidences (evidence_id),
+  CONSTRAINT fk_survey_reporter  FOREIGN KEY (reported_by)  REFERENCES internal_users (user_id),
+  CONSTRAINT fk_survey_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='Trường images của app = evidences với ref_type=SURVEY_REPORT';
 
-INSERT INTO inventory_reservation_items (id, reservation_id, equipment_item_id, reserved_quantity) VALUES
-  (1,1,1,20),(2,1,5,200),(3,1,8,20),(4,2,2,15),(5,2,4,150),(6,3,2,10),(7,3,3,80),(8,3,27,1);
+-- ============ NHÓM NHÀ CUNG CẤP & MUA SẮM (SuppliersView) ============
 
-INSERT INTO inventory_reports (inventory_report_id, order_id, report_type, recorded_by, confirmed_by, status, note) VALUES
-  (1,1,'checkout',3,2,'confirmed','Xuất kho đơn 1'),
-  (2,1,'return',3,2,'confirmed','Trả về kho - có hụt'),
-  (3,2,'checkout',4,NULL,'submitted','Xuất kho đơn 2');
+-- [v2] thêm supplier_code, service_type, rating; status tiếng Việt
+CREATE TABLE suppliers (
+  supplier_id   BIGINT NOT NULL AUTO_INCREMENT,
+  supplier_code VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị NCC-001',
+  supplier_name VARCHAR(200) NOT NULL,
+  service_type  VARCHAR(150) NOT NULL COMMENT 'Hoa tươi & Decor / Âm thanh ánh sáng & LED... (option app)',
+  contact_person VARCHAR(150) NULL,
+  phone         VARCHAR(20)  NULL,
+  email         VARCHAR(150) NULL,
+  address       VARCHAR(255) NULL,
+  rating        TINYINT NULL COMMENT 'Đánh giá 1-5 sao (trường rating)',
+  notes         VARCHAR(500) NULL,
+  status        ENUM('Hoạt động','Ngừng hoạt động') NOT NULL DEFAULT 'Hoạt động',
+  created_by    BIGINT NOT NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (supplier_id),
+  UNIQUE KEY uq_supplier_code (supplier_code),
+  CONSTRAINT fk_supplier_creator FOREIGN KEY (created_by) REFERENCES internal_users (user_id),
+  CONSTRAINT chk_supplier_rating CHECK (rating IS NULL OR (rating BETWEEN 1 AND 5))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO inventory_report_items (id, inventory_report_id, equipment_item_id, expected_quantity, quantity, condition_status) VALUES
-  (1,1,1,NULL,20,'good'),(2,1,5,NULL,200,'good'),(3,1,8,NULL,20,'good'),
-  (4,2,1,20,20,'good'),(5,2,5,200,198,'lost'),(6,2,8,20,20,'good'),(7,3,2,NULL,15,'good');
+-- [v2] khớp ProcurementRequest: service_title, estimated_cost, deposit_amount; status tiếng Việt
+CREATE TABLE supplier_transactions (
+  transaction_id   BIGINT NOT NULL AUTO_INCREMENT,
+  transaction_code VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị PR-001',
+  supplier_id      BIGINT NOT NULL,
+  order_id         BIGINT NOT NULL,
+  transaction_type ENUM('Thuê','Mua') NOT NULL DEFAULT 'Thuê',
+  service_title    VARCHAR(255) NOT NULL COMMENT 'Trường serviceTitle của app',
+  estimated_cost   DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT 'Trường estimatedCost',
+  deposit_amount   DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT 'Trường depositAmount',
+  payment_status   ENUM('Chưa thanh toán','Đã cọc','Đã thanh toán') NOT NULL DEFAULT 'Chưa thanh toán'
+                   COMMENT 'UC-60 Record Supplier Payment',
+  status           ENUM('Chờ duyệt','Đã duyệt','Đang thực hiện','Hoàn thành','Đã hủy') NOT NULL DEFAULT 'Chờ duyệt'
+                   COMMENT 'Đúng 5 trạng thái option của SuppliersView',
+  received_by      BIGINT NULL COMMENT 'Leader xác nhận nhận hàng (UC-78)',
+  received_at      DATETIME NULL,
+  returned_by      BIGINT NULL COMMENT 'Leader xác nhận trả hàng thuê (UC-80)',
+  returned_at      DATETIME NULL,
+  notes            VARCHAR(500) NULL,
+  created_by       BIGINT NOT NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (transaction_id),
+  UNIQUE KEY uq_st_code (transaction_code),
+  KEY idx_st_supplier (supplier_id),
+  KEY idx_st_order (order_id),
+  CONSTRAINT fk_st_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id),
+  CONSTRAINT fk_st_order    FOREIGN KEY (order_id)    REFERENCES orders (order_id),
+  CONSTRAINT fk_st_creator  FOREIGN KEY (created_by)  REFERENCES internal_users (user_id),
+  CONSTRAINT fk_st_receiver FOREIGN KEY (received_by) REFERENCES internal_users (user_id),
+  CONSTRAINT fk_st_returner FOREIGN KEY (returned_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO supplier_transactions (supplier_transaction_id, supplier_id, order_id, type, total_cost, paid_amount, payment_status, status, created_by) VALUES
-  (1,1,1,'rental',5000000,5000000,'paid','returned',2),
-  (2,2,2,'purchase',3000000,0,'unpaid','received',2);
+CREATE TABLE supplier_transaction_items (
+  st_item_id     BIGINT NOT NULL AUTO_INCREMENT,
+  transaction_id BIGINT NOT NULL,
+  item_id        BIGINT NULL,
+  item_name      VARCHAR(200) NOT NULL,
+  quantity       INT NOT NULL,
+  unit_cost      DECIMAL(15,2) NOT NULL,
+  subtotal       DECIMAL(15,2) GENERATED ALWAYS AS (quantity * unit_cost) STORED,
+  received_quantity INT NOT NULL DEFAULT 0 COMMENT 'Số thực nhận khi Leader đối chiếu (UC-78)',
+  notes          VARCHAR(255) NULL,
+  PRIMARY KEY (st_item_id),
+  KEY idx_stitem_txn (transaction_id),
+  CONSTRAINT fk_stitem_txn  FOREIGN KEY (transaction_id) REFERENCES supplier_transactions (transaction_id) ON DELETE CASCADE,
+  CONSTRAINT fk_stitem_item FOREIGN KEY (item_id) REFERENCES items (item_id),
+  CONSTRAINT chk_stitem_qty CHECK (quantity > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO supplier_transaction_items (id, supplier_transaction_id, equipment_item_id, description, quantity, quantity_received, quantity_returned, unit_cost) VALUES
-  (1,1,46,'Thuê chữ phông cao cấp',1,1,1,3000000),(2,1,NULL,'Thuê backdrop đặc biệt',1,1,1,2000000),(3,2,NULL,'Mua hoa tươi',1,1,0,3000000);
+-- ============ NHÓM THANH TOÁN & QUYẾT TOÁN (PaymentsView) ============
 
-INSERT INTO supplier_payments (payment_id, supplier_transaction_id, amount, paid_at, recorded_by, note) VALUES
-  (1,1,5000000,'2026-05-20 10:00:00',2,'Thanh toán NCC Minh Anh');
+CREATE TABLE settlements (
+  settlement_id BIGINT NOT NULL AUTO_INCREMENT,
+  order_id      BIGINT NOT NULL,
+  additional_fee DECIMAL(15,2) NOT NULL DEFAULT 0,
+  compensation  DECIMAL(15,2) NOT NULL DEFAULT 0,
+  discount      DECIMAL(15,2) NOT NULL DEFAULT 0,
+  final_amount  DECIMAL(15,2) NOT NULL COMMENT 'Số tiền còn phải thu = tổng + phụ phí + bồi thường - cọc - giảm',
+  payment_method VARCHAR(100) NULL COMMENT 'VD: Chuyển khoản ngân hàng (thủ công)',
+  qr_code_url   VARCHAR(500) NULL COMMENT 'URL ảnh QR quyết toán nhúng số tiền, lưu Firebase (UC-90)',
+  paid_at       DATETIME NULL COMMENT 'Thời điểm khách thanh toán quyết toán',
+  evidence_id   BIGINT NULL COMMENT 'Ảnh minh chứng thanh toán quyết toán (lưu ở evidences, UC-89)',
+  status        ENUM('Nháp','Đã thống nhất','Đã yêu cầu','Đã thanh toán','Đã xác nhận') NOT NULL DEFAULT 'Nháp',
+  requested_by  BIGINT NULL,
+  requested_at  DATETIME NULL,
+  confirmed_by  BIGINT NULL,
+  confirmed_at  DATETIME NULL,
+  notes         VARCHAR(500) NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (settlement_id),
+  KEY idx_settlement_order (order_id),
+  CONSTRAINT fk_settle_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
+  CONSTRAINT fk_settle_evidence  FOREIGN KEY (evidence_id)  REFERENCES evidences (evidence_id),
+  CONSTRAINT fk_settle_requester FOREIGN KEY (requested_by) REFERENCES internal_users (user_id),
+  CONSTRAINT fk_settle_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Quyết toán (Settlement is settled by Order theo ERD)';
 
-INSERT INTO survey_reports (survey_report_id, order_id, work_task_id, site_address, site_condition, feasibility_note, area_sqm, has_power, ground_type, recorded_by, reviewed_by, reviewed_at, review_note, status) VALUES
-  (1,1,1,'TT tiệc cưới Sao Mai','Mặt bằng 200m2, điện 3 pha','Khả thi',200.00,TRUE,'Sân bê tông',3,2,'2026-04-16 09:00:00','Đạt yêu cầu','confirmed'),
-  (2,2,2,'Hội trường XYZ','Trong nhà, điều hòa','Khả thi',150.00,TRUE,'Trong nhà',4,2,'2026-05-26 09:00:00','Đạt','confirmed'),
-  (3,3,3,'Nhà văn hóa Hà Đông','Sân ngoài trời','Cần kiểm tra thời tiết',150.00,FALSE,'Sân ngoài trời',3,NULL,NULL,NULL,'submitted');
+-- [v6 — theo ERD] Bảng DEPOSITS (Deposit is paid by Order): yêu cầu & xác nhận đặt cọc.
+-- Có cột evidence_id lưu ảnh minh chứng chuyển cọc (đẩy vào evidences -> Firebase).
+CREATE TABLE deposits (
+  deposit_id    BIGINT NOT NULL AUTO_INCREMENT,
+  deposit_code  VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị DEP-001',
+  order_id      BIGINT NOT NULL,
+  amount        DECIMAL(15,2) NOT NULL COMMENT 'Số tiền cọc (theo chính sách Đặt cọc)',
+  due_date      DATE NULL COMMENT 'Hạn đặt cọc',
+  payment_date  DATE NULL COMMENT 'Ngày khách chuyển tiền thực tế',
+  payment_method VARCHAR(100) NULL COMMENT 'VD: Chuyển khoản ngân hàng (thủ công)',
+  qr_code_url   VARCHAR(500) NULL COMMENT 'URL ảnh QR nhúng số tiền, lưu Firebase (UC-70)',
+  status        ENUM('Chờ đặt cọc','Thành công','Quá hạn','Đã hủy') NOT NULL DEFAULT 'Chờ đặt cọc',
+  evidence_id   BIGINT NULL COMMENT 'Ảnh minh chứng chuyển cọc (lưu ở evidences, UC-71)',
+  requested_by  BIGINT NOT NULL COMMENT 'Manager tạo yêu cầu cọc (UC-69)',
+  approved_by   BIGINT NULL COMMENT 'Người xác nhận đã nhận cọc',
+  approved_at   DATETIME NULL,
+  notes         VARCHAR(500) NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (deposit_id),
+  UNIQUE KEY uq_deposit_code (deposit_code),
+  KEY idx_deposit_order (order_id),
+  KEY idx_deposit_status (status),
+  CONSTRAINT fk_deposit_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
+  CONSTRAINT fk_deposit_evidence  FOREIGN KEY (evidence_id)  REFERENCES evidences (evidence_id),
+  CONSTRAINT fk_deposit_requester FOREIGN KEY (requested_by) REFERENCES internal_users (user_id),
+  CONSTRAINT fk_deposit_approver  FOREIGN KEY (approved_by)  REFERENCES internal_users (user_id),
+  CONSTRAINT chk_deposit_amount CHECK (amount > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO change_requests (change_request_id, order_id, requested_by, type, reason, note_from_leader, estimated_cost, status, executed_at, approved_by, reconciled_by, reconciled_at) VALUES
-  (1,1,3,'add','Khách thêm cổng vòm sắt','Lắp được trong ngày',2000000,'reconciled','2026-05-09 18:00:00',2,2,'2026-05-11 09:00:00'),
-  (2,2,4,'replace','Đổi ghế inox sang Tiffany','Cần xác nhận màu',300000,'pending',NULL,NULL,NULL,NULL);
+-- ============ NHÓM THU HỒI & XUẤT NHẬP KHO (Staff app — giữ theo Use Case) ============
 
-INSERT INTO change_request_items (id, change_request_id, equipment_item_id, quantity, action, note) VALUES
-  (1,1,30,1,'add','Cổng vòm lối vào'),(2,2,4,20,'replace','Nâng cấp ghế tiệc');
+CREATE TABLE collected_equipment_reports (
+  report_id      BIGINT NOT NULL AUTO_INCREMENT,
+  order_id       BIGINT NOT NULL,
+  report_type    ENUM('Kho công ty','Nhà cung cấp') NOT NULL,
+  transaction_id BIGINT NULL,
+  status         ENUM('Đã nộp','Đã xác nhận') NOT NULL DEFAULT 'Đã nộp',
+  reported_by    BIGINT NOT NULL,
+  confirmed_by   BIGINT NULL,
+  confirmed_at   DATETIME NULL,
+  notes          VARCHAR(500) NULL,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (report_id),
+  KEY idx_cer_order (order_id),
+  CONSTRAINT fk_cer_order     FOREIGN KEY (order_id)       REFERENCES orders (order_id),
+  CONSTRAINT fk_cer_txn       FOREIGN KEY (transaction_id) REFERENCES supplier_transactions (transaction_id),
+  CONSTRAINT fk_cer_reporter  FOREIGN KEY (reported_by)    REFERENCES internal_users (user_id),
+  CONSTRAINT fk_cer_confirmer FOREIGN KEY (confirmed_by)   REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO handover_records (handover_id, order_id, recorded_by, confirmed_by, status, note) VALUES
-  (1,1,3,2,'confirmed','Bàn giao hoàn tất, khách ký nhận');
+CREATE TABLE collected_equipment_report_items (
+  cer_item_id    BIGINT NOT NULL AUTO_INCREMENT,
+  report_id      BIGINT NOT NULL,
+  item_id        BIGINT NOT NULL,
+  good_quantity  INT NOT NULL DEFAULT 0,
+  damaged_quantity INT NOT NULL DEFAULT 0,
+  lost_quantity  INT NOT NULL DEFAULT 0,
+  notes          VARCHAR(255) NULL,
+  PRIMARY KEY (cer_item_id),
+  UNIQUE KEY uq_cer_item (report_id, item_id),
+  CONSTRAINT fk_ceritem_report FOREIGN KEY (report_id) REFERENCES collected_equipment_reports (report_id) ON DELETE CASCADE,
+  CONSTRAINT fk_ceritem_item   FOREIGN KEY (item_id)   REFERENCES items (item_id),
+  CONSTRAINT chk_cer_qty CHECK (good_quantity >= 0 AND damaged_quantity >= 0 AND lost_quantity >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO damage_loss_reports (damage_loss_id, order_id, recorded_by, confirmed_by, total_compensation, status) VALUES
-  (1,1,3,2,1000000,'confirmed');
+CREATE TABLE inventory_movements (
+  movement_id   BIGINT NOT NULL AUTO_INCREMENT,
+  item_id       BIGINT NOT NULL,
+  order_id      BIGINT NULL,
+  report_id     BIGINT NULL,
+  movement_type ENUM('Xuất kho','Nhập kho','Điều chỉnh') NOT NULL,
+  quantity      INT NOT NULL,
+  performed_by  BIGINT NOT NULL,
+  notes         VARCHAR(255) NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (movement_id),
+  KEY idx_move_item (item_id),
+  KEY idx_move_order (order_id),
+  KEY idx_move_time (created_at),
+  CONSTRAINT fk_move_item      FOREIGN KEY (item_id)      REFERENCES items (item_id),
+  CONSTRAINT fk_move_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
+  CONSTRAINT fk_move_report    FOREIGN KEY (report_id)    REFERENCES collected_equipment_reports (report_id),
+  CONSTRAINT fk_move_performer FOREIGN KEY (performed_by) REFERENCES internal_users (user_id),
+  CONSTRAINT chk_move_qty CHECK (quantity > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO damage_loss_items (id, damage_loss_id, equipment_item_id, quantity, damage_type, source, supplier_transaction_item_id, compensation_amount) VALUES
-  (1,1,5,2,'lost','internal',NULL,900000),(2,1,46,1,'damaged','supplier',1,100000);
+-- ============ NHÓM CÔNG & LƯƠNG (WagesView) ============
 
-INSERT INTO notifications (notification_id, user_id, type, title, content, priority, target_screen, target_ref_type, target_ref_id, is_read, push_status, push_sent_at, fcm_message_id) VALUES
-  (1,3,'task','Bạn được giao khảo sát','Khảo sát địa điểm đơn 1','normal','task_detail','work_task',1,TRUE,'sent','2026-04-15 08:05:00','projects/bnwems/messages/1'),
-  (2,2,'operational','Cần xác nhận bàn giao','Đơn 1 có handover chờ duyệt','high','handover_detail','handover_record',1,TRUE,'sent','2026-05-10 10:05:00','projects/bnwems/messages/2'),
-  (3,2,'operational','Cần phê duyệt phát sinh','Đơn 2 yêu cầu đổi thiết bị','high','change_request_detail','change_request',2,FALSE,'sent','2026-06-15 09:00:00','projects/bnwems/messages/3'),
-  (4,4,'task','Bạn được giao việc','Chuẩn bị & xuất kho đơn 2','normal','task_detail','work_task',7,FALSE,'failed',NULL,NULL);
+-- [v2] ĐỔI CẤU TRÚC: app tính lương theo TỪNG ĐƠN HÀNG (WageRecord), không theo kỳ tháng
+CREATE TABLE wage_records (
+  wage_id     BIGINT NOT NULL AUTO_INCREMENT,
+  wage_code   VARCHAR(20) NOT NULL COMMENT 'Mã hiển thị LC-001',
+  order_id    BIGINT NOT NULL COMMENT 'Đơn hàng phát sinh công (trường orderId)',
+  user_id     BIGINT NOT NULL COMMENT 'Nhân viên (app hiển thị staffName qua join)',
+  wage_role   ENUM('Setup Nhân sự','Thi công Decor','Kỹ thuật Âm thanh','Leader Điều phối','MC / Ca sĩ') NOT NULL
+              COMMENT 'Đúng 5 vai trò option của WagesView (trường role)',
+  shifts      INT NOT NULL DEFAULT 1 COMMENT 'Số ca (trường shifts) — đối chiếu bảng attendances',
+  wage_rate   DECIMAL(15,2) NOT NULL COMMENT 'Đơn giá/ca (trường wageRate)',
+  total_wage  DECIMAL(15,2) GENERATED ALWAYS AS (shifts * wage_rate) STORED
+              COMMENT 'Trường totalWage = shifts × wageRate',
+  status      ENUM('Nháp','Chờ duyệt','Đã xác nhận','Đã thanh toán') NOT NULL DEFAULT 'Nháp'
+              COMMENT 'Đúng 4 trạng thái option của WagesView (UC-66)',
+  confirmed_by BIGINT NULL COMMENT 'Manager xác nhận (UC-66)',
+  confirmed_at DATETIME NULL,
+  notes       VARCHAR(255) NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (wage_id),
+  UNIQUE KEY uq_wage_code (wage_code),
+  UNIQUE KEY uq_wage_order_user_role (order_id, user_id, wage_role),
+  CONSTRAINT fk_wage_order     FOREIGN KEY (order_id)     REFERENCES orders (order_id),
+  CONSTRAINT fk_wage_user      FOREIGN KEY (user_id)      REFERENCES internal_users (user_id),
+  CONSTRAINT fk_wage_confirmer FOREIGN KEY (confirmed_by) REFERENCES internal_users (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO device_tokens (device_token_id, user_id, fcm_token, platform, device_name, last_used_at) VALUES
-  (1,2,'fcm_demo_manager01_0001','android','Manager Pixel 7','2026-06-29 08:00:00'),
-  (2,3,'fcm_demo_leader01_0002','android','Leader Samsung A52','2026-06-28 18:00:00'),
-  (3,5,'fcm_demo_tech01_0003','ios','Tech iPhone 12','2026-06-28 17:00:00');
+-- =====================================================================
+-- ==================  DỮ LIỆU MẪU (SEED DATA)  ========================
+-- Catalog theo danh sách thiết bị THỰC TẾ của doanh nghiệp (đồ cưới hỏi,
+-- nhà rạp); 28 nhân sự (1 Admin, 2 Manager, 5 Leader, 20 Technical);
+-- địa điểm lắp đặt thực tế trên địa bàn Hà Nội; 1 kho duy nhất
+-- (địa chỉ kho: thôn Lai Xá, xã Kim Chung, huyện Hoài Đức, Hà Nội).
+-- =====================================================================
 
-INSERT INTO evidence (evidence_id, ref_type, ref_id, order_id, storage_path, file_url, file_name, file_size, file_type, uploaded_by) VALUES
-  (1,'survey_report',1,1,'evidences/order_1/survey_1.jpg','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/evidences%2Forder_1%2Fsurvey_1.jpg?alt=media','survey_1.jpg',251000,'image',3),
-  (2,'payment',1,1,'evidences/order_1/pay_1.jpg','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/evidences%2Forder_1%2Fpay_1.jpg?alt=media','pay_1.jpg',252000,'image',2),
-  (3,'payment',2,1,'evidences/order_1/pay_2.jpg','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/evidences%2Forder_1%2Fpay_2.jpg?alt=media','pay_2.jpg',253000,'image',3),
-  (4,'handover_record',1,1,'evidences/order_1/handover_1.jpg','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/evidences%2Forder_1%2Fhandover_1.jpg?alt=media','handover_1.jpg',254000,'image',3),
-  (5,'damage_loss_report',1,1,'evidences/order_1/damage_1.jpg','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/evidences%2Forder_1%2Fdamage_1.jpg?alt=media','damage_1.jpg',255000,'image',3),
-  (6,'inventory_report',1,1,'evidences/order_1/checkout_1.jpg','https://firebasestorage.googleapis.com/v0/b/bnwems.appspot.com/o/evidences%2Forder_1%2Fcheckout_1.jpg?alt=media','checkout_1.jpg',256000,'image',3);
+-- ---------- 1. NGƯỜI DÙNG: 1 Admin + 2 Manager + 5 Leader + 20 Technical = 28 ----------
+-- Hash là placeholder bcrypt của admin123/manager123 — backend thay bằng hash thật.
+INSERT INTO internal_users (user_id, username, password_hash, full_name, email, phone, address, role, status, avatar_url, bio) VALUES
+(1, 'binhnguyen.admin', '$2a$10$hrmzWv0ZdLH6PxLT1/Cc6ulMmumg2M2x99dp/8ihMK7Vd6tXmyEee', 'Nguyễn Thanh Bình', 'binhnguyen.admin@binhnguyenwems.vn', '0903111222', 'Phường Dịch Vọng, quận Cầu Giấy, Hà Nội', 'Quản trị viên', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Fbinhnguyen.jpg?alt=media', 'Quản trị hệ thống WEMS'),
+(2, 'trinhtran.mgr', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Trần Tuyết Trinh', 'vutuyettrinh2004@gmail.com', '0903222333', 'Phường Mỹ Đình 1, quận Nam Từ Liêm, Hà Nội', 'Quản lý', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Ftrinhtran.jpg?alt=media', 'Quản lý vận hành sự kiện'),
+(3, 'huy.mgr', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Lê Quang Huy', 'huy.mgr@binhnguyenwems.vn', '0903333444', 'Phường Quan Hoa, quận Cầu Giấy, Hà Nội', 'Quản lý', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Fhuy.jpg?alt=media', 'Quản lý kho & cung ứng'),
+(4, 'tuan.leader', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Trần Anh Tuấn', 'tuan.leader@binhnguyenwems.vn', '0904445555', 'Xã An Khánh, huyện Hoài Đức, Hà Nội', 'Trưởng nhóm', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Ftuan.jpg?alt=media', 'Trưởng nhóm thi công lắp đặt'),
+(5, 'tu.leader', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Vũ Đình Tú', 'tu.leader@binhnguyenwems.vn', '0904445556', 'Phường Phú Diễn, quận Bắc Từ Liêm, Hà Nội', 'Trưởng nhóm', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Ftu.jpg?alt=media', 'Trưởng nhóm thi công lắp đặt'),
+(6, 'son.leader', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Ngô Văn Sơn', 'son.leader@binhnguyenwems.vn', '0904445557', 'Xã Kim Chung, huyện Hoài Đức, Hà Nội', 'Trưởng nhóm', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Fson.jpg?alt=media', 'Trưởng nhóm thi công lắp đặt'),
+(7, 'dat.leader', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Đặng Quốc Đạt', 'dat.leader@binhnguyenwems.vn', '0904445558', 'Phường Tây Tựu, quận Bắc Từ Liêm, Hà Nội', 'Trưởng nhóm', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Fdat.jpg?alt=media', 'Trưởng nhóm thi công lắp đặt'),
+(8, 'long.leader', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Phùng Văn Long', 'long.leader@binhnguyenwems.vn', '0904445559', 'Xã Vân Canh, huyện Hoài Đức, Hà Nội', 'Trưởng nhóm', 'Hoạt động', 'https://firebasestorage.googleapis.com/v0/b/wems/o/avatars%2Flong.jpg?alt=media', 'Trưởng nhóm thi công lắp đặt'),
+(9, 'thai.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Phạm Hồng Thái', 'thai.tech@binhnguyenwems.vn', '09120300', 'Phường Cổ Nhuế 1, quận Bắc Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(10, 'nam.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Lê Hoàng Nam', 'nam.tech@binhnguyenwems.vn', '09120301', 'Phường Xuân Phương, quận Nam Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(11, 'hainguyen.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Nguyễn Hải', 'hainguyen.tech@binhnguyenwems.vn', '09120302', 'Phường Mai Dịch, quận Cầu Giấy, Hà Nội', 'Nhân viên kỹ thuật', 'Tạm khóa', NULL, 'Tài khoản bị tạm khóa — test luồng chặn đăng nhập'),
+(12, 'cuong.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Đỗ Mạnh Cường', 'cuong.tech@binhnguyenwems.vn', '09120303', 'Xã Đức Thượng, huyện Hoài Đức, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(13, 'hieu.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Bùi Trung Hiếu', 'hieu.tech@binhnguyenwems.vn', '09120304', 'Phường Yên Nghĩa, quận Hà Đông, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(14, 'quan.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Nguyễn Minh Quân', 'quan.tech@binhnguyenwems.vn', '09120305', 'Phường Cổ Nhuế 1, quận Bắc Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(15, 'duc.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Trần Văn Đức', 'duc.tech@binhnguyenwems.vn', '09120306', 'Phường Xuân Phương, quận Nam Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(16, 'kien.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Hoàng Văn Kiên', 'kien.tech@binhnguyenwems.vn', '09120307', 'Phường Mai Dịch, quận Cầu Giấy, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(17, 'phong.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Đinh Thanh Phong', 'phong.tech@binhnguyenwems.vn', '09120308', 'Xã Đức Thượng, huyện Hoài Đức, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(18, 'tam.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Lưu Văn Tám', 'tam.tech@binhnguyenwems.vn', '09120309', 'Phường Yên Nghĩa, quận Hà Đông, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(19, 'hung.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Nguyễn Việt Hùng', 'hung.tech@binhnguyenwems.vn', '09120310', 'Phường Cổ Nhuế 1, quận Bắc Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(20, 'toan.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Phan Văn Toàn', 'toan.tech@binhnguyenwems.vn', '09120311', 'Phường Xuân Phương, quận Nam Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(21, 'binh.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Vũ Thanh Bình', 'binh.tech@binhnguyenwems.vn', '09120312', 'Phường Mai Dịch, quận Cầu Giấy, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(22, 'dai.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Nguyễn Văn Đại', 'dai.tech@binhnguyenwems.vn', '09120313', 'Xã Đức Thượng, huyện Hoài Đức, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(23, 'khoa.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Lý Đăng Khoa', 'khoa.tech@binhnguyenwems.vn', '09120314', 'Phường Yên Nghĩa, quận Hà Đông, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(24, 'thanh.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Trịnh Quang Thành', 'thanh.tech@binhnguyenwems.vn', '09120315', 'Phường Cổ Nhuế 1, quận Bắc Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(25, 'vinh.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Mai Văn Vinh', 'vinh.tech@binhnguyenwems.vn', '09120316', 'Phường Xuân Phương, quận Nam Từ Liêm, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(26, 'lam.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Hồ Tùng Lâm', 'lam.tech@binhnguyenwems.vn', '09120317', 'Phường Mai Dịch, quận Cầu Giấy, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(27, 'sang.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Chu Văn Sáng', 'sang.tech@binhnguyenwems.vn', '09120318', 'Xã Đức Thượng, huyện Hoài Đức, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt'),
+(28, 'tien.tech', '$2a$10$eBfnpq97VVorXWNjTku..e6XR1r1xb60V5XloVoJdqKzRu9qZ4dCi', 'Ngô Minh Tiến', 'tien.tech@binhnguyenwems.vn', '09120319', 'Phường Yên Nghĩa, quận Hà Đông, Hà Nội', 'Nhân viên kỹ thuật', 'Hoạt động', NULL, 'Nhân viên kỹ thuật lắp đặt');
 
-INSERT INTO audit_logs (log_id, user_id, action, entity_type, entity_id, new_value) VALUES
-  (1,2,'login','internal_users',2,NULL),
-  (2,2,'create','orders',1,'{"status":"draft"}'),
-  (3,2,'confirm','payments',1,'{"status":"success"}'),
-  (4,1,'recognize_revenue','orders',1,'{"period":"2026-05"}');
+-- ---------- 2. DEVICE TOKENS (FCM) ----------
+INSERT INTO device_tokens (user_id, fcm_token, platform, device_name, is_active, last_used_at) VALUES
+(2, 'fcm-token-trinh-web-001', 'web', 'Chrome trên laptop quản lý', TRUE, '2026-07-04 09:15:00'),
+(4, 'fcm-token-tuan-android-001', 'android', 'Samsung Galaxy A54', TRUE, '2026-07-04 07:30:00'),
+(9, 'fcm-token-thai-android-001', 'android', 'Xiaomi Redmi Note 12', TRUE, '2026-07-03 18:00:00');
+
+-- ---------- 3. LOẠI -> CHI TIẾT LOẠI -> ITEM -> THÔNG TIN TỪNG LOẠI (theo sơ đồ) ----------
+INSERT INTO item_categories (category_id, category_name) VALUES
+(1, 'Bàn ghế'),
+(2, 'Khăn bàn & Runner'),
+(3, 'Áo ghế & Nơ ghế'),
+(4, 'Ấm chén'),
+(5, 'Quạt'),
+(6, 'Khung nhà rạp'),
+(7, 'Bạt che'),
+(8, 'Rèm & Quây trần'),
+(9, 'Đèn trang trí'),
+(10, 'Thảm'),
+(11, 'Cổng hoa'),
+(12, 'Hoa giả'),
+(13, 'Phụ kiện bàn gallery'),
+(14, 'Phông cưới hỏi & Sân khấu'),
+(15, 'Loa đài');
+
+INSERT INTO item_types (type_id, category_id, type_name) VALUES
+(1, 1, 'Bàn ghế chavari'),
+(2, 1, 'Bàn ghế nhỏ'),
+(3, 1, 'Bàn lẻ'),
+(4, 1, 'Ghế lẻ'),
+(5, 2, 'Khăn bàn'),
+(6, 2, 'Runner'),
+(7, 3, 'Áo ghế'),
+(8, 3, 'Nơ ghế'),
+(9, 4, 'Bộ ấm chén'),
+(10, 5, 'Quạt công nghiệp'),
+(11, 5, 'Quạt hơi nước'),
+(12, 6, 'Thanh sắt'),
+(13, 6, 'Cột chống & Kèo'),
+(14, 6, 'Mẩu sắt nối'),
+(15, 7, 'Bạt trắng'),
+(16, 8, 'Rèm'),
+(17, 8, 'Quây trần'),
+(18, 9, 'Đèn trang trí'),
+(19, 10, 'Thảm'),
+(20, 11, 'Khung cổng hoa'),
+(21, 11, 'Cổng hoa vàng'),
+(22, 11, 'Cổng hoa hồng'),
+(23, 12, 'Hoa giả'),
+(24, 13, 'Hòm tiền mừng'),
+(25, 13, 'Phụ kiện trang trí gallery'),
+(26, 14, 'Phông cưới hỏi & Sân khấu'),
+(27, 15, 'Hệ thống loa đài');
+
+-- 72 item: 67 thiết bị lẻ + 3 bộ trọn gói + hoa vàng (bổ sung cho Cổng hoa vàng)
+INSERT INTO items (item_id, item_code, item_name, type_id, unit, rental_price, price_valid_from, price_valid_to, status, created_by) VALUES
+(1, 'BAN-TO', 'Bàn loại to', 3, 'Cái', 25000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(2, 'BAN-NHO', 'Bàn loại nhỏ', 3, 'Cái', 15000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(3, 'GHE-DAU', 'Ghế đẩu', 4, 'Cái', 3000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(4, 'GHE-INOX', 'Ghế inox', 4, 'Cái', 5000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(5, 'GHE-CHIAVARI', 'Ghế chiavari', 4, 'Cái', 12000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(6, 'KHAN-DO', 'Khăn bàn màu đỏ', 5, 'Chiếc', 10000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(7, 'KHAN-VANG', 'Khăn bàn màu vàng', 5, 'Chiếc', 10000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(8, 'KHAN-TRANG', 'Khăn bàn màu trắng', 5, 'Chiếc', 10000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(9, 'RUNNER', 'Runner (dải vải trải dọc giữa bàn)', 6, 'Chiếc', 8000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(10, 'AO-GHE', 'Áo ghế', 7, 'Chiếc', 4000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(11, 'NO-GHE', 'Nơ ghế', 8, 'Chiếc', 2000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(12, 'BO-COC-CHEN', 'Bộ cốc, chén, ấm nước', 9, 'Bộ', 15000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(13, 'QUAT-CN', 'Quạt công nghiệp', 10, 'Cái', 80000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(14, 'QUAT-HOI-NUOC', 'Quạt hơi nước', 11, 'Cái', 150000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(15, 'SAT-2M5', 'Thanh sắt 2,5m', 12, 'Thanh', 8000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(16, 'SAT-3M', 'Thanh sắt 3m', 12, 'Thanh', 10000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(17, 'SAT-4M', 'Thanh sắt 4m', 12, 'Thanh', 12000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(18, 'COT-CHONG', 'Cột chống', 13, 'Cái', 15000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(19, 'KEO-RAP', 'Kèo', 13, 'Cái', 15000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(20, 'SAT-LAP-NOC', 'Thanh sắt lắp nóc', 12, 'Thanh', 12000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(21, 'NOI-GOC', 'Mẩu sắt nối góc', 14, 'Cái', 3000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(22, 'NOI-DAU-CONG', 'Mẩu sắt nối dấu cộng (+)', 14, 'Cái', 3000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(23, 'NOI-2-THANH', 'Mẩu nối 2 thanh sắt', 14, 'Cái', 3000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(24, 'NOI-XA-TREN', 'Mẩu nối thanh xà trên', 14, 'Cái', 3000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(25, 'NOI-LAP-NOC', 'Mẩu lắp nóc', 14, 'Cái', 4000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(26, 'NOI-LAP-KEO', 'Mẩu lắp kèo', 14, 'Cái', 4000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(27, 'BAT-3X4', 'Bạt trắng 3x4m', 15, 'Tấm', 40000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(28, 'BAT-4X3', 'Bạt trắng 4x3m', 15, 'Tấm', 40000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(29, 'BAT-4X4', 'Bạt trắng 4x4m', 15, 'Tấm', 50000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(30, 'BAT-4X5', 'Bạt trắng 4x5m', 15, 'Tấm', 60000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(31, 'BAT-6X3', 'Bạt trắng 6x3m', 15, 'Tấm', 60000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(32, 'BAT-6X4', 'Bạt trắng 6x4m', 15, 'Tấm', 70000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(33, 'BAT-6X5', 'Bạt trắng 6x5m', 15, 'Tấm', 80000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(34, 'BAT-6X7', 'Bạt trắng 6x7m', 15, 'Tấm', 100000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(35, 'BAT-6X9', 'Bạt trắng 6x9m', 15, 'Tấm', 120000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(36, 'BAT-8X3', 'Bạt trắng 8x3m', 15, 'Tấm', 80000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(37, 'BAT-8X4', 'Bạt trắng 8x4m', 15, 'Tấm', 100000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(38, 'BAT-8X5', 'Bạt trắng 8x5m', 15, 'Tấm', 120000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(39, 'REM-QUAY', 'Rèm quây xung quanh (đủ màu)', 16, 'Bộ', 50000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(40, 'REM-TAO-SONG', 'Rèm tạo sóng', 16, 'Bộ', 70000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(41, 'QUAY-TRAN', 'Quây trần nhà', 17, 'Bộ', 100000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(42, 'DEN-NHAP-NHAY', 'Đèn nhấp nháy', 18, 'Dây', 15000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(43, 'DEN-CHUM', 'Đèn chùm', 18, 'Cái', 100000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(44, 'DEN-CHAY-DOC-20M', 'Đèn chạy dọc 20m', 18, 'Dây', 120000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(45, 'DEN-CHIM', 'Đèn chim', 18, 'Cái', 30000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(46, 'THAM-CO', 'Thảm cỏ', 19, 'Tấm', 50000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(47, 'THAM-DO', 'Thảm đỏ', 19, 'Cuộn', 80000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(48, 'CONG-HOA-TRON', 'Khung cổng hoa hình tròn', 20, 'Bộ', 200000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(49, 'CONG-HOA-VUONG', 'Khung cổng hoa hình vuông', 20, 'Bộ', 200000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(50, 'CONG-HOA-LUC-GIAC', 'Khung cổng hoa hình lục giác', 20, 'Bộ', 250000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(51, 'CONG-VOM', 'Cổng vòm sắt/nhựa gắn hoa', 20, 'Bộ', 250000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(52, 'HOA-GIA-TRANG', 'Hoa giả tone trắng (cụm/dải)', 23, 'Cụm', 20000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(53, 'HOA-GIA-HONG', 'Hoa giả tone hồng (cụm/dải)', 23, 'Cụm', 20000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(54, 'HOA-GIA-DO', 'Hoa giả tone đỏ (cụm/dải)', 23, 'Cụm', 20000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(55, 'HOA-GIA-PASTEL', 'Hoa giả tone pastel (cụm/dải)', 23, 'Cụm', 20000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(56, 'HOA-GIA-SEN-DA', 'Hoa giả tone sen đá (cụm/dải)', 23, 'Cụm', 20000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(57, 'KHUNG-ANH', 'Khung ảnh trang trí', 25, 'Cái', 20000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(58, 'HOM-TIEN-NHA', 'Hòm tiền mừng hình ngôi nhà', 24, 'Cái', 50000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(59, 'HOM-TIEN-THU', 'Hòm tiền mừng hình hòm thư', 24, 'Cái', 50000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(60, 'HOM-TIEN-MICA', 'Hòm tiền mừng mica trong suốt', 24, 'Cái', 50000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(61, 'BINH-HOA-TT', 'Bình hoa thủy tinh (đủ kích thước)', 25, 'Cái', 15000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(62, 'KHAY-3-TANG', 'Khay 3 tầng để bánh kẹo', 25, 'Cái', 25000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(63, 'CHU-PHONG', 'Chữ trang trí trên phông', 26, 'Bộ', 100000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(64, 'DEN-SAN-KHAU', 'Đèn sân khấu', 26, 'Cái', 120000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(65, 'TRAP-CUOI-HOI', 'Trap ăn cưới hỏi', 26, 'Bộ', 150000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(66, 'PHONG-QUAY', 'Phông quây', 26, 'Bộ', 200000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(67, 'LOA-DAI', 'Hệ thống loa đài', 27, 'Bộ', 1500000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(68, 'BO-BAN-GHE-CHAVARI', 'Bộ bàn ghế chavari (1 bàn to + 6 ghế chiavari)', 1, 'Bộ', 95000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(69, 'BO-BAN-GHE-NHO', 'Bộ bàn ghế nhỏ (1 bàn nhỏ + 6 ghế đẩu)', 2, 'Bộ', 30000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(70, 'HOA-GIA-VANG', 'Hoa giả tone vàng (cụm/dải)', 23, 'Cụm', 20000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(71, 'CONG-HOA-VANG-SET', 'Cổng hoa vàng (khung vòm + hoa giả tone vàng)', 21, 'Bộ', 400000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1),
+(72, 'CONG-HOA-HONG-SET', 'Cổng hoa hồng (khung vòm + hoa giả tone hồng)', 22, 'Bộ', 400000, '2026-01-01', '2026-12-31', 'Đang hoạt động', 1);
+
+-- Thông tin từng loại: cấu thành của các chi tiết loại dạng BỘ ("có thể là 1" dòng trở lên)
+INSERT INTO item_type_specs (type_id, component_item_id, component_name, quantity, note) VALUES
+(1, 1, 'Bàn chavari (bàn loại to)', 1, 'Theo sơ đồ: 1 bàn chavari và 6 ghế lớn (chavari)'),
+(1, 5, 'Ghế lớn (chavari)', 6, NULL),
+(2, 2, 'Bàn loại nhỏ', 1, NULL),
+(2, 3, 'Ghế đẩu', 6, NULL),
+(21, 51, 'Khung cổng vòm', 1, NULL),
+(21, 70, 'Hoa giả tone vàng', 12, 'Cắm sẵn thành cụm phủ khung'),
+(22, 51, 'Khung cổng vòm', 1, NULL),
+(22, 53, 'Hoa giả tone hồng', 12, 'Cắm sẵn thành cụm phủ khung'),
+(9, 12, 'Ấm nước', 1, 'Mỗi bộ gồm 1 ấm + 6 chén + 6 cốc'),
+(9, 12, 'Chén', 6, NULL),
+(9, 12, 'Cốc', 6, NULL);
+
+-- ---------- 5. TỒN KHO (1 kho duy nhất; khả dụng tự tính; giữ chỗ sinh từ đơn) ----------
+INSERT INTO inventory (item_id, quantity_total, quantity_damaged, quantity_reserved, updated_by) VALUES
+(1, 80, 2, 30, 1),
+(2, 60, 0, 20, 1),
+(3, 500, 15, 0, 1),
+(4, 400, 10, 200, 1),
+(5, 400, 5, 300, 1),
+(6, 150, 4, 0, 1),
+(7, 150, 0, 0, 1),
+(8, 150, 6, 30, 1),
+(9, 100, 0, 0, 1),
+(10, 500, 20, 300, 1),
+(11, 600, 0, 300, 1),
+(12, 200, 8, 0, 1),
+(13, 30, 2, 0, 1),
+(14, 12, 1, 0, 1),
+(15, 300, 5, 0, 1),
+(16, 400, 8, 60, 1),
+(17, 200, 4, 0, 1),
+(18, 150, 3, 0, 1),
+(19, 120, 2, 0, 1),
+(20, 150, 0, 0, 1),
+(21, 250, 5, 0, 1),
+(22, 200, 0, 0, 1),
+(23, 300, 6, 0, 1),
+(24, 200, 0, 0, 1),
+(25, 150, 2, 0, 1),
+(26, 150, 0, 0, 1),
+(27, 15, 1, 0, 1),
+(28, 12, 0, 0, 1),
+(29, 15, 0, 0, 1),
+(30, 15, 1, 0, 1),
+(31, 10, 0, 0, 1),
+(32, 12, 0, 0, 1),
+(33, 12, 1, 0, 1),
+(34, 10, 0, 0, 1),
+(35, 10, 2, 6, 1),
+(36, 8, 0, 0, 1),
+(37, 8, 0, 0, 1),
+(38, 8, 1, 0, 1),
+(39, 40, 2, 0, 1),
+(40, 20, 0, 0, 1),
+(41, 15, 1, 0, 1),
+(42, 100, 5, 0, 1),
+(43, 20, 1, 0, 1),
+(44, 15, 0, 0, 1),
+(45, 50, 2, 0, 1),
+(46, 30, 2, 0, 1),
+(47, 15, 1, 2, 1),
+(48, 6, 0, 0, 1),
+(49, 5, 0, 0, 1),
+(50, 4, 0, 0, 1),
+(51, 8, 1, 1, 1),
+(52, 60, 0, 0, 1),
+(53, 60, 0, 0, 1),
+(54, 60, 2, 0, 1),
+(55, 60, 0, 20, 1),
+(56, 40, 0, 0, 1),
+(57, 40, 1, 0, 1),
+(58, 10, 0, 0, 1),
+(59, 10, 0, 0, 1),
+(60, 12, 1, 0, 1),
+(61, 80, 4, 0, 1),
+(62, 60, 2, 0, 1),
+(63, 20, 0, 0, 1),
+(64, 24, 2, 4, 1),
+(65, 10, 0, 0, 1),
+(66, 15, 1, 1, 1),
+(67, 5, 0, 2, 1),
+(68, 40, 0, 0, 1),
+(69, 50, 0, 0, 1),
+(70, 60, 0, 0, 1),
+(71, 4, 0, 0, 1),
+(72, 4, 0, 1, 1);
+
+-- ---------- 6. CHÍNH SÁCH ----------
+INSERT INTO business_policies (policy_id, policy_code, policy_name, policy_type, description, policy_value, unit, is_active, updated_by) VALUES
+(1, 'POL-DEP-30',  'Đặt cọc tối thiểu 30% giá trị đơn',            'Đặt cọc',    'Khách hàng đặt cọc 30% khi xác nhận đơn hàng.',       30,     '%',   TRUE, 1),
+(2, 'POL-CAN-07',  'Hủy đơn trước sự kiện 7 ngày hoàn cọc 100%',   'Hủy đơn',    'Hủy trước 7 ngày: hoàn toàn bộ cọc; sau đó mất cọc.',  7,      'Ngày', TRUE, 1),
+(3, 'POL-COM-100', 'Bồi thường 100% giá trị thiết bị hư hỏng/mất', 'Bồi thường', 'Theo giá trị thiết bị tại thời điểm sự kiện.',         100,    '%',   TRUE, 1),
+(4, 'POL-FEE-OT',  'Phụ phí phát sinh ngoài giờ',                  'Phụ phí',    'Phụ phí cố định mỗi giờ phát sinh sau 22h.',           200000, 'VNĐ', TRUE, 1),
+(5, 'POL-WAGE-CA', 'Đơn giá công chuẩn mỗi ca kỹ thuật',           'Lương',      'Đơn giá tham chiếu khi lập bảng công.',                350000, 'VNĐ', TRUE, 1);
+
+-- ---------- 7. KHÁCH HÀNG (địa bàn Hà Nội) ----------
+INSERT INTO customers (customer_id, customer_code, customer_name, phone, email, address, notes, status, created_by) VALUES
+(1, 'KH-001', 'Nguyễn Văn An',   '0912345678', 'an.nguyen@gmail.com',  'Thôn Ngãi Cầu, xã An Khánh, huyện Hoài Đức, Hà Nội', 'Đám cưới con trai — khách quen', 'Hoạt động', 2),
+(2, 'KH-002', 'Trần Minh Quân',  '0987654321', 'quan.tran@gmail.com',  'Ngõ 68 Xuân Đỉnh, quận Bắc Từ Liêm, Hà Nội',        'Yêu cầu decor tông đỏ truyền thống', 'Hoạt động', 2),
+(3, 'KH-003', 'Công ty TNHH Sao Việt', '0243123456', 'contact@saoviet.vn', 'Tầng 5, tòa nhà CTM, 299 Cầu Giấy, quận Cầu Giấy, Hà Nội', 'Khách doanh nghiệp — hội nghị định kỳ', 'Hoạt động', 3);
+
+-- ---------- 8. BÁO GIÁ ----------
+INSERT INTO quotations (quotation_id, quotation_code, customer_id, version, subtotal, discount_total, total_amount, status, notes, created_by, created_at) VALUES
+(1, 'BG-2026-001', 1, 'v1.0', 18280000, 0, 18280000, 'Đã duyệt', 'Đám cưới 30 mâm tại tư gia — trọn gói nhà rạp + bàn ghế + loa đài', 2, '2026-06-20 09:00:00'),
+(2, 'BG-2026-002', 3, 'v1.0', 9780000, 0, 9780000, 'Nháp',     'Hội nghị khách hàng 200 ghế tại nhà văn hóa', 2, '2026-07-01 10:30:00');
+
+INSERT INTO quotation_items (quotation_id, item_id, item_name, category, unit, quantity, price, discount) VALUES
+(1, 1, 'Bàn loại to', 'Bàn ghế', 'Cái', 30, 25000, 0),
+(1, 5, 'Ghế chiavari', 'Bàn ghế', 'Cái', 300, 12000, 0),
+(1, 8, 'Khăn bàn màu trắng', 'Khăn bàn & Runner', 'Chiếc', 30, 10000, 0),
+(1, 10, 'Áo ghế', 'Áo ghế & Nơ ghế', 'Chiếc', 300, 4000, 0),
+(1, 11, 'Nơ ghế', 'Áo ghế & Nơ ghế', 'Chiếc', 300, 2000, 0),
+(1, 51, 'Cổng vòm sắt/nhựa gắn hoa', 'Cổng hoa', 'Bộ', 1, 250000, 0),
+(1, 55, 'Hoa giả tone pastel (cụm/dải)', 'Hoa giả', 'Cụm', 20, 20000, 0),
+(1, 67, 'Hệ thống loa đài', 'Loa đài', 'Bộ', 1, 1500000, 0),
+(1, 66, 'Phông quây', 'Phông cưới hỏi & Sân khấu', 'Bộ', 1, 200000, 0),
+(1, 47, 'Thảm đỏ', 'Thảm', 'Cuộn', 2, 80000, 0),
+(1, 16, 'Thanh sắt 3m', 'Khung nhà rạp', 'Thanh', 60, 10000, 0),
+(1, 35, 'Bạt trắng 6x9m', 'Bạt che', 'Tấm', 6, 120000, 0),
+(1, NULL, 'Nhân công lắp đặt nhà rạp & setup trọn gói', NULL, 'Gói', 1, 8000000, 0),
+(2, 4, 'Ghế inox', 'Bàn ghế', 'Cái', 200, 5000, 0),
+(2, 2, 'Bàn loại nhỏ', 'Bàn ghế', 'Cái', 20, 15000, 0),
+(2, 67, 'Hệ thống loa đài', 'Loa đài', 'Bộ', 1, 1500000, 0),
+(2, 64, 'Đèn sân khấu', 'Phông cưới hỏi & Sân khấu', 'Cái', 4, 120000, 0),
+(2, 14, 'Quạt hơi nước', 'Quạt', 'Cái', 10, 150000, 0),
+(2, NULL, 'Nhân công setup hội nghị', NULL, 'Gói', 1, 5000000, 0);
+
+-- ---------- 9. ĐƠN HÀNG (địa điểm lắp đặt tại Hà Nội) ----------
+INSERT INTO orders (order_id, order_code, customer_id, quotation_id, policy_id, event_type, event_name, event_date, location, guest_count, total_amount, payment_status, order_status, notes, created_by) VALUES
+(1, 'DH-2026-001', 1, 1, 1, 'Tiệc Cưới Trọn Gói',  'Đám cưới An & Ngọc (30 mâm)',      '2026-07-14', 'Tư gia, thôn Ngãi Cầu, xã An Khánh, huyện Hoài Đức, Hà Nội', 300, 18280000, 'Đã cọc',          'Đã xác nhận', 'Dựng rạp từ chiều hôm trước', 2),
+(2, 'DH-2026-002', 3, 2, 1, 'Hội Nghị Khách Hàng', 'Hội nghị khách hàng Sao Việt Q3',  '2026-08-05', 'Nhà văn hóa phường Dịch Vọng Hậu, quận Cầu Giấy, Hà Nội',    200, 9780000, 'Chưa thanh toán', 'Mới',         'Chờ khách duyệt báo giá', 2),
+(3, 'DH-2026-003', 2, NULL, 1, 'Tiệc Đính Hôn',    'Lễ đính hôn Quân & Hà',            '2026-06-28', 'Tư gia, ngõ 68 Xuân Đỉnh, quận Bắc Từ Liêm, Hà Nội',           80, 5830000, 'Đã thanh toán',   'Hoàn thành',  'Đã quyết toán đầy đủ', 2);
+
+INSERT INTO order_items (order_id, item_id, quantity, unit_price, source, prepared_qty, prepared_by, notes) VALUES
+(1, 1, 30, 25000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 5, 300, 12000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 8, 30, 10000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 10, 300, 4000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 11, 300, 2000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 51, 1, 250000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 55, 20, 20000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 67, 1, 1500000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 66, 1, 200000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 47, 2, 80000, 'Kho nội bộ', 0, NULL, NULL),
+(1, 16, 60, 10000, 'Kho nội bộ', 60, 4, NULL),
+(1, 35, 6, 120000, 'Kho nội bộ', 6, 4, NULL),
+(2, 4, 200, 5000, 'Kho nội bộ', 0, NULL, NULL),
+(2, 2, 20, 15000, 'Kho nội bộ', 0, NULL, NULL),
+(2, 67, 1, 1500000, 'Kho nội bộ', 0, NULL, NULL),
+(2, 64, 4, 120000, 'Kho nội bộ', 0, NULL, NULL),
+(2, 14, 10, 150000, 'Nhà cung cấp', 0, NULL, 'Kho chỉ còn 11 khả dụng — thuê thêm từ NCC'),
+(3, 5, 60, 12000, 'Kho nội bộ', 60, 5, NULL),
+(3, 1, 6, 25000, 'Kho nội bộ', 6, 5, NULL),
+(3, 6, 6, 10000, 'Kho nội bộ', 6, 5, NULL),
+(3, 48, 1, 200000, 'Kho nội bộ', 1, 5, NULL),
+(3, 54, 10, 20000, 'Kho nội bộ', 10, 5, NULL),
+(3, 67, 1, 1500000, 'Kho nội bộ', 1, 5, NULL);
+
+-- ---------- 10. CẢNH BÁO ĐƠN (Audit) ----------
+INSERT INTO order_warnings (order_id, content, is_resolved, resolved_by, resolved_at) VALUES
+(1, 'Số lượng ghế chiavari đặt (300) chiếm phần lớn khả dụng của kho — cần khóa hàng sớm.', FALSE, NULL, NULL),
+(2, 'Đơn chưa có tiền cọc dù đã quá 3 ngày từ khi tạo báo giá.', FALSE, NULL, NULL),
+(3, 'Chênh lệch nhỏ giữa báo giá miệng và giá trị quyết toán.', TRUE, 1, '2026-06-30 09:00:00');
+
+-- ---------- 11. MINH CHỨNG (upload trước, các bảng nghiệp vụ trỏ evidence_id về đây) ----------
+INSERT INTO evidences (evidence_id, file_url, description, uploaded_by) VALUES
+(1, 'https://firebasestorage.googleapis.com/v0/b/wems/o/checkin%2Fsp001-tuan.jpg?alt=media',   'Ảnh check-in đầu việc Khảo sát — Trần Anh Tuấn', 4),
+(2, 'https://firebasestorage.googleapis.com/v0/b/wems/o/checkin%2Fsp001-thai.jpg?alt=media',   'Ảnh check-in đầu việc Khảo sát — Phạm Hồng Thái', 9),
+(3, 'https://firebasestorage.googleapis.com/v0/b/wems/o/checkin%2Fsp005-tu.jpg?alt=media',     'Ảnh check-in đầu việc Thu hồi — Vũ Đình Tú', 5),
+(4, 'https://firebasestorage.googleapis.com/v0/b/wems/o/handover%2Fsp001-hoanthanh.jpg?alt=media', 'Ảnh bàn giao kết quả khảo sát hiện trường', 4),
+(5, 'https://firebasestorage.googleapis.com/v0/b/wems/o/surveys%2Fks001-hientruong.jpg?alt=media', 'Ảnh hiện trường sân dựng rạp (khảo sát KS-001)', 4),
+(6, 'https://firebasestorage.googleapis.com/v0/b/wems/o/handover%2Fsp005-thuhoi.jpg?alt=media','Ảnh bàn giao hoàn tất thu hồi sau lễ đính hôn', 5),
+(7, 'https://firebasestorage.googleapis.com/v0/b/wems/o/deposits%2Fdep001-unc.jpg?alt=media',  'Ủy nhiệm chi đặt cọc đơn DH-2026-001', 2),
+(8, 'https://firebasestorage.googleapis.com/v0/b/wems/o/settlements%2Fpay001-bienlai.jpg?alt=media', 'Biên lai thanh toán quyết toán đơn DH-2026-003', 5);
+
+-- ---------- 12. DANH MỤC ĐẦU CÔNG VIỆC + CHI TIẾT GIAO VIỆC + CHẤM CÔNG ----------
+INSERT INTO work_tasks (task_id, task_code, task_name, description) VALUES
+(1, 'DV-KS', 'Khảo sát',   'Khảo sát hiện trường trước sự kiện'),
+(2, 'DV-GS', 'Giám sát',   'Giám sát vận hành trong sự kiện'),
+(3, 'DV-CB', 'Chuẩn bị',   'Soạn hàng tại kho theo danh sách thiết bị của đơn'),
+(4, 'DV-VC', 'Vận chuyển', 'Vận chuyển thiết bị đến/đi khỏi địa điểm'),
+(5, 'DV-TC', 'Thi công',   'Dựng rạp, lắp đặt, setup'),
+(6, 'DV-BG', 'Bàn giao',   'Bàn giao mặt bằng/thiết bị cho khách'),
+(7, 'DV-TH', 'Thu hồi',    'Thu hồi thiết bị sau sự kiện, phân loại tốt/hỏng/mất'),
+(8, 'DV-HT', 'Hoàn trả',   'Hoàn trả thiết bị về kho hoặc trả nhà cung cấp');
+
+INSERT INTO schedule_plans (plan_id, plan_code, order_id, task_id, assigned_to, start_time, end_time, location, status, evidence_id, notes, created_by) VALUES
+(1, 'SP-001', 1, 1, 4, '2026-07-05 08:00:00', '2026-07-05 09:30:00', 'Tư gia, thôn Ngãi Cầu, xã An Khánh, Hoài Đức, Hà Nội', 'Hoàn thành',     4,    'Đo sân dựng rạp 6x9, kiểm tra nguồn điện', 2),
+(2, 'SP-002', 1, 3, 4, '2026-07-13 08:00:00', '2026-07-13 12:00:00', 'Kho Lai Xá, xã Kim Chung, Hoài Đức, Hà Nội',           'Đang thực hiện', NULL, 'Soạn hàng theo danh sách thiết bị của đơn DH-2026-001', 2),
+(3, 'SP-003', 1, 4, 5, '2026-07-13 13:00:00', '2026-07-13 16:00:00', 'Kho Lai Xá → thôn Ngãi Cầu, An Khánh, Hoài Đức',       'Đã xác nhận',    NULL, 'Xe tải 3,5 tấn, đi 2 chuyến', 2),
+(4, 'SP-004', 1, 5, 4, '2026-07-13 16:00:00', '2026-07-13 21:00:00', 'Tư gia, thôn Ngãi Cầu, xã An Khánh, Hoài Đức, Hà Nội', 'Đã xác nhận',    NULL, 'Dựng khung 6x9 x2 gian, căng bạt, setup 30 mâm', 2),
+(5, 'SP-005', 3, 7, 5, '2026-06-28 21:00:00', '2026-06-28 23:30:00', 'Ngõ 68 Xuân Đỉnh, quận Bắc Từ Liêm, Hà Nội',           'Hoàn thành',     6,    'Thu hồi ngay sau tiệc, phân loại tốt/hỏng/mất', 2),
+(6, 'SP-006', 1, 2, 6, '2026-07-14 09:00:00', '2026-07-14 15:00:00', 'Tư gia, thôn Ngãi Cầu, xã An Khánh, Hoài Đức, Hà Nội', 'Chờ xử lý',      NULL, 'Giám sát vận hành trong tiệc cưới', 2);
+
+INSERT INTO attendances (plan_id, user_id, check_in_at, check_in_evidence_id, check_out_at, note) VALUES
+(1, 4, '2026-07-05 07:55:00', 1, '2026-07-05 09:50:00', NULL),
+(1, 9, '2026-07-05 08:02:00', 2, '2026-07-05 09:50:00', 'Kỹ thuật đi cùng hỗ trợ đo đạc'),
+(5, 5, '2026-06-28 20:55:00', 3, '2026-06-29 00:05:00', NULL);
+
+-- ---------- 14. KHẢO SÁT ----------
+INSERT INTO survey_reports (survey_id, report_code, order_id, plan_id, evidence_id, survey_date, location, area, length, width, entrance, site_constraints, additional_requests, proposed_items, notes, status, reported_by, confirmed_by, confirmed_at) VALUES
+(1, 'KS-001', 1, 1, 5, '2026-07-05', 'Sân trước tư gia, thôn Ngãi Cầu, xã An Khánh, Hoài Đức, Hà Nội', 108.00, 12.00, 9.00, 'Ngõ rộng 4m — xe tải 3,5 tấn vào tận sân', 'Sân nghiêng nhẹ về phía cổng, có 1 cột điện góc sân cần né khi dựng khung', 'Gia đình xin thêm 2 quạt hơi nước vì tiệc giữa trưa', 'Khung rạp 6x9 x2 gian; bạt 6x9 x6; thảm đỏ lối đi; cổng hoa hồng trọn bộ', 'Nguồn điện 3 pha có sẵn ở bếp', 'Đã nộp', 4, 2, '2026-07-05 15:00:00');
+
+-- ---------- 15. NHÀ CUNG CẤP (Hà Nội) & THUÊ NGOÀI ----------
+INSERT INTO suppliers (supplier_id, supplier_code, supplier_name, service_type, contact_person, phone, email, address, rating, status, created_by) VALUES
+(1, 'NCC-001', 'Hoa Lụa Hà Thành',            'Hoa giả & Decor',            'Ngô Thị Lan',  '0911222333', 'lan@hoaluahathanh.vn', 'Phường Quảng An, quận Tây Hồ, Hà Nội',    5, 'Hoạt động', 2),
+(2, 'NCC-002', 'Âm Thanh Ánh Sáng Thăng Long','Loa đài & Đèn sân khấu',     'Đỗ Văn Kiên',  '0922333444', 'kien@thanglongav.vn',  'Phường Mộ Lao, quận Hà Đông, Hà Nội',     4, 'Hoạt động', 2),
+(3, 'NCC-003', 'Thiết Bị Sự Kiện Đại Phát',   'Quạt & Bạt rạp & Bàn ghế',   'Bùi Minh Đức', '0933444555', 'duc@daiphat.vn',       'Xã Hà Hồi, huyện Thường Tín, Hà Nội',     4, 'Hoạt động', 3);
+
+INSERT INTO supplier_transactions (transaction_id, transaction_code, supplier_id, order_id, transaction_type, service_title, estimated_cost, deposit_amount, payment_status, status, notes, created_by) VALUES
+(1, 'PR-001', 3, 2, 'Thuê', 'Thuê 10 quạt hơi nước cho hội nghị Sao Việt (kho nội bộ không đủ)', 1200000, 400000, 'Đã cọc', 'Đã duyệt', 'NCC giao tận nhà văn hóa trước 06:00 ngày sự kiện', 3);
+
+INSERT INTO supplier_transaction_items (transaction_id, item_id, item_name, quantity, unit_cost, received_quantity, notes) VALUES
+(1, 14, 'Quạt hơi nước', 10, 120000, 0, 'Đơn giá thuê/cái/ngày');
+
+-- ---------- 16. ĐẶT CỌC & QUYẾT TOÁN (minh chứng trỏ về evidences) ----------
+INSERT INTO deposits (deposit_id, deposit_code, order_id, amount, due_date, payment_date, payment_method, qr_code_url, status, evidence_id, requested_by, approved_by, approved_at, notes) VALUES
+(1, 'DEP-001', 1, 5484000, '2026-07-08', '2026-07-03', 'Chuyển khoản ngân hàng (thủ công)', 'https://firebasestorage.googleapis.com/v0/b/wems/o/qr%2Fdep001.png?alt=media', 'Thành công',  7,    2, 2, '2026-07-03 14:20:00', 'Cọc 30% theo chính sách POL-DEP-30'),
+(2, 'DEP-002', 2, 2934000, '2026-07-20', NULL,        NULL,                                'https://firebasestorage.googleapis.com/v0/b/wems/o/qr%2Fdep002.png?alt=media', 'Chờ đặt cọc', NULL, 2, NULL, NULL, 'Chờ khách duyệt báo giá BG-2026-002'),
+(3, 'DEP-003', 3, 1749000, '2026-06-20', '2026-06-18', 'Chuyển khoản ngân hàng (thủ công)', NULL, 'Thành công', NULL, 2, 2, '2026-06-18 10:00:00', 'Cọc 30% lễ đính hôn');
+
+INSERT INTO settlements (settlement_id, order_id, additional_fee, compensation, discount, final_amount, payment_method, qr_code_url, paid_at, evidence_id, status, requested_by, requested_at, confirmed_by, confirmed_at, notes) VALUES
+(1, 3, 200000, 150000, 0, 4431000, 'Chuyển khoản ngân hàng (thủ công)', 'https://firebasestorage.googleapis.com/v0/b/wems/o/qr%2Fpay001.png?alt=media', '2026-06-29 10:00:00', 8, 'Đã xác nhận', 5, '2026-06-28 23:00:00', 2, '2026-06-29 10:00:00', 'Phụ phí quá giờ 1h + bồi thường 5 ghế chiavari gãy chân');
+
+-- ---------- 17. THU HỒI & XUẤT NHẬP KHO (đơn DH-2026-003) ----------
+INSERT INTO collected_equipment_reports (report_id, order_id, report_type, status, reported_by, confirmed_by, confirmed_at, notes) VALUES
+(1, 3, 'Kho công ty', 'Đã xác nhận', 5, 2, '2026-06-29 09:00:00', 'Thu hồi sau lễ đính hôn Quân & Hà');
+
+INSERT INTO collected_equipment_report_items (report_id, item_id, good_quantity, damaged_quantity, lost_quantity, notes) VALUES
+(1, 5, 55, 5, 0, '5 ghế chiavari gãy chân — đã tính bồi thường'),
+(1, 1, 6, 0, 0, NULL),
+(1, 48, 1, 0, 0, NULL),
+(1, 67, 1, 0, 0, NULL);
+
+INSERT INTO inventory_movements (item_id, order_id, report_id, movement_type, quantity, performed_by, notes, created_at) VALUES
+(5, 3, NULL, 'Xuất kho', 60, 5, 'Xuất kho phục vụ DH-2026-003', '2026-06-28 08:00:00'),
+(1, 3, NULL, 'Xuất kho', 6, 5, 'Xuất kho phục vụ DH-2026-003', '2026-06-28 08:00:00'),
+(5, 3, 1, 'Nhập kho', 60, 5, 'Nhập lại (55 tốt + 5 hỏng chuyển khu hỏng)', '2026-06-29 09:30:00'),
+(1, 3, 1, 'Nhập kho', 6, 5, 'Nhập kho lại bàn to', '2026-06-29 09:30:00');
+
+-- ---------- 18. CÔNG & LƯƠNG ----------
+INSERT INTO wage_records (wage_id, wage_code, order_id, user_id, wage_role, shifts, wage_rate, status, confirmed_by, confirmed_at, notes) VALUES
+(1, 'LC-001', 3, 5,  'Leader Điều phối',  2, 500000, 'Đã thanh toán', 2, '2026-06-30 09:00:00', 'DH-2026-003: ca sự kiện + ca thu hồi'),
+(2, 'LC-002', 3, 15, 'Setup Nhân sự',     2, 350000, 'Đã thanh toán', 2, '2026-06-30 09:00:00', NULL),
+(3, 'LC-003', 1, 4,  'Leader Điều phối',  3, 500000, 'Đã xác nhận',   2, '2026-07-04 08:00:00', 'DH-2026-001: khảo sát + soạn hàng + thi công'),
+(4, 'LC-004', 1, 10, 'Thi công Decor',    2, 350000, 'Chờ duyệt',     NULL, NULL, NULL),
+(5, 'LC-005', 1, 9,  'Kỹ thuật Âm thanh', 2, 350000, 'Nháp',          NULL, NULL, NULL);
+
+-- ---------- 19. THÔNG BÁO ----------
+INSERT INTO notifications (notification_id, title, content, notification_type, ref_type, ref_id, created_by, created_at) VALUES
+(1, 'Đơn DH-2026-001 đã nhận cọc',      'Khách Nguyễn Văn An đã chuyển cọc 5.484.000đ — đơn chuyển sang Đã xác nhận.', 'Thanh toán', 'Đơn hàng', 1, NULL, '2026-07-03 14:21:00'),
+(2, 'Báo cáo khảo sát KS-001 đã nộp',   'Trần Anh Tuấn đã nộp báo cáo khảo sát tại An Khánh, Hoài Đức — chờ Manager xác nhận.', 'Khảo sát', 'Báo cáo khảo sát', 1, 4, '2026-07-05 10:30:00'),
+(3, 'Nhắc soạn hàng đơn DH-2026-001',   'Danh sách thiết bị đơn DH-2026-001 cần soạn xong trước 12:00 ngày 13/07.', 'Tồn kho', 'Đơn hàng', 1, NULL, '2026-07-04 08:00:00'),
+(4, 'Kho: 5 ghế chiavari hỏng',         'Sau thu hồi DH-2026-003, 5 ghế chiavari gãy chân được chuyển sang số lượng hỏng.', 'Tồn kho', 'Thiết bị', 5, 1, '2026-06-29 09:35:00'),
+(5, 'Người dùng bị tạm khóa',           'Tài khoản hainguyen.tech (Nguyễn Hải) đã bị Admin chuyển sang trạng thái Tạm khóa.', 'Người dùng', 'Người dùng', 11, 1, '2026-07-02 09:00:00');
+
+INSERT INTO notification_recipients (notification_id, user_id, is_read, sent_at, read_at, push_status) VALUES
+(1, 2, TRUE,  '2026-07-03 14:21:05', '2026-07-03 14:25:00', 'Đã gửi'),
+(2, 2, FALSE, '2026-07-05 10:30:05', NULL,                  'Đã gửi'),
+(3, 2, FALSE, '2026-07-04 08:00:05', NULL,                  'Đã gửi'),
+(3, 4, TRUE,  '2026-07-04 08:00:05', '2026-07-04 08:10:00', 'Đã gửi'),
+(4, 1, FALSE, '2026-06-29 09:35:05', NULL,                  'Đã gửi'),
+(5, 1, TRUE,  '2026-07-02 09:00:05', '2026-07-02 09:05:00', 'Đã gửi');
+
+-- ---------- 20. NHẬT KÝ THAO TÁC ----------
+INSERT INTO audit_logs (user_id, action, entity_type, entity_id, new_value, ip_address, created_at) VALUES
+(1, 'Đăng nhập',        NULL,     NULL, NULL,                                    '113.161.35.10', '2026-07-04 07:58:00'),
+(2, 'Tạo đơn hàng',     'Đơn hàng',  1, JSON_OBJECT('order_code','DH-2026-001'), '113.161.35.11', '2026-06-21 09:12:00'),
+(1, 'Cập nhật tồn kho', 'Tồn kho', 5, JSON_OBJECT('quantity_damaged',5),      '113.161.35.10', '2026-06-29 09:35:00'),
+(2, 'Xác nhận đặt cọc', 'Đặt cọc', 1, JSON_OBJECT('status','Thành công'),     '113.161.35.11', '2026-07-03 14:20:00');
+
+-- ============================== HẾT ==================================

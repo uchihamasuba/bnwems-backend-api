@@ -1,16 +1,41 @@
 import { Router } from 'express';
-import * as policyController from '../controllers/policy.controller';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
+import { policyController } from '../controllers/policy.controller';
 import { validate } from '../middlewares/validate.middleware';
-import { getPoliciesSchema, createPolicySchema, updatePolicySchema } from '../validators/policy.validator';
+import {
+  verifyToken as protect,
+  authorizeRoles as restrictTo,
+} from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
+import {
+  getPoliciesSchema,
+  createPolicySchema,
+  updatePolicySchema,
+} from '../validators/policy.validator';
 
 const router = Router();
 
-router.use(authenticate);
-router.use(authorizeRoles('ADMIN'));
+router.get(
+  '/',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(getPoliciesSchema),
+  policyController.getPolicies,
+);
 
-router.get('/', validate(getPoliciesSchema), policyController.getPolicies);
-router.post('/', validate(createPolicySchema), policyController.createPolicy);
-router.put('/:id', validate(updatePolicySchema), policyController.updatePolicy);
+router.post(
+  '/',
+  protect,
+  restrictTo(Role.ADMIN),
+  validate(createPolicySchema),
+  policyController.createPolicy,
+);
+
+router.put(
+  '/:id',
+  protect,
+  restrictTo(Role.ADMIN),
+  validate(updatePolicySchema),
+  policyController.updatePolicy,
+);
 
 export default router;

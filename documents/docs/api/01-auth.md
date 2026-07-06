@@ -41,11 +41,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
       "fullName": "System Admin",
       "avatarUrl": "https://example.com/avatar.jpg",
       "bio": "Quản trị viên hệ thống",
-      "role": {
-        "roleId": 1,
-        "roleName": "Admin"
-      },
-      "status": "active"
+      "role": "Quản trị viên",
+      "status": "Hoạt động"
     }
   }
 }
@@ -124,11 +121,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
     "phone": "+123456789",
     "avatarUrl": "https://example.com/avatar.jpg",
     "bio": "Quản trị viên hệ thống",
-    "role": {
-      "roleId": 1,
-      "roleName": "Admin"
-    },
-    "status": "active",
+    "role": "Quản trị viên",
+    "status": "Hoạt động",
     "createdAt": "2026-06-22T10:00:00Z",
     "updatedAt": "2026-06-22T10:00:00Z"
   }
@@ -162,11 +156,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
     "phone": "+1234567890",
     "avatarUrl": "https://example.com/new-avatar.jpg",
     "bio": "Quản trị viên hệ thống (đã cập nhật)",
-    "role": {
-      "roleId": 1,
-      "roleName": "Admin"
-    },
-    "status": "active",
+    "role": "Quản trị viên",
+    "status": "Hoạt động",
     "createdAt": "2026-06-22T10:00:00Z",
     "updatedAt": "2026-06-22T10:00:00Z"
   }
@@ -180,8 +171,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 - **Request Body:**
 ```json
 {
-  "deviceToken": "fcm_token_string_here",
-  "deviceType": "android" 
+  "fcmToken": "fcm_token_string_here",
+  "platform": "IOS" 
 }
 ```
 - **Response (200 OK):**

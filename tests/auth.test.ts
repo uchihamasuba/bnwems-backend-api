@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { generateTestToken } from './setup/authMock';
 
 describe('Auth API (Module 1)', () => {
-  const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const token = generateTestToken({ userId: '1', role: 'ADMIN' });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -57,10 +57,10 @@ describe('Auth API (Module 1)', () => {
         userId: 1n,
         username: 'admin',
         passwordHash: await bcrypt.hash('correctpass', 10),
-        status: 'active',
+        status: 'ACTIVE',
         role: { roleId: 1n, roleName: 'ADMIN' },
       } as any);
-      
+
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
@@ -80,7 +80,7 @@ describe('Auth API (Module 1)', () => {
       const res = await request(app)
         .post('/api/v1/auth/logout')
         .set('Authorization', `Bearer ${token}`);
-        
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(prismaMock.auditLog.create).toHaveBeenCalled();
@@ -89,7 +89,9 @@ describe('Auth API (Module 1)', () => {
 
   describe('POST /api/v1/auth/forgot-password', () => {
     it('should return 200 if email sent or process initiated', async () => {
-      const res = await request(app).post('/api/v1/auth/forgot-password').send({ username: 'admin' });
+      const res = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ username: 'admin' });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
     });
@@ -114,7 +116,11 @@ describe('Auth API (Module 1)', () => {
       const res = await request(app)
         .put('/api/v1/auth/change-password')
         .set('Authorization', `Bearer ${token}`)
-        .send({ oldPassword: 'wrongold', newPassword: 'newpass123', confirmNewPassword: 'newpass123' });
+        .send({
+          oldPassword: 'wrongold',
+          newPassword: 'newpass123',
+          confirmNewPassword: 'newpass123',
+        });
 
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('MSG-UC02-01');
@@ -131,7 +137,11 @@ describe('Auth API (Module 1)', () => {
       const res = await request(app)
         .put('/api/v1/auth/change-password')
         .set('Authorization', `Bearer ${token}`)
-        .send({ oldPassword: 'realold', newPassword: 'newpass123', confirmNewPassword: 'newpass123' });
+        .send({
+          oldPassword: 'realold',
+          newPassword: 'newpass123',
+          confirmNewPassword: 'newpass123',
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -141,16 +151,19 @@ describe('Auth API (Module 1)', () => {
 
   describe('GET /api/v1/auth/profile', () => {
     it('should return 200 and user profile', async () => {
-      prismaMock.internalUser.findUnique.mockResolvedValue({ username: 'admin', fullName: 'Admin User' } as any);
+      prismaMock.internalUser.findUnique.mockResolvedValue({
+        username: 'admin',
+        fullName: 'Admin User',
+      } as any);
       const res = await request(app)
         .get('/api/v1/auth/profile')
         .set('Authorization', `Bearer ${token}`);
-      
+
       expect(res.status).toBe(200);
       expect(res.body.data.username).toBe('admin');
       expect(res.body.data.fullName).toBe('Admin User');
     });
-    
+
     it('should return 401 if token is not provided', async () => {
       const res = await request(app).get('/api/v1/auth/profile');
       expect(res.status).toBe(401);
@@ -171,7 +184,7 @@ describe('Auth API (Module 1)', () => {
         .put('/api/v1/auth/profile')
         .set('Authorization', `Bearer ${token}`)
         .send({ fullName: 'Updated Admin User', avatarUrl: 'http://example.com/avatar.png' });
-      
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.fullName).toBe('Updated Admin User');
@@ -180,7 +193,9 @@ describe('Auth API (Module 1)', () => {
     });
 
     it('should return 401 if token is not provided', async () => {
-      const res = await request(app).put('/api/v1/auth/profile').send({ fullName: 'Updated Admin User' });
+      const res = await request(app)
+        .put('/api/v1/auth/profile')
+        .send({ fullName: 'Updated Admin User' });
       expect(res.status).toBe(401);
     });
   });
@@ -193,8 +208,8 @@ describe('Auth API (Module 1)', () => {
       const res = await request(app)
         .post('/api/v1/auth/device-token')
         .set('Authorization', `Bearer ${token}`)
-        .send({ deviceToken: 'fcm_token_123', deviceType: 'android' });
-      
+        .send({ deviceToken: 'fcm_token_123', deviceType: 'ANDROID' });
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(prismaMock.deviceToken.create).toHaveBeenCalled();
@@ -205,7 +220,7 @@ describe('Auth API (Module 1)', () => {
         .post('/api/v1/auth/device-token')
         .set('Authorization', `Bearer ${token}`)
         .send({ deviceToken: 'fcm_token_123', deviceType: 'invalid_type' });
-      
+
       expect(res.status).toBe(400);
     });
   });

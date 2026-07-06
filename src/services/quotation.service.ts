@@ -1,184 +1,156 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
+import { QuotationStatus } from '@prisma/client';
 
 class QuotationService {
-  public async getQuotationsByOrder(orderId: string, page: number, limit: number) {
-    const quotations = await prisma.quotation.findMany({
-      where: { orderId: BigInt(orderId) },
-      orderBy: { version: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    
-    const mapped = quotations.map(q => ({
-      ...q,
-      subtotal: q.subtotal,
-      tax: q.tax,
-      discount: q.discount,
-      totalAmount: q.totalAmount
-    }));
+  public async getCustomerQuotations(customerId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
 
-    const totalCount = await prisma.quotation.count({ where: { orderId: BigInt(orderId) } });
+    const [quotations, totalCount] = await Promise.all([
+      prisma.quotation.findMany({
+        where: { customerId: BigInt(customerId) },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.quotation.count({ where: { customerId: BigInt(customerId) } }),
+    ]);
 
-    return { quotations: mapped, totalCount };
+    return { quotations, totalCount };
   }
 
   public async getQuotationById(id: string) {
-    const quotation = await prisma.quotation.findUnique({ 
+    const quotation = await prisma.quotation.findUnique({
       where: { quotationId: BigInt(id) },
-    });
-    if (!quotation) throw new AppError('Không tìm thấy báo giá.', 404);
-    
-    const items = await prisma.quotationItem.findMany({
-      where: { quotationId: BigInt(id) }
-    });
-    
-    return {
-      ...quotation,
-      subtotal: quotation.subtotal,
-      tax: quotation.tax,
-      discount: quotation.discount,
-      items
-    };
-  }
-
-  public async createQuotation(orderId: string, data: any, actionUserId: string) {
-    const { totalAmount, items } = data;
-
-    const order = await prisma.order.findUnique({ where: { orderId: BigInt(orderId) } });
-    if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
-
-    const latestQuote = await prisma.quotation.findFirst({ 
-      where: { orderId: BigInt(orderId) },
-      orderBy: { version: 'desc' }
-    });
-
-    const newVersion = latestQuote ? latestQuote.version + 1 : 1;
-
-    let quote: any;
-    await prisma.$transaction(async (prismaTx) => {
-      quote = await prismaTx.quotation.create({
-        data: {
-          orderId: BigInt(orderId),
-          customerId: order.customerId,
-          subtotal: data.subtotal || totalAmount,
-          tax: data.tax || 0,
-          discount: data.discount || 0,
-          totalAmount,
-          version: newVersion,
-          status: 'draft',
-          createdBy: BigInt(actionUserId),
-        },
-      });
-
-      if (items && items.length > 0) {
-        await prismaTx.quotationItem.createMany({
-          data: items.map((item: any) => ({
-            quotationId: quote.quotationId,
-            equipmentItemId: BigInt(item.equipmentItemId),
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            lineTotal: item.quantity * item.unitPrice
-          }))
-        });
-      }
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: BigInt(actionUserId),
-        action: 'CREATE_QUOTATION',
-        entityType: 'Quotation',
-        entityId: quote.quotationId,
+      include: {
+        items: true,
       },
     });
+    if (!quotation) throw new AppError('Không tìm thấy báo giá.', 404);
 
-    return quote;
+    return quotation;
   }
 
-  public async updateQuotation(id: string, data: any) {
-    const { totalAmount, items } = data;
+  private async prepareQuotationItems(itemsData: any[]) {
+    let subtotal = 0;
+    let discountTotal = 0;
+    const itemIds = itemsData.map((i) => BigInt(i.itemId));
+    const itemsInfo = await prisma.item.findMany({
+      where: { itemId: { in: itemIds } },
+      select: { itemId: true, itemName: true },
+    });
+    const itemMap = new Map(itemsInfo.map((i) => [i.itemId.toString(), i.itemName]));
 
-    const existing = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!existing) throw new AppError('Không tìm thấy báo giá.', 404);
+    const quotationItems = itemsData.map((i: any) => {
+      const discount = i.discount || 0;
+      const lineTotal = i.price * i.quantity - discount;
+      subtotal += i.price * i.quantity;
+      discountTotal += discount;
 
-    if (existing.status === 'confirmed' || existing.status === 'SENT') {
-      throw new AppError('Không thể chỉnh sửa sau khi đã xác nhận.', 400, 'MSG-UC10-04');
+      return {
+        itemId: BigInt(i.itemId),
+        itemName: itemMap.get(i.itemId.toString()) || 'Unknown Item',
+        quantity: i.quantity,
+        price: i.price,
+        discount: discount,
+        lineTotal: lineTotal,
+      };
+    });
+
+    const totalAmount = subtotal - discountTotal;
+    return { subtotal, discountTotal, totalAmount, quotationItems };
+  }
+
+  public async createQuotation(customerId: string, data: any, actionUserId: string) {
+    const { version, notes, items } = data;
+
+    const { subtotal, discountTotal, totalAmount, quotationItems } =
+      await this.prepareQuotationItems(items);
+    const quotationCode = 'QUO-' + Date.now();
+
+    return await prisma.quotation.create({
+      data: {
+        quotationCode,
+        customerId: BigInt(customerId),
+        version,
+        subtotal,
+        discountTotal,
+        totalAmount,
+        status: QuotationStatus.DRAFT,
+        notes,
+        createdBy: BigInt(actionUserId),
+        items: {
+          create: quotationItems,
+        },
+      },
+    });
+  }
+
+  public async updateQuotation(id: string, data: any, actionUserId: string) {
+    const { notes, items } = data;
+
+    const quotation = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
+    if (!quotation) throw new AppError('Không tìm thấy báo giá.', 404);
+    if (
+      quotation.status === QuotationStatus.APPROVED ||
+      quotation.status === QuotationStatus.REJECTED
+    ) {
+      throw new AppError(
+        'Không thể sửa báo giá sau khi đã được duyệt hoặc từ chối.',
+        400,
+        'MSG-UC10-04',
+      );
     }
 
-    await prisma.$transaction(async (prismaTx) => {
-      await prismaTx.quotation.update({
+    const { subtotal, discountTotal, totalAmount, quotationItems } =
+      await this.prepareQuotationItems(items);
+
+    await prisma.$transaction(async (tx) => {
+      // Delete old items
+      await tx.quotationItem.deleteMany({
         where: { quotationId: BigInt(id) },
-        data: { 
-          subtotal: data.subtotal || totalAmount,
-          tax: data.tax || 0,
-          discount: data.discount || 0,
-          totalAmount 
+      });
+
+      // Update quotation and create new items
+      await tx.quotation.update({
+        where: { quotationId: BigInt(id) },
+        data: {
+          subtotal,
+          discountTotal,
+          totalAmount,
+          notes,
+          items: {
+            create: quotationItems,
+          },
         },
       });
-      
-      if (items) {
-        await prismaTx.quotationItem.deleteMany({ where: { quotationId: BigInt(id) } });
-        await prismaTx.quotationItem.createMany({
-          data: items.map((item: any) => ({
-            quotationId: BigInt(id),
-            equipmentItemId: BigInt(item.equipmentItemId),
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            lineTotal: item.quantity * item.unitPrice
-          }))
-        });
-      }
+    });
+
+    return { success: true };
+  }
+
+  public async updateQuotationStatus(id: string, status: QuotationStatus, actionUserId: string) {
+    const quotation = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
+    if (!quotation) throw new AppError('Không tìm thấy báo giá.', 404);
+
+    return await prisma.quotation.update({
+      where: { quotationId: BigInt(id) },
+      data: { status },
     });
   }
 
   public async deleteQuotation(id: string) {
-    const existing = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!existing) throw new AppError('Không tìm thấy báo giá.', 404);
-
-    if (existing.status === 'confirmed') {
-      throw new AppError('Không thể xóa báo giá đã được chấp nhận.', 400, 'MSG-UC10-05');
+    const quotation = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
+    if (!quotation) throw new AppError('Không tìm thấy báo giá.', 404);
+    if (quotation.status === QuotationStatus.APPROVED) {
+      throw new AppError('Không thể xóa báo giá đã được duyệt.', 400);
     }
 
-    await prisma.$transaction(async (prismaTx) => {
-      await prismaTx.quotationItem.deleteMany({ where: { quotationId: BigInt(id) } });
-      await prismaTx.quotation.delete({ where: { quotationId: BigInt(id) } });
+    await prisma.quotation.delete({
+      where: { quotationId: BigInt(id) },
     });
-  }
 
-  public async confirmQuotation(id: string, actionUserId: string) {
-    const quote = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!quote) throw new AppError('Không tìm thấy báo giá.', 404);
-
-    await prisma.$transaction([
-      prisma.quotation.update({ where: { quotationId: BigInt(id) }, data: { status: 'confirmed' } }),
-      prisma.order.update({ where: { orderId: quote.orderId }, data: { status: 'confirmed' } }),
-    ]);
-
-    await prisma.auditLog.create({
-      data: {
-        userId: BigInt(actionUserId),
-        action: 'CONFIRM_QUOTATION',
-        entityType: 'Quotation',
-        entityId: BigInt(id),
-      },
-    });
-  }
-
-  public async updateQuotationStatus(id: string, status: string, actionUserId: string) {
-    const quote = await prisma.quotation.findUnique({ where: { quotationId: BigInt(id) } });
-    if (!quote) throw new AppError('Không tìm thấy báo giá.', 404);
-
-    await prisma.quotation.update({ where: { quotationId: BigInt(id) }, data: { status } });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: BigInt(actionUserId),
-        action: 'UPDATE_QUOTATION_STATUS',
-        entityType: 'Quotation',
-        entityId: BigInt(id),
-      },
-    });
+    return { success: true };
   }
 }
 

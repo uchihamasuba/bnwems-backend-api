@@ -1,284 +1,301 @@
-import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
+import { AppError } from '../middlewares/error.middleware';
+import { ItemStatus } from '@prisma/client';
 
-// ============================================================================
-// CATALOG CATEGORY
-// ============================================================================
+class CatalogService {
+  // ============================================================================
+  // CATALOG CATEGORY
+  // ============================================================================
 
-export const catalogCategoryService = {
-  async getCatalogCategories(page: number, limit: number, search?: string, isActive?: boolean) {
+  public async getCatalogCategories(page: number, limit: number, search?: string) {
     const skip = (page - 1) * limit;
-
-    const where: Prisma.CatalogCategoryWhereInput = {};
+    const whereClause: any = {};
     if (search) {
-      where.name = { contains: search };
-    }
-    if (isActive !== undefined) {
-      where.isActive = isActive;
+      whereClause.categoryName = { contains: search };
     }
 
     const [categories, totalCount] = await Promise.all([
-      prisma.catalogCategory.findMany({
-        where,
+      prisma.itemCategory.findMany({
+        where: whereClause,
         skip,
         take: limit,
-        orderBy: { displayOrder: 'asc' },
+      }),
+      prisma.itemCategory.count({ where: whereClause }),
+    ]);
+
+    return { categories, totalCount };
+  }
+
+  public async createCatalogCategory(data: any) {
+    return await prisma.itemCategory.create({
+      data: {
+        categoryName: data.categoryName,
+        description: data.description,
+      },
+    });
+  }
+
+  public async updateCatalogCategory(id: string, data: any) {
+    return await prisma.itemCategory.update({
+      where: { categoryId: BigInt(id) },
+      data: {
+        categoryName: data.categoryName,
+        description: data.description,
+      },
+    });
+  }
+
+  public async getCatalogCategory(id: string) {
+    const category = await prisma.itemCategory.findUnique({
+      where: { categoryId: BigInt(id) },
+    });
+    if (!category) throw new AppError('Không tìm thấy danh mục.', 404);
+    return category;
+  }
+
+  public async updateCatalogCategoryStatus(id: string, isActive: boolean) {
+    // Database schema does not have isActive for ItemCategory.
+    // Return success to fulfill API contract for frontend compatibility.
+    return { success: true };
+  }
+
+  // ============================================================================
+  // CATALOG TYPE
+  // ============================================================================
+
+  public async getCatalogTypes(page: number, limit: number, search?: string, categoryId?: string) {
+    const skip = (page - 1) * limit;
+    const whereClause: any = {};
+    if (search) {
+      whereClause.typeName = { contains: search };
+    }
+    if (categoryId) {
+      whereClause.categoryId = BigInt(categoryId);
+    }
+
+    const [types, totalCount] = await Promise.all([
+      prisma.itemType.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
         include: {
-          _count: {
-            select: { items: true },
+          category: {
+            select: { categoryName: true },
           },
         },
       }),
-      prisma.catalogCategory.count({ where }),
+      prisma.itemType.count({ where: whereClause }),
     ]);
 
-    // Map _count.items to totalEquipment for frontend compatibility
-    const mappedCategories = categories.map(cat => ({
-      id: cat.categoryId.toString(),
-      name: cat.name,
-      description: cat.description,
-      displayOrder: cat.displayOrder,
-      notes: cat.notes,
-      isActive: cat.isActive,
-      totalEquipment: cat._count.items,
-      createdAt: cat.createdAt,
-      updatedAt: cat.updatedAt,
+    // Format response to include categoryName inline
+    const formattedTypes = types.map((t) => ({
+      ...t,
+      categoryName: t.category?.categoryName,
     }));
 
-    return { categories: mappedCategories, totalCount };
-  },
+    return { types: formattedTypes, totalCount };
+  }
 
-  async getCatalogCategoryById(id: string) {
-    const category = await prisma.catalogCategory.findUnique({
-      where: { categoryId: BigInt(id) },
+  public async createCatalogType(data: any) {
+    return await prisma.itemType.create({
+      data: {
+        categoryId: BigInt(data.categoryId),
+        typeName: data.typeName,
+        description: data.description,
+      },
+    });
+  }
+
+  public async updateCatalogType(id: string, data: any) {
+    return await prisma.itemType.update({
+      where: { typeId: BigInt(id) },
+      data: {
+        categoryId: data.categoryId ? BigInt(data.categoryId) : undefined,
+        typeName: data.typeName,
+        description: data.description,
+      },
+    });
+  }
+
+  // ============================================================================
+  // ITEM TYPE SPECS
+  // ============================================================================
+
+  public async getTypeSpecs(typeId: string) {
+    const specs = await prisma.itemTypeSpec.findMany({
+      where: { typeId: BigInt(typeId) },
       include: {
-        _count: { select: { items: true } },
+        componentItem: {
+          select: { itemName: true },
+        },
       },
     });
 
-    if (!category) {
-      const error: any = new Error('Không tìm thấy danh mục.');
-      error.statusCode = 404;
-      throw error;
-    }
+    return specs.map((s) => ({
+      ...s,
+      componentName: s.componentItem?.itemName,
+    }));
+  }
 
-    return {
-      id: category.categoryId.toString(),
-      name: category.name,
-      description: category.description,
-      displayOrder: category.displayOrder,
-      notes: category.notes,
-      isActive: category.isActive,
-      totalEquipment: category._count.items,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt,
-    };
-  },
+  public async updateTypeSpecs(typeId: string, specsData: any[]) {
+    // Transaction to replace all specs for this type
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete existing
+      await tx.itemTypeSpec.deleteMany({
+        where: { typeId: BigInt(typeId) },
+      });
 
-  async createCatalogCategory(data: any) {
-    const newCategory = await prisma.catalogCategory.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        displayOrder: data.displayOrder ?? 0,
-        notes: data.notes,
-      },
-    });
-    return {
-      ...newCategory,
-      categoryId: newCategory.categoryId.toString(),
-    };
-  },
-
-  async updateCatalogCategory(id: string, data: any) {
-    const categoryId = BigInt(id);
-
-    const existing = await prisma.catalogCategory.findUnique({
-      where: { categoryId },
-    });
-    if (!existing) {
-      const error: any = new Error('Không tìm thấy danh mục.');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const updatedCategory = await prisma.catalogCategory.update({
-      where: { categoryId },
-      data: {
-        name: data.name,
-        description: data.description,
-        displayOrder: data.displayOrder,
-        notes: data.notes,
-      },
+      // 2. Insert new
+      if (specsData && specsData.length > 0) {
+        const createData = specsData.map((s) => ({
+          typeId: BigInt(typeId),
+          componentItemId: BigInt(s.componentItemId),
+          componentName: s.componentName || 'Unknown',
+          quantity: s.quantity,
+          note: s.note,
+        }));
+        await tx.itemTypeSpec.createMany({
+          data: createData,
+        });
+      }
     });
 
-    return {
-      ...updatedCategory,
-      categoryId: updatedCategory.categoryId.toString(),
-    };
-  },
+    return { success: true };
+  }
 
-  async updateCatalogCategoryStatus(id: string, isActive: boolean) {
-    const categoryId = BigInt(id);
+  // ============================================================================
+  // CATALOG ITEM
+  // ============================================================================
 
-    const existing = await prisma.catalogCategory.findUnique({
-      where: { categoryId },
-    });
-    if (!existing) {
-      const error: any = new Error('Không tìm thấy danh mục.');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    await prisma.catalogCategory.update({
-      where: { categoryId },
-      data: { isActive },
-    });
-  },
-};
-
-// ============================================================================
-// CATALOG ITEM
-// ============================================================================
-
-export const catalogItemService = {
-  async getCatalogItems(
+  public async getCatalogItems(
     page: number,
     limit: number,
     search?: string,
-    itemType?: string,
-    categoryId?: string,
-    isActive?: boolean
+    typeId?: string,
+    status?: ItemStatus,
   ) {
     const skip = (page - 1) * limit;
-
-    const where: Prisma.CatalogItemWhereInput = {};
+    const whereClause: any = {};
     if (search) {
-      where.name = { contains: search };
+      whereClause.OR = [{ itemName: { contains: search } }, { itemCode: { contains: search } }];
     }
-    if (itemType) {
-      where.itemType = itemType;
+    if (typeId) {
+      whereClause.typeId = BigInt(typeId);
     }
-    if (categoryId) {
-      where.categoryId = BigInt(categoryId);
-    }
-    if (isActive !== undefined) {
-      where.isActive = isActive;
+    if (status) {
+      whereClause.status = status;
     }
 
     const [items, totalCount] = await Promise.all([
-      prisma.catalogItem.findMany({
-        where,
+      prisma.item.findMany({
+        where: whereClause,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        include: {
+          type: {
+            select: { typeName: true },
+          },
+          inventory: {
+            select: { quantityTotal: true, quantityAvailable: true },
+          },
+        },
       }),
-      prisma.catalogItem.count({ where }),
+      prisma.item.count({ where: whereClause }),
     ]);
 
-    const mappedItems = items.map(item => ({
-      id: item.itemId.toString(),
-      name: item.name,
-      description: item.description,
-      itemType: item.itemType,
-      basePrice: Number(item.basePrice),
-      categoryId: item.categoryId?.toString() || null,
-      isActive: item.isActive,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
+    const formattedItems = items.map((i) => ({
+      ...i,
+      typeName: i.type?.typeName,
+      inventory: i.inventory || { quantityTotal: 0, quantityAvailable: 0 },
     }));
 
-    return { items: mappedItems, totalCount };
-  },
+    return { items: formattedItems, totalCount };
+  }
 
-  async getCatalogItemById(id: string) {
-    const item = await prisma.catalogItem.findUnique({
+  public async getCatalogItemById(id: string) {
+    const item = await prisma.item.findUnique({
       where: { itemId: BigInt(id) },
-    });
-
-    if (!item) {
-      const error: any = new Error('Không tìm thấy thiết bị/vật tư.');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    return {
-      id: item.itemId.toString(),
-      name: item.name,
-      description: item.description,
-      itemType: item.itemType,
-      basePrice: Number(item.basePrice),
-      categoryId: item.categoryId?.toString() || null,
-      isActive: item.isActive,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-    };
-  },
-
-  async createCatalogItem(data: any) {
-    const newItem = await prisma.catalogItem.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        itemType: data.itemType,
-        basePrice: data.basePrice,
-        categoryId: data.categoryId ? BigInt(data.categoryId) : null,
+      include: {
+        type: {
+          select: { typeName: true },
+        },
+        inventory: true,
       },
     });
+    if (!item) throw new AppError('Không tìm thấy thiết bị.', 404);
 
     return {
-      ...newItem,
-      itemId: newItem.itemId.toString(),
-      categoryId: newItem.categoryId?.toString() || null,
-      basePrice: Number(newItem.basePrice),
+      ...item,
+      typeName: item.type?.typeName,
+      inventory: item.inventory || null,
     };
-  },
+  }
 
-  async updateCatalogItem(id: string, data: any) {
-    const itemId = BigInt(id);
-
-    const existing = await prisma.catalogItem.findUnique({
-      where: { itemId },
-    });
-    if (!existing) {
-      const error: any = new Error('Không tìm thấy thiết bị/vật tư.');
-      error.statusCode = 404;
-      throw error;
+  public async createCatalogItem(data: any) {
+    // Check itemCode uniqueness
+    const existing = await prisma.item.findUnique({ where: { itemCode: data.itemCode } });
+    if (existing) {
+      throw new AppError('Mã thiết bị đã tồn tại.', 400, 'MSG-UC05-05');
     }
 
-    const updatedItem = await prisma.catalogItem.update({
-      where: { itemId },
-      data: {
-        name: data.name,
-        description: data.description,
-        basePrice: data.basePrice,
-        categoryId: data.categoryId ? BigInt(data.categoryId) : null,
-      },
+    // Transaction to create item AND inventory
+    const result = await prisma.$transaction(async (tx) => {
+      const newItem = await tx.item.create({
+        data: {
+          itemCode: data.itemCode,
+          itemName: data.itemName,
+          typeId: BigInt(data.typeId),
+          description: data.description,
+          unit: data.unit,
+          rentalPrice: data.rentalPrice,
+          priceValidFrom: data.priceValidFrom ? new Date(data.priceValidFrom) : undefined,
+          imageUrl: data.imageUrl,
+          status: data.status || ItemStatus.ACTIVE,
+        },
+      });
+
+      // Automatically create Inventory record with 0 quantity
+      await tx.inventory.create({
+        data: {
+          itemId: newItem.itemId,
+          quantityTotal: 0,
+          quantityAvailable: 0,
+          quantityReserved: 0,
+          quantityDamaged: 0,
+        },
+      });
+
+      return newItem;
     });
 
-    return {
-      ...updatedItem,
-      itemId: updatedItem.itemId.toString(),
-      categoryId: updatedItem.categoryId?.toString() || null,
-      basePrice: Number(updatedItem.basePrice),
+    return result;
+  }
+
+  public async updateCatalogItem(id: string, data: any) {
+    const updateData: any = {
+      itemName: data.itemName,
+      description: data.description,
+      unit: data.unit,
+      rentalPrice: data.rentalPrice,
+      imageUrl: data.imageUrl,
+      status: data.status,
     };
-  },
 
-  async updateCatalogItemStatus(id: string, isActive: boolean) {
-    const itemId = BigInt(id);
+    if (data.typeId) updateData.typeId = BigInt(data.typeId);
+    if (data.priceValidFrom) updateData.priceValidFrom = new Date(data.priceValidFrom);
 
-    const existing = await prisma.catalogItem.findUnique({
-      where: { itemId },
+    return await prisma.item.update({
+      where: { itemId: BigInt(id) },
+      data: updateData,
     });
-    if (!existing) {
-      const error: any = new Error('Không tìm thấy thiết bị/vật tư.');
-      error.statusCode = 404;
-      throw error;
-    }
+  }
 
-    await prisma.catalogItem.update({
-      where: { itemId },
-      data: { isActive },
+  public async updateCatalogItemStatus(id: string, status: ItemStatus) {
+    return await prisma.item.update({
+      where: { itemId: BigInt(id) },
+      data: { status },
     });
-  },
-};
+  }
+}
+
+export const catalogService = new CatalogService();

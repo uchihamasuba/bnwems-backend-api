@@ -20,8 +20,8 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   - `page` (number, default 1)
   - `limit` (number, default 20)
   - `search` (string, optional) - searches username or fullName
-  - `role` (enum, optional) - Admin, Manager, Leader Staff, Technical Staff
-  - `status` (enum, optional) - active, inactive
+  - `role` (enum, optional) - Quản trị viên, Quản lý, Trưởng nhóm, Nhân viên kỹ thuật
+  - `status` (enum, optional) - Hoạt động, Ngừng hoạt động, Tạm khóa
 - **Response (200 OK):**
 ```json
 {
@@ -32,11 +32,8 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
       "userId": 1,
       "username": "user1",
       "fullName": "Manager One",
-      "role": {
-        "roleId": 2,
-        "roleName": "Manager"
-      },
-      "status": "active",
+      "role": "Quản lý",
+      "status": "Hoạt động",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -60,7 +57,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   "username": "user1",
   "password": "InitialPassword123!",
   "fullName": "Manager One",
-  "roleId": 2,
+  "role": "Quản lý",
   "email": "user1@company.vn",
   "phone": "0900000000",
   "bio": "Quản lý sự kiện",
@@ -77,11 +74,8 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
     "userId": 2,
     "username": "user1",
     "fullName": "Manager One",
-    "role": {
-      "roleId": 2,
-      "roleName": "Manager"
-    },
-    "status": "active"
+    "role": "Quản lý",
+    "status": "Hoạt động"
   }
 }
 ```
@@ -96,7 +90,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 ```json
 {
   "fullName": "Manager Two",
-  "roleId": 2,
+  "role": "Quản lý",
   "email": "user2@company.vn",
   "phone": "0900000002",
   "bio": "Quản lý sự kiện cấp cao",
@@ -118,7 +112,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 - **Request Body:**
 ```json
 {
-  "status": "inactive"
+  "status": "Ngừng hoạt động"
 }
 ```
 - **Response (200 OK):**
@@ -155,7 +149,6 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 - **Description:** Retrieves paginated notifications for the currently authenticated user.
 - **Query Parameters:** 
   - `isRead` (boolean, optional)
-  - `scope` (enum, optional) - manager (để lấy thông báo chuyên biệt/chuẩn cho Manager)
   - `page` (number, default 1)
   - `limit` (number, default 20)
 - **Response (200 OK):**
@@ -166,15 +159,13 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
   "data": [
     {
       "notificationId": 1,
-      "type": "task",
+      "type": "Hệ thống",
       "title": "Phân công mới",
       "content": "Bạn đã được phân công thực hiện công việc T123",
-      "priority": "normal",
-      "targetScreen": "task_detail",
-      "targetRefType": "work_task",
-      "targetRefId": 1,
+      "refType": "work_task",
+      "refId": 1,
       "isRead": false,
-      "pushStatus": "sent",
+      "pushStatus": "Đã gửi",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -191,6 +182,7 @@ It primarily interacts with the `InternalUser` and `Notification` entities.
 - **Description:** Marks a specific notification as read.
 - **Business Rules:**
   - BR-03-01: User can only mark their own notifications as read.
+- **Request Body:** None
 - **Response (200 OK):**
 ```json
 {

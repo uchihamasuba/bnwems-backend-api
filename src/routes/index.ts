@@ -1,57 +1,61 @@
 import { Router } from 'express';
 import authRoutes from './auth.route';
 import userRoutes from './user.route';
-import notificationRoutes from './notification.route';
-import equipmentRoutes from './equipment.route';
-import supplierRoutes from './supplier.route';
-import policyRoutes from './policy.route';
-import attendanceRoutes from './attendance.route';
 import wageRoutes from './wage.route';
 import customerRoutes from './customer.route';
 import orderRoutes from './order.route';
-import { quotationRouter } from './quotation.route';
-import { changeRequestRouter } from './changerequest.route';
-import inventoryRoutes from './inventory.route';
-import scheduleRoutes from './schedule.route';
-import { taskRouter } from './task.route';
-import suppliertxRoutes from './suppliertx.route';
-import { paymentRouter, paymentRequestRouter } from './payment.route';
-import { settlementRouter } from './settlement.route';
-import reportRoutes from './report.route';
-import dashboardRoutes from './dashboard.route';
-import uploadRoutes from './upload.route';
 import catalogRoutes from './catalog.route';
-import warehouseHistoryRoutes from './warehouse-history.route';
+import inventoryRoutes from './inventory.route';
+import policyRoutes from './policy.route';
+import quotationRoutes from './quotation.route';
+import supplierRoutes from './supplier.route';
+import operationsRoutes from './operations.route';
+import attendanceRoutes from './attendance.route';
+import dashboardRoutes from './dashboard.route';
+import evidenceRoutes from './evidence.route';
+import reportsRoutes from './reports.route';
 import managerRoutes from './manager.route';
 
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
+import notificationRoutes from './notification.route';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/notifications', notificationRoutes);
-router.use('/equipment', equipmentRoutes);
-router.use('/', catalogRoutes);
-router.use('/suppliers', supplierRoutes);
-router.use('/policies', policyRoutes);
-router.use('/attendance', attendanceRoutes);
 router.use('/wages', wageRoutes);
 router.use('/customers', customerRoutes);
-router.use('/orders', orderRoutes);
-router.use('/quotations', quotationRouter);
-router.use('/change-requests', changeRequestRouter);
+
+// Batch 1
+router.use('/catalog', catalogRoutes);
 router.use('/inventory', inventoryRoutes);
-router.use('/warehouse-histories', warehouseHistoryRoutes);
-router.use('/schedules', scheduleRoutes);
-router.use('/tasks', taskRouter);
-router.use('/', suppliertxRoutes);
-router.use('/payments', paymentRouter);
-router.use('/payment-requests', paymentRequestRouter);
-router.use('/settlements', settlementRouter);
-router.use('/reports', reportRoutes);
+
+import supplierTransactionRoutes from './supplier-transaction.route';
+
+// Batch 2
+router.use('/policies', policyRoutes);
+router.use('/quotations', quotationRoutes);
+router.use('/suppliers', supplierRoutes);
+router.use('/supplier-transactions', supplierTransactionRoutes);
+
+import warningRoutes from './warning.route';
+import depositRoutes from './deposit.route';
+import settlementRoutes from './settlement.route';
+
+// Batch 3
+router.use('/orders', orderRoutes);
+router.use('/warnings', warningRoutes);
+router.use('/deposits', depositRoutes);
+router.use('/settlements', settlementRoutes);
+
+// Batch 4
+router.use('/', operationsRoutes); // operationsRoutes handles /work-tasks, /schedule-plans, /survey-reports, /mobile
+router.use('/attendance', attendanceRoutes);
+
+// Batch 5
 router.use('/dashboard', dashboardRoutes);
-router.use('/upload', uploadRoutes);
+router.use('/evidence', evidenceRoutes);
+router.use('/reports', reportsRoutes);
 router.use('/manager', managerRoutes);
 
 export default router;

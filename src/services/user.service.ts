@@ -1,21 +1,25 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database';
+import { Role, UserStatus } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
 
 class UserService {
-  public async getUsers(page: number, limit: number, search?: string, roles?: string[], status?: string) {
+  public async getUsers(
+    page: number,
+    limit: number,
+    search?: string,
+    roles?: Role[],
+    status?: UserStatus,
+  ) {
     const skip = (page - 1) * limit;
     const whereClause: any = {};
 
     if (search) {
-      whereClause.OR = [
-        { username: { contains: search } },
-        { fullName: { contains: search } },
-      ];
+      whereClause.OR = [{ username: { contains: search } }, { fullName: { contains: search } }];
     }
-    
+
     if (roles && roles.length > 0) {
-      whereClause.role = { roleName: { in: roles } };
+      whereClause.role = { in: roles };
     }
     if (status) whereClause.status = status;
 
@@ -28,12 +32,7 @@ class UserService {
           userId: true,
           username: true,
           fullName: true,
-          role: {
-            select: {
-              roleId: true,
-              roleName: true
-            }
-          },
+          role: true,
           status: true,
           createdAt: true,
           updatedAt: true,
@@ -47,7 +46,7 @@ class UserService {
   }
 
   public async createUser(data: any, actionUserId: string) {
-    const { username, password, fullName, roleId, email, phone, bio, avatarUrl } = data;
+    const { username, password, fullName, role, email, phone, bio, avatarUrl } = data;
 
     const existingUser = await prisma.internalUser.findUnique({ where: { username } });
     if (existingUser) {
@@ -61,15 +60,12 @@ class UserService {
         username,
         passwordHash,
         fullName,
-        roleId: BigInt(roleId),
+        role,
         email,
         phone,
         bio,
         avatarUrl,
       },
-      include: {
-        role: true
-      }
     });
 
     await prisma.auditLog.create({
@@ -85,22 +81,19 @@ class UserService {
       userId: newUser.userId,
       username: newUser.username,
       fullName: newUser.fullName,
-      role: {
-        roleId: newUser.role.roleId,
-        roleName: newUser.role.roleName
-      },
+      role: newUser.role,
       status: newUser.status,
     };
   }
 
   public async updateUser(id: string, data: any, actionUserId: string) {
-    const { fullName, roleId, email, phone, bio, avatarUrl } = data;
+    const { fullName, role, email, phone, bio, avatarUrl } = data;
 
     const updatedUser = await prisma.internalUser.update({
       where: { userId: BigInt(id) },
-      data: { 
-        ...(fullName && { fullName }), 
-        ...(roleId && { roleId: BigInt(roleId) }),
+      data: {
+        ...(fullName && { fullName }),
+        ...(role && { role }),
         ...(email !== undefined && { email }),
         ...(phone !== undefined && { phone }),
         ...(bio !== undefined && { bio }),
@@ -120,7 +113,7 @@ class UserService {
     return updatedUser;
   }
 
-  public async updateStatus(id: string, status: string, actionUserId: string) {
+  public async updateStatus(id: string, status: UserStatus, actionUserId: string) {
     await prisma.internalUser.update({
       where: { userId: BigInt(id) },
       data: { status },

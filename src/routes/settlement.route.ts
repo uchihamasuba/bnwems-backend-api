@@ -1,16 +1,21 @@
 import { Router } from 'express';
-import * as settlementController from '../controllers/settlement.controller';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
-
-export const nestedSettlementRouter = Router({ mergeParams: true });
-nestedSettlementRouter.use(authenticate);
-
+import { orderController } from '../controllers/order.controller';
 import { validate } from '../middlewares/validate.middleware';
-import { recordSettlementSchema, confirmSettlementSchema, getSettlementByOrderSchema } from '../validators/settlement.validator';
+import {
+  verifyToken as protect,
+  authorizeRoles as restrictTo,
+} from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
+import { confirmSettlementSchema } from '../validators/order.validator';
 
-nestedSettlementRouter.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getSettlementByOrderSchema), settlementController.getSettlementByOrder);
-nestedSettlementRouter.post('/', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(recordSettlementSchema), settlementController.recordSettlement);
+const router = Router();
 
-export const settlementRouter = Router();
-settlementRouter.use(authenticate);
-settlementRouter.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmSettlementSchema), settlementController.confirmSettlement);
+router.put(
+  '/:id/confirm',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(confirmSettlementSchema),
+  orderController.confirmSettlement,
+);
+
+export default router;

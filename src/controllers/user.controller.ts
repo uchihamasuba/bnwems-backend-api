@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Role, UserStatus } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { userService } from '../services/user.service';
 
@@ -9,24 +10,32 @@ export const getUsers = async (req: Request, res: Response, next: NextFunction) 
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string;
-    const role = req.query.role as string;
-    const status = req.query.status as string;
+    const role = req.query.role as Role;
+    const status = req.query.status as UserStatus;
 
     const userObj = (req as AuthRequest).user!;
-    const userRoleName = typeof userObj.role === 'string' ? userObj.role : (userObj.role as any).roleName;
-    let allowedRoles: string[] = [];
+    const userRoleName = userObj.role as Role;
+    let allowedRoles: Role[] = [];
     if (role) allowedRoles.push(role);
 
-    if (userRoleName === 'MANAGER') {
-      if (role && !['LEADER_STAFF', 'TECHNICAL_STAFF'].includes(role)) {
-        return next(new AppError('MANAGER chỉ được xem danh sách LEADER_STAFF hoặc TECHNICAL_STAFF.', 403));
+    if (userRoleName === Role.MANAGER) {
+      if (role && !([Role.LEADER, Role.TECHNICAL] as Role[]).includes(role)) {
+        return next(
+          new AppError('MANAGER chỉ được xem danh sách Trưởng nhóm hoặc Nhân viên kỹ thuật.', 403),
+        );
       }
       if (!role) {
-        allowedRoles = ['LEADER_STAFF', 'TECHNICAL_STAFF'];
+        allowedRoles = [Role.LEADER, Role.TECHNICAL];
       }
     }
 
-    const { users, totalCount } = await userService.getUsers(page, limit, search, allowedRoles, status);
+    const { users, totalCount } = await userService.getUsers(
+      page,
+      limit,
+      search,
+      allowedRoles,
+      status,
+    );
 
     res.status(200).json({
       success: true,
@@ -101,6 +110,39 @@ export const resetPassword = async (req: AuthRequest, res: Response, next: NextF
     res.status(200).json({
       success: true,
       message: 'Đặt lại mật khẩu người dùng thành công.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAvatar = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const actionUserId = req.user!.userId;
+    const role = req.user!.role;
+
+    if (role !== Role.ADMIN && actionUserId !== id) {
+      throw new AppError('Bạn không có quyền thực hiện thao tác này.', 403, 'MSG-UC04-03');
+    }
+
+    if (!req.file) {
+      throw new AppError('Không có tệp được cung cấp.', 400, 'MSG-UF-01');
+    }
+
+    const { UploadService } = await import('../services/upload.service');
+    const uploadResult = await UploadService.uploadImageToFirebase(req.file, 'avatars');
+    const avatarUrl = uploadResult.url;
+
+    await userService.updateUser(id, { avatarUrl }, actionUserId);
+
+    res.status(200).json({
+      success: true,
+      code: 'MSG-UF-05',
+      message: 'Cập nhật ảnh đại diện thành công.',
+      data: {
+        avatarUrl,
+      },
     });
   } catch (error) {
     next(error);

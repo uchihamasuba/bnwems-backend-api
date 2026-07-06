@@ -3,7 +3,12 @@ import { getStorage } from 'firebase-admin/storage';
 import { env } from './env';
 
 // Initialize Firebase only if the required env vars are present
-if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY && env.FIREBASE_STORAGE_BUCKET) {
+if (
+  env.FIREBASE_PROJECT_ID &&
+  env.FIREBASE_CLIENT_EMAIL &&
+  env.FIREBASE_PRIVATE_KEY &&
+  env.FIREBASE_STORAGE_BUCKET
+) {
   try {
     if (!getApps().length) {
       initializeApp({

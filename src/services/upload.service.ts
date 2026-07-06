@@ -15,7 +15,7 @@ export class UploadService {
     const bucket = storage.bucket();
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const fileName = `${uniqueSuffix}${path.extname(file.originalname)}`;
-    
+
     // Create the file reference in the specified folder
     const fileRef = bucket.file(`${folder}/${fileName}`);
 
@@ -30,7 +30,9 @@ export class UploadService {
     try {
       await fileRef.makePublic();
     } catch (err) {
-      console.warn('Could not make file public. It may already be public or bucket policies prevent it.');
+      console.warn(
+        'Could not make file public. It may already be public or bucket policies prevent it.',
+      );
     }
 
     // Construct the public URL

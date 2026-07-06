@@ -3,9 +3,9 @@ const path = require('path');
 const expressListEndpoints = require('express-list-endpoints');
 const express = require('express');
 
-const backendDir = __dirname;
-const backendRoutesPath = path.join(backendDir, 'src', 'routes', 'index');
-const frontendServicesDir = path.join(backendDir, '..', 'web-frontend', 'src', 'services');
+const rootDir = __dirname;
+const backendRoutesPath = path.join(rootDir, 'src', 'routes', 'index');
+const frontendServicesDir = path.join(rootDir, '..', 'web-frontend', 'src', 'services');
 
 // 1. Get backend implemented APIs
 let implementedApis = new Set();
@@ -65,12 +65,10 @@ function scanFrontendServices(dir) {
                 let method = match[1];
                 let pathStr = match[2];
                 // normalize {id} or :id to :param
-                pathStr = pathStr.replace(/{[a-zA-Z0-9_]+}/g, ':param');
-                pathStr = pathStr.replace(/:[a-zA-Z0-9_]+/g, ':param');
-                // Remove trailing slash if any for consistency
-                if (pathStr.endsWith('/')) {
-                    pathStr = pathStr.slice(0, -1);
-                }
+                pathStr = pathStr.replace(/{[a-zA-Z0-9_]+}/g, '/:param');
+                pathStr = pathStr.replace(/:[a-zA-Z0-9_]+/g, '/:param');
+                // fix some duplicate slash
+                pathStr = pathStr.replace(/\/+/g, '/');
                 frontendApis.add(`${method} ${pathStr}`);
             }
         }

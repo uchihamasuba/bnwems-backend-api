@@ -1,263 +1,203 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
+import { MovementType, ReportStatus } from '@prisma/client';
 
 class InventoryService {
-  public async getInventory(equipmentItemId?: string, page: number = 1, limit: number = 20) {
+  public async getInventory(page: number, limit: number, itemId?: string) {
     const skip = (page - 1) * limit;
     const whereClause: any = {};
-    if (equipmentItemId) whereClause.equipmentItemId = BigInt(equipmentItemId);
+    if (itemId) {
+      whereClause.itemId = BigInt(itemId);
+    }
 
-    const [inventory, totalCount] = await Promise.all([
+    const [inventories, totalCount] = await Promise.all([
       prisma.inventory.findMany({
         where: whereClause,
         skip,
         take: limit,
+        include: {
+          item: {
+            select: { itemName: true },
+          },
+        },
       }),
       prisma.inventory.count({ where: whereClause }),
     ]);
 
-    // Map to API contract
-    const data = inventory.map(inv => ({
-      inventoryId: inv.inventoryId,
-      equipmentItemId: inv.equipmentItemId,
-      totalQuantity: inv.totalQuantity,
-      availableQuantity: inv.availableQuantity,
-      reservedQuantity: inv.reservedQuantity, 
-      checkedOutQuantity: inv.totalQuantity - inv.availableQuantity - inv.reservedQuantity,
-      damagedQuantity: inv.damagedQuantity,
-      lostQuantity: 0
+    const formattedInventories = inventories.map((inv) => ({
+      ...inv,
+      itemName: inv.item?.itemName,
     }));
 
-    return { inventory: data, totalCount };
+    return { inventories: formattedInventories, totalCount };
   }
 
-  public async createInventory(data: any) {
-    const equipmentItemId = BigInt(data.equipmentItemId);
-    
-    const eq = await prisma.equipment.findUnique({ where: { equipmentItemId } });
-    if (!eq) {
-      throw new AppError('Không tìm thấy thiết bị.', 404);
-    }
+  public async adjustInventory(data: any, actionUserId: string) {
+    const { itemId, quantityChange, notes } = data;
 
-    const newInventory = await prisma.inventory.create({
-      data: {
-        equipmentItemId,
-        totalQuantity: data.availableQuantity,
-        availableQuantity: data.availableQuantity,
-        reservedQuantity: 0,
-        damagedQuantity: 0,
-      },
-    });
+    // Run within a transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Fetch current inventory
+      const inv = await tx.inventory.findUnique({ where: { itemId: BigInt(itemId) } });
+      if (!inv) throw new AppError('Không tìm thấy thông tin kho cho thiết bị này.', 404);
 
-    return newInventory;
-  }
+      // 2. Update inventory
+      const newTotal = inv.quantityTotal + quantityChange;
+      const newAvailable = (inv.quantityAvailable || 0) + quantityChange;
 
-  public async updateInventory(id: string, data: any) {
-    const inventoryId = BigInt(id);
-
-    const existing = await prisma.inventory.findUnique({
-      where: { inventoryId },
-    });
-    if (!existing) {
-      throw new AppError('Không tìm thấy dữ liệu kho.', 404);
-    }
-
-    const availableQuantity = data.availableQuantity ?? existing.availableQuantity;
-    const reservedQuantity = data.reservedQuantity ?? existing.reservedQuantity;
-    const damagedQuantity = data.damagedQuantity ?? existing.damagedQuantity;
-    const totalQuantity = availableQuantity + reservedQuantity + damagedQuantity;
-
-    const updated = await prisma.inventory.update({
-      where: { inventoryId },
-      data: {
-        totalQuantity,
-        availableQuantity,
-        reservedQuantity,
-        damagedQuantity,
-      },
-    });
-
-    return updated;
-  }
-
-  public async checkAvailability(eventDate: string, itemId: string) {
-    const inventories = await prisma.inventory.findMany({
-      where: { equipmentItemId: BigInt(itemId) },
-    });
-
-    let totalAvailable = 0;
-    for (const inv of inventories) {
-      totalAvailable += inv.availableQuantity;
-    }
-    
-    // In a real scenario, we'd subtract any active reservations for eventDate from totalAvailable
-    const activeReservations = await prisma.inventoryReservation.findMany({
-      where: {
-        eventDate: new Date(eventDate),
-        status: 'reserved'
+      if (newTotal < 0 || newAvailable < 0) {
+        throw new AppError('Số lượng sau điều chỉnh không được nhỏ hơn 0.', 400);
       }
-    });
 
-    const reservationIds = activeReservations.map(r => r.reservationId);
-
-    const reservations = await prisma.inventoryReservationItem.findMany({
-      where: {
-        equipmentItemId: BigInt(itemId),
-        reservationId: { in: reservationIds }
-      }
-    });
-    
-    const totalReserved = reservations.reduce((sum, r) => sum + r.reservedQuantity, 0);
-    const availableOnDate = totalAvailable - totalReserved;
-
-    return {
-      equipmentItemId: itemId,
-      isAvailable: availableOnDate > 0,
-      availableQuantityOnDate: availableOnDate > 0 ? availableOnDate : 0,
-    };
-  }
-
-  public async reserveInventory(orderId: string, items: any[], eventDate: string, actionUserId: string) {
-    for (const item of items) {
-      const inv = await prisma.inventory.findFirst({
-        where: { equipmentItemId: BigInt(item.equipmentItemId) },
-      });
-      if (!inv) {
-        throw new AppError('Không tìm thấy vật tư trong kho.', 404);
-      }
-      
-      const availability = await this.checkAvailability(eventDate, item.equipmentItemId);
-      if (item.quantity > availability.availableQuantityOnDate) {
-        throw new AppError('Không đủ số lượng trong kho cho ngày yêu cầu.', 400, 'MSG-UC13-04');
-      }
-    }
-
-    // New schema uses InventoryReservation instead of updating Inventory.reservedQuantity
-    await prisma.$transaction(async (prismaTx) => {
-      const reservation = await prismaTx.inventoryReservation.create({
+      await tx.inventory.update({
+        where: { itemId: BigInt(itemId) },
         data: {
-          orderId: BigInt(orderId),
-          eventDate: new Date(eventDate),
-          status: 'reserved',
-          createdBy: BigInt(actionUserId)
-        }
+          quantityTotal: newTotal,
+          quantityAvailable: newAvailable,
+        },
       });
 
-      for (const item of items) {
-        await prismaTx.inventoryReservationItem.create({
-          data: {
-            reservationId: reservation.reservationId,
-            equipmentItemId: BigInt(item.equipmentItemId),
-            reservedQuantity: item.quantity
-          }
-        });
-      }
+      // 3. Log movement
+      await tx.inventoryMovement.create({
+        data: {
+          itemId: BigInt(itemId),
+          movementType: MovementType.ADJUSTMENT,
+          quantity: quantityChange,
+          performedBy: BigInt(actionUserId),
+          notes: notes,
+        },
+      });
     });
+
+    return { success: true };
   }
-  public async getInventoryReports(reportType?: string, page: number = 1, limit: number = 20) {
+
+  public async getInventoryMovements(
+    page: number,
+    limit: number,
+    itemId?: string,
+    movementType?: MovementType,
+  ) {
     const skip = (page - 1) * limit;
     const whereClause: any = {};
-    if (reportType) whereClause.reportType = reportType;
+    if (itemId) {
+      whereClause.itemId = BigInt(itemId);
+    }
+    if (movementType) {
+      whereClause.movementType = movementType;
+    }
 
-    const [reports, totalCount] = await Promise.all([
-      prisma.inventoryReport.findMany({
+    const [movements, totalCount] = await Promise.all([
+      prisma.inventoryMovement.findMany({
         where: whereClause,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          item: { select: { itemName: true } },
+          performer: { select: { fullName: true } },
+        },
       }),
-      prisma.inventoryReport.count({ where: whereClause })
+      prisma.inventoryMovement.count({ where: whereClause }),
     ]);
-    
-    return {
-      reports: reports.map(r => ({
-        ...r,
-        inventoryReportId: r.inventoryReportId.toString(),
-        orderId: r.orderId.toString(),
-        recordedBy: r.recordedBy.toString(),
-        confirmedBy: r.confirmedBy?.toString()
-      })),
-      totalCount
-    };
+
+    const formattedMovements = movements.map((m) => ({
+      ...m,
+      itemName: m.item?.itemName,
+      performedByName: m.performer?.fullName,
+    }));
+
+    return { movements: formattedMovements, totalCount };
   }
 
-  public async checkoutInventory(data: any, actionUserId: string) {
-    const { orderId, items } = data;
-    
-    await prisma.$transaction(async (prismaTx) => {
-      const report = await prismaTx.inventoryReport.create({
-        data: {
-          orderId: BigInt(orderId),
-          reportType: 'checkout',
-          recordedBy: BigInt(actionUserId),
-        }
+  public async createReturnReport(data: any, actionUserId: string) {
+    const { orderId, reportType, notes, items } = data;
+
+    const report = await prisma.collectedEquipmentReport.create({
+      data: {
+        orderId: BigInt(orderId),
+        reportType: reportType,
+        notes: notes,
+        reportedBy: BigInt(actionUserId),
+        status: ReportStatus.SUBMITTED,
+        items: {
+          create: items.map((i: any) => ({
+            itemId: BigInt(i.itemId),
+            goodQuantity: i.goodQuantity,
+            damagedQuantity: i.damagedQuantity,
+            lostQuantity: i.lostQuantity,
+          })),
+        },
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    return report;
+  }
+
+  public async confirmReturnReport(reportId: string, actionUserId: string) {
+    await prisma.$transaction(async (tx) => {
+      // 1. Find report
+      const report = await tx.collectedEquipmentReport.findUnique({
+        where: { reportId: BigInt(reportId) },
+        include: { items: true },
+      });
+      if (!report) throw new AppError('Không tìm thấy báo cáo.', 404);
+      if (report.status === ReportStatus.CONFIRMED) {
+        throw new AppError('Báo cáo đã được xác nhận trước đó.', 400);
+      }
+
+      // 2. Update status
+      await tx.collectedEquipmentReport.update({
+        where: { reportId: BigInt(reportId) },
+        data: { status: ReportStatus.CONFIRMED },
       });
 
-      for (const item of items) {
-        await prismaTx.inventoryReportItem.create({
+      // 3. Process inventory for each item
+      for (const item of report.items) {
+        const inv = await tx.inventory.findUnique({ where: { itemId: item.itemId } });
+        if (!inv) continue;
+
+        // "Kho công ty" returns items back to available inventory.
+        // - goodQuantity returns to Available
+        // - damagedQuantity goes to Damaged
+        // - lostQuantity reduces Total (and Reserved if it was reserved)
+
+        // This is a simplified model of returns based on UC 2.23:
+        // Actually, returning from event reduces Reserved (since they were checked out).
+        // Let's assume returning increases Available. Check-out reduces Available and Increases Reserved. Wait.
+        // In 05-warehouse-inventory.md:
+        // "Confirm Return Report triggers the creation of INBOUND movements, updating quantityTotal and quantityDamaged."
+        // We will do:
+        const totalReturned = item.goodQuantity + item.damagedQuantity;
+
+        await tx.inventory.update({
+          where: { itemId: item.itemId },
           data: {
-            inventoryReportId: report.inventoryReportId,
-            equipmentItemId: BigInt(item.equipmentItemId),
-            quantity: item.quantity,
-          }
+            quantityAvailable: (inv.quantityAvailable || 0) + item.goodQuantity,
+            quantityDamaged: inv.quantityDamaged + item.damagedQuantity,
+            // lostQuantity means it's permanently gone, so quantityTotal drops.
+            quantityTotal: inv.quantityTotal - item.lostQuantity,
+          },
         });
 
-        // Checkout decreases reservedQuantity
-        const inv = await prismaTx.inventory.findUnique({ where: { equipmentItemId: BigInt(item.equipmentItemId) } });
-        if (inv) {
-          await prismaTx.inventory.update({
-            where: { equipmentItemId: BigInt(item.equipmentItemId) },
+        if (totalReturned > 0) {
+          await tx.inventoryMovement.create({
             data: {
-              reservedQuantity: Math.max(0, inv.reservedQuantity - item.quantity)
-            }
+              itemId: item.itemId,
+              movementType: MovementType.INBOUND,
+              quantity: totalReturned,
+              performedBy: BigInt(actionUserId),
+              notes: `Nhập kho từ báo cáo thu hồi ${reportId}`,
+            },
           });
         }
       }
     });
-  }
 
-  public async returnInventory(data: any, actionUserId: string) {
-    const { orderId, items } = data;
-    
-    await prisma.$transaction(async (prismaTx) => {
-      const report = await prismaTx.inventoryReport.create({
-        data: {
-          orderId: BigInt(orderId),
-          reportType: 'return',
-          recordedBy: BigInt(actionUserId),
-        }
-      });
-
-      for (const item of items) {
-        await prismaTx.inventoryReportItem.create({
-          data: {
-            inventoryReportId: report.inventoryReportId,
-            equipmentItemId: BigInt(item.equipmentItemId),
-            quantity: item.quantity,
-            conditionStatus: item.condition || 'good'
-          }
-        });
-
-        const inv = await prismaTx.inventory.findUnique({ where: { equipmentItemId: BigInt(item.equipmentItemId) } });
-        if (inv) {
-          if (item.condition === 'damaged' || item.condition === 'lost') {
-            await prismaTx.inventory.update({
-              where: { equipmentItemId: BigInt(item.equipmentItemId) },
-              data: {
-                damagedQuantity: inv.damagedQuantity + item.quantity
-              }
-            });
-          } else {
-            await prismaTx.inventory.update({
-              where: { equipmentItemId: BigInt(item.equipmentItemId) },
-              data: {
-                availableQuantity: inv.availableQuantity + item.quantity
-              }
-            });
-          }
-        }
-      }
-    });
+    return { success: true };
   }
 }
 

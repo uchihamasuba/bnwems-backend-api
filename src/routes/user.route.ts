@@ -1,20 +1,47 @@
 import { Router } from 'express';
 import * as userController from '../controllers/user.controller';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
+import {
+  verifyToken as protect,
+  authorizeRoles as restrictTo,
+} from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
 import { validate } from '../middlewares/validate.middleware';
-import { getUsersSchema, createUserSchema, updateUserSchema, updateStatusSchema, resetPasswordSchema } from '../validators/user.validator';
+import {
+  getUsersSchema,
+  createUserSchema,
+  updateUserSchema,
+  updateStatusSchema,
+  resetPasswordSchema,
+} from '../validators/user.validator';
+import { upload } from '../middlewares/upload.middleware';
 
 const router = Router();
 
 // Apply authentication and ADMIN role check to all user management routes
-router.use(authenticate);
+router.use(protect);
 // Do not apply global ADMIN check to allow MANAGER on GET
-// router.use(authorizeRoles('ADMIN'));
+// router.use(restrictTo(Role.ADMIN));
 
-router.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getUsersSchema), userController.getUsers);
-router.post('/', authorizeRoles('ADMIN'), validate(createUserSchema), userController.createUser);
-router.put('/:id', authorizeRoles('ADMIN'), validate(updateUserSchema), userController.updateUser);
-router.patch('/:id/status', authorizeRoles('ADMIN'), validate(updateStatusSchema), userController.updateStatus);
-router.post('/:id/reset-password', authorizeRoles('ADMIN'), validate(resetPasswordSchema), userController.resetPassword);
+router.get(
+  '/',
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(getUsersSchema),
+  userController.getUsers,
+);
+router.post('/', restrictTo(Role.ADMIN), validate(createUserSchema), userController.createUser);
+router.put('/:id', restrictTo(Role.ADMIN), validate(updateUserSchema), userController.updateUser);
+router.patch(
+  '/:id/status',
+  restrictTo(Role.ADMIN),
+  validate(updateStatusSchema),
+  userController.updateStatus,
+);
+router.post(
+  '/:id/reset-password',
+  restrictTo(Role.ADMIN),
+  validate(resetPasswordSchema),
+  userController.resetPassword,
+);
+router.post('/:id/avatar', upload.single('file'), userController.updateAvatar);
 
 export default router;

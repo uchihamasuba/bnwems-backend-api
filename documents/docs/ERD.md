@@ -1,82 +1,67 @@
 # Entity Relationship Diagram (ERD)
 
 ## 1. System Overview
-This document outlines the core Entity Relationship Diagram (ERD) based on the comprehensive 40-table architecture defined in the `BNWEMS.sql` schema. The system handles all operations from customer orders, inventory management, detailed field operations, supplier interactions, up to financial settlements and wage calculations.
+This document outlines the core Entity Relationship Diagram (ERD) based on the updated `BNWEMS.sql` schema (v2/v6). The system handles all operations from customer orders, inventory management (using category/type/item hierarchy), field operations, supplier interactions, up to financial settlements and wage calculations.
 
 ## 2. Core Domains & Entities
 
 The ERD is organized into logical domains.
 
 ### 1. User & Role Management
-- **Role**: Defines permissions and role levels (Admin, Manager, Leader Staff, Technical Staff).
-- **InternalUser**: Personnel who can log in and act on the system. Linked to Roles.
+- **InternalUser**: Personnel who can log in and act on the system. Enums define their roles (Admin, Manager, Leader, Technical) and status.
+- **DeviceToken**: Managing Firebase Cloud Messaging (FCM) tokens for push notifications across multiple platforms.
+- **AuditLog**: Immutable ledger of critical actions (login, create, confirm).
 
-### 2. Customer, Supplier & Business Configuration
+### 2. Evidence & Notifications
+- **Evidence**: A central, polymorphic table storing file URLs (photos, PDFs) from Firebase. Many entities (Deposits, Settlements, Schedule Plans, Attendances, Survey Reports) link their `evidence_id` directly to this table.
+- **Notification**: Alerts created by the system or users.
+- **NotificationRecipient**: Tracking read status and push delivery per user.
+
+### 3. Customer & Business Configuration
 - **Customer**: Clients who place orders.
-- **Supplier**: Partners who provide rental or purchase equipment.
-- **BusinessPolicy**: Dynamic configuration for deposits, refunds, cancellations, compensations, and fees.
+- **BusinessPolicy**: Dynamic configuration for deposits, refunds, cancellations, compensations, and wages. Uses standard units (Day, Percent, VND).
 
-### 3. Equipment (Catalog)
-- **Equipment**: Core dictionary of services, equipment, materials, and packages (replaces catalog items). Includes rental price, cost price, and replacement value.
+### 4. Catalog & Inventory (No Warehouse)
+- **ItemCategory**: Top-level grouping (e.g., Furniture, Lighting).
+- **ItemType**: Detailed categorization within a category (e.g., Chavari Chairs).
+- **Item**: The core operational asset for rent (e.g., GHE-CHIAVARI).
+- **ItemTypeSpec**: The composition of an `ItemType` (e.g., 1 Table + 6 Chairs).
+- **Inventory**: Real-time stock tracking directly linked to an `Item`. (Note: The system assumes a single enterprise warehouse, so location tracking inside a multi-warehouse setup is obsolete).
 
-### 4. Order & Quotation Lifecycle
-- **Order**: The central business transaction with a customer.
-- **OrderItem**: The finalized list of items for the order, distinguishing between internal and supplier sources.
-- **OrderStatusHistory**: Tracks all status transitions for an order.
-- **Quotation**: The proposed pricing sent to the customer before order confirmation (supports versioning).
+### 5. Order & Quotation Lifecycle
+- **Order**: The central business transaction with a customer. Captures event type, date, location.
+- **OrderItem**: The finalized list of items for the order, including `prepared_qty` and `prepared_by` to track warehouse preparation directly (replacing separate pick list tables).
+- **OrderWarning**: Configurable alerts or risks tied to an order that can be resolved by staff.
+- **Quotation**: The proposed pricing sent to the customer before order confirmation.
 - **QuotationItem**: The items and their line totals within a quotation.
 
-### 5. Payment & Settlement
-- **CompanyBankAccount**: Bank accounts used for receiving transfers.
-- **PaymentRequest**: Requests sent to customers to pay deposits or final amounts.
-- **Payment**: Actual confirmed receipts of money.
-- **Settlement**: Detailed financial reconciliation of the order (original value, changes, fees, compensations).
-- **SettlementLine**: Line items detailing each financial adjustment applied in a settlement.
+### 6. Payments, Deposits & Settlement
+- **Deposit**: Tracks requested and paid deposits for an order. Includes evidence linking and QR codes.
+- **Settlement**: Detailed financial reconciliation of the order (original value, changes, fees, compensations). Tracks final payment.
 
-### 6. Scheduling
-- **Schedule**: Specific planned milestones (survey, preparation, transport, execution, collection, return). Combines schedule plans and activities.
+### 7. Task Execution, Schedule & Staff Management
+- **WorkTask**: A catalog of standardized tasks (e.g., Survey, Setup, Teardown).
+- **SchedulePlan**: Specific assignment of a `WorkTask` to an `InternalUser` for a given `Order`, time, and location. Includes handover evidence.
+- **Attendance**: Real-time check-in and check-out against a `SchedulePlan`. Includes photo evidence of presence.
 
-### 7. Task Execution & Staff Management
-- **WorkTask**: Specific operational duties linked to schedule activities.
-- **Assignment**: Linking a `WorkTask` to an `InternalUser`.
-- **TaskProgressUpdate**: Real-time status updates from the field.
-- **Attendance**: Check-in/check-out tracking for assigned tasks.
-- **StaffAvailability**: Tracking whether staff are available on specific dates.
+### 8. Field Operations & Reports
+- **SurveyReport**: Pre-event site surveys measuring area, constraints, and proposed items.
+- **CollectedEquipmentReport**: Reports from staff recovering equipment from the field or returning to suppliers.
+- **CollectedEquipmentReportItem**: Detailed breakdown of good, damaged, or lost items.
+- **InventoryMovement**: Immutable ledger of all stock quantity changes (Outbound, Inbound, Adjustments).
 
-### 8. Wage Calculation
-- **WageRule**: Pay rates based on roles.
-- **WageSummary**: Aggregated pay for a user over a period or order, including total sessions, gross amount, and deductions.
+### 9. Supplier Transactions
+- **Supplier**: Partners who provide rental or purchase equipment.
+- **SupplierTransaction**: Sub-contracts with suppliers for specific orders (rental or purchase). Tracks costs and deposit amounts.
+- **SupplierTransactionItem**: The items transacted with the supplier and received quantities.
 
-### 9. Inventory Operations
-- **Inventory**: Real-time stock levels per equipment (no multi-warehouse support). Includes available, reserved, and damaged quantities.
-- **InventoryReservation**: Stock reserved for upcoming confirmed orders.
-- **InventoryReservationItem**: The reserved equipment items.
-- **InventoryReport**: Checkouts, collections, and returns logged by staff.
-- **InventoryReportItem**: The equipment items reported, along with condition status.
-
-### 10. Supplier Transactions
-- **SupplierTransaction**: Sub-contracts with suppliers for specific orders (rental or purchase).
-- **SupplierTransactionItem**: The items transacted with the supplier.
-- **SupplierPayment**: Tracking what we've paid to suppliers.
-
-### 11. Field Operations (Mobile)
-- **SurveyReport**: Pre-event site surveys.
-- **ChangeRequest**: On-site adjustments by the customer (add/remove/replace).
-- **ChangeRequestItem**: The items to change.
-- **HandoverRecord**: Formal customer sign-off on installation.
-- **DamageLossReport**: Tracking items broken or lost during the event.
-- **DamageLossItem**: The specific items damaged or lost, along with compensation amount.
-
-### 12. System Audit & Evidence
-- **Notification**: Alerts sent to internal users via push notifications.
-- **DeviceToken**: Managing Firebase Cloud Messaging (FCM) tokens for push notifications.
-- **Evidence**: Polymorphic table storing file URLs (photos, PDFs) attached to various entities (payments, reports, handovers).
-- **AuditLog**: Immutable ledger of critical actions (login, create, confirm).
+### 10. Wage Calculation
+- **WageRecord**: Direct compensation log calculated per order, per user, based on their role and number of shifts. Replaces periodic wage summaries with order-based granularity.
 
 ## 3. Key Relationships & Workflows
 
-- **The Order Hub:** `Order` is strictly 1:1 with `Settlement`. It has 1:N relationships with `Quotation`, `OrderStatusHistory`, `PaymentRequest`, `WorkTask`, `ChangeRequest`, `HandoverRecord`, `Schedule`, `DamageLossReport`, `SurveyReport`, `InventoryReservation`, and `InventoryReport`.
-- **The Physical Flow:** An `Order` creates an `InventoryReservation`. A `Schedule` spawns a `WorkTask`. The `WorkTask` drives operations and triggers an `InventoryReport` (checkout/return), which updates the `Inventory` quantities directly.
-- **The Financial Flow:** `Quotation` establishes expected value. `PaymentRequest` drives actual `Payment`. Any `ChangeRequest` or `DamageLossReport` alters the final `Settlement`.
-- **The Subcontracting Flow:** If internal inventory is insufficient, a `SupplierTransaction` is created. Payments to suppliers are recorded via `SupplierPayment`.
-- **The HR Flow:** An `Assignment` leads to `Attendance`. Pay is governed by `WageRule` and aggregated into a `WageSummary` for the staff member.
+- **The Order Hub:** `Order` is the primary anchor. It links to exactly one `Quotation`, `Settlement`, and `BusinessPolicy`. It generates 1:N relations for `SchedulePlan`, `Deposit`, `OrderItem`, `SupplierTransaction`, `SurveyReport`, `WageRecord`, and `CollectedEquipmentReport`.
+- **The Catalog & Inventory Flow:** `ItemCategory` -> `ItemType` -> `Item` -> `Inventory`. There are no intermediate physical locations; `Inventory` holds total, damaged, and reserved counters.
+- **The Physical Flow:** An `Order` triggers `SchedulePlan`s (giao việc). Staff use the Staff App to check in via `Attendance`. Preparing goods updates `prepared_qty` on `OrderItem`. After the event, `CollectedEquipmentReport` drives `InventoryMovement`, adjusting the `Inventory` counts directly.
+- **The Financial Flow:** Customers pay `Deposit`s. `Settlement` resolves the final bill. `SupplierTransaction` handles outgoing expenses. `WageRecord` calculates internal labor costs per order.
+- **The Subcontracting Flow:** If internal inventory is insufficient, a `SupplierTransaction` is created. `CollectedEquipmentReport` tracks returning those items to the supplier.

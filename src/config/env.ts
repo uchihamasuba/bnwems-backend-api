@@ -8,16 +8,16 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().transform(Number).default(3000),
-  
+
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  
+
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
   JWT_EXPIRES_IN: z.string().default('8h'),
-  
+
   BCRYPT_SALT_ROUNDS: z.string().transform(Number).default(12),
   MAX_LOGIN_ATTEMPTS: z.string().transform(Number).default(5),
   LOCK_DURATION_MINUTES: z.string().transform(Number).default(15),
-  
+
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 
   FIREBASE_PROJECT_ID: z.string().min(1, 'FIREBASE_PROJECT_ID is required').optional(),

@@ -9,7 +9,7 @@ const app = express();
 Object.defineProperty(BigInt.prototype, 'toJSON', {
   get() {
     return () => String(this);
-  }
+  },
 });
 
 app.use(express.json());
@@ -19,7 +19,7 @@ app.use(
   cors({
     origin: env.CORS_ORIGIN,
     credentials: true, // Allow cookies if needed
-  })
+  }),
 );
 
 // Serve static files from public/uploads
