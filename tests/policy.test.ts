@@ -4,7 +4,7 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Policy API (Module 6)', () => {
-  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const adminToken = generateTestToken({ userId: '1', role: 'ADMIN' });
   const validId1 = '1';
 
   beforeEach(() => {
@@ -14,7 +14,7 @@ describe('Policy API (Module 6)', () => {
   describe('GET /api/v1/policies', () => {
     it('should return list of policies', async () => {
       prismaMock.businessPolicy.findMany.mockResolvedValue([
-        { policyId: 1n, policyType: 'DEPOSIT' } as any
+        { policyId: 1n, policyType: 'DEPOSIT' } as any,
       ]);
 
       const res = await request(app)
@@ -35,9 +35,11 @@ describe('Policy API (Module 6)', () => {
         .post('/api/v1/policies')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
+          policyCode: 'DEP01',
+          policyName: 'Standard Deposit Policy',
           policyType: 'DEPOSIT',
-          name: 'Standard Deposit Policy',
-          rules: { percentage: 50 }
+          policyValue: 50,
+          unit: '%',
         });
 
       expect(res.status).toBe(201);
@@ -66,7 +68,7 @@ describe('Policy API (Module 6)', () => {
       const res = await request(app)
         .put(`/api/v1/policies/${validId1}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ rules: { percentage: 60 } });
+        .send({ policyValue: 60, unit: '%' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -78,7 +80,7 @@ describe('Policy API (Module 6)', () => {
       const res = await request(app)
         .put(`/api/v1/policies/${validId1}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ rules: { percentage: 60 } });
+        .send({ policyValue: 60, unit: '%' });
 
       expect(res.status).toBe(404);
     });

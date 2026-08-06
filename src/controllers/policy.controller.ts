@@ -1,51 +1,54 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthRequest } from '../middlewares/auth.middleware';
 import { policyService } from '../services/policy.service';
+import { BigIntUtils } from '../utils/bigint.util';
+import { PolicyType } from '@prisma/client';
 
-export const getPolicies = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const policyType = req.query.policyType as string;
-    const isActiveParam = req.query.isActive as string;
+export const policyController = {
+  async getPolicies(req: Request, res: Response, next: NextFunction) {
+    try {
+      const policyType = req.query.policyType as PolicyType;
+      const isActive = req.query.isActive ? req.query.isActive === 'true' : undefined;
 
-    const policies = await policyService.getPolicies(policyType, isActiveParam);
+      const { policies, totalCount } = await policyService.getPolicies(policyType, isActive);
 
-    res.status(200).json({
-      success: true,
-      data: policies,
-      meta: { totalCount: policies.length },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(200).json({
+        success: true,
+        code: 'MSG-PO-01',
+        data: BigIntUtils.toJSON(policies),
+        meta: { totalCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const createPolicy = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const actionUserId = req.user!.userId;
-    const newPolicy = await policyService.createPolicy(req.body, actionUserId);
+  async createPolicy(req: Request, res: Response, next: NextFunction) {
+    try {
+      const newPolicy = await policyService.createPolicy(req.body);
 
-    res.status(201).json({
-      success: true,
-      message: 'Policy created successfully.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(201).json({
+        success: true,
+        code: 'MSG-PO-02',
+        message: 'Tạo chính sách thành công.',
+        data: BigIntUtils.toJSON(newPolicy),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const updatePolicy = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { rules } = req.body;
-    const actionUserId = req.user!.userId;
+  async updatePolicy(req: Request, res: Response, next: NextFunction) {
+    try {
+      const updatedPolicy = await policyService.updatePolicy(req.params.id, req.body);
 
-    await policyService.updatePolicy(id, rules, actionUserId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Policy updated successfully.',
-    });
-  } catch (error) {
-    next(error);
-  }
+      res.status(200).json({
+        success: true,
+        code: 'MSG-PO-03',
+        message: 'Cập nhật chính sách thành công.',
+        data: BigIntUtils.toJSON(updatedPolicy),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

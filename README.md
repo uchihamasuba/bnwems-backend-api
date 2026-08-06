@@ -8,141 +8,150 @@ Dưới đây là sơ đồ cây thư mục của dự án và giải thích vai
 
 ```text
 backend-api/
+├── documents/
+│   └── BNWEMS.sql           # File chứa toàn bộ cấu trúc DB và dữ liệu mẫu chuẩn (Mock data).
 ├── prisma/
-│   ├── schema.prisma        # Nơi định nghĩa toàn bộ mô hình dữ liệu (models) và các mối quan hệ (relations) cho CSDL.
-│   └── seed.ts              # Script dùng để chèn dữ liệu mẫu (Seeding) vào CSDL.
+│   ├── schema.prisma        # Nơi định nghĩa toàn bộ mô hình dữ liệu (models) cho Prisma.
+│   └── seed.ts              # Script tự động đọc file BNWEMS.sql và nạp vào Database.
 ├── src/
-│   ├── app.ts               # File cấu hình Express app, tích hợp middlewares cơ bản và gắn các routes chính.
-│   ├── server.ts            # Entry point của ứng dụng; khởi tạo và chạy web server trên port được chỉ định.
-│   ├── config/
-│   │   ├── database.ts      # Khởi tạo instance PrismaClient singleton để sử dụng lại xuyên suốt dự án.
-│   │   └── env.ts           # File khai báo, parse và kiểm tra tính hợp lệ của các biến môi trường (Environment Variables).
-│   ├── controllers/         # Tầng giao tiếp HTTP: Nhận request, gọi service xử lý, và trả về response chuẩn.
-│   ├── services/            # Tầng Business Logic: Nơi chứa toàn bộ nghiệp vụ cốt lõi và gọi truy vấn CSDL qua Prisma.
-│   ├── routes/              # Tầng định tuyến: Định nghĩa URL Endpoints, method và chèn Middlewares tương ứng.
-│   │   └── index.ts         # Router trung tâm gộp tất cả các sub-routers con.
-│   ├── middlewares/
-│   │   ├── auth.middleware.ts       # Middleware kiểm tra Token hợp lệ (JWT) và xác thực quyền Role (RBAC).
-│   │   ├── error.middleware.ts      # Middleware bắt lỗi Global và xử lý khi route không tồn tại (404).
-│   │   └── validate.middleware.ts   # Middleware chặn bắt đầu vào (body/query) nếu sai định dạng trước khi vào controller.
-│   ├── validators/          # Các schema kiểm tra đầu vào (sử dụng Zod)
-│   └── utils/
-│       └── response.ts      # Các Utility Functions dùng để chuẩn hóa format response (success/error envelope).
-├── tests/                   # Thư mục chứa các file Test Case tự động bằng Jest (Unit Test, Integration Test).
-└── TESTING_PLAN.md          # Bản kế hoạch và chiến lược kiểm thử tự động.
+│   ├── app.ts               # File cấu hình Express app, tích hợp middlewares cơ bản và gắn routes.
+│   ├── server.ts            # Entry point khởi tạo web server.
+│   ├── config/              # Khởi tạo Database (Prisma), Firebase, kiểm tra biến môi trường.
+│   ├── controllers/         # Tầng giao tiếp HTTP: Nhận request và trả về response.
+│   ├── services/            # Tầng Business Logic: Chứa nghiệp vụ cốt lõi và gọi truy vấn CSDL.
+│   ├── routes/              # Tầng định tuyến: URL Endpoints và Middlewares.
+│   ├── middlewares/         # Middleware bảo mật, xác thực token (JWT), bắt lỗi (Error Handling).
+│   └── validators/          # Các schema kiểm tra đầu vào (sử dụng thư viện Zod).
+├── tests/                   # Thư mục chứa các Unit & Integration Tests tự động (Jest).
+└── TESTING_PLAN.md          # Kế hoạch và chiến lược kiểm thử.
 ```
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt Và Chạy (Installation & Setup)
+## 🚀 Hướng Dẫn Cài Đặt (Tutorial & Setup)
 
-### 1. Yêu cầu hệ thống (Prerequisites)
+Để chạy dự án trên máy cá nhân, bạn chỉ cần làm theo các bước đơn giản sau.
+
+### 1. Yêu cầu hệ thống
 - **Node.js**: Phiên bản v22 LTS trở lên.
-- **MySQL**: Máy chủ MySQL (Local, XAMPP, hoặc Docker).
-- **Trình quản lý gói**: `npm` (được khuyến nghị).
+- **MySQL**: Máy chủ MySQL đang chạy (Local, XAMPP, Docker, hoặc dịch vụ Cloud như **Aiven.io**).
+- Trình quản lý gói: `npm`.
 
 ### 2. Các bước cài đặt chi tiết
 
-**Bước 1:** Clone mã nguồn và cài đặt các thư viện phụ thuộc:
+**Bước 1: Clone và Cài Đặt Thư Viện**
+Mở terminal, di chuyển vào thư mục backend và cài đặt thư viện:
 ```bash
-# Trỏ vào thư mục backend
 cd backend-api
-
-# Cài đặt tất cả dependencies
 npm install
 ```
 
-**Bước 2:** Cấu hình biến môi trường:
-Copy file `.env.example` thành file `.env` ở thư mục gốc của `backend-api` và thiết lập các thông số cơ bản.
+**Bước 2: Cấu Hình Biến Môi Trường**
+Tạo file `.env` từ file mẫu:
 ```bash
 cp .env.example .env
 ```
-Mở file `.env` và chỉnh sửa các thông số. Nội dung file cơ bản nên bao gồm:
+Mở file `.env` và cập nhật thông số kết nối Database:
+
+**Tùy chọn 1: Dùng MySQL Local (XAMPP, Docker, v.v.)**
 ```env
 PORT=3000
-# Sửa lại user, password và database name của bạn
+# Thay thế 'root' và 'password' bằng tài khoản MySQL của máy bạn.
 DATABASE_URL="mysql://root:password@localhost:3306/bnwems_db"
 JWT_SECRET="your_jwt_secret_key_here"
 ```
 
-**Bước 3:** Khởi tạo cơ sở dữ liệu với Prisma:
-Để tạo cấu trúc bảng trong MySQL dựa theo file `schema.prisma`:
-```bash
-# Chạy migration để đồng bộ database và cập nhật Prisma Client
-npx prisma migrate dev
+**Tùy chọn 2: Dùng Aiven.io MySQL (Cloud)**
+Nếu bạn sử dụng Aiven.io, hãy copy "Service URI" trong giao diện Overview của Aiven. Vì Aiven yêu cầu kết nối bảo mật, chuỗi kết nối nên có `?ssl-mode=REQUIRED`:
+```env
+PORT=3000
+# URI mẫu từ Aiven.io:
+DATABASE_URL="mysql://avnadmin:your_password@your-project.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED"
+JWT_SECRET="your_jwt_secret_key_here"
 ```
 
-**Bước 4:** Nạp dữ liệu mẫu (Seeding)
-Hệ thống đi kèm dữ liệu mẫu để bạn có thể test ứng dụng ngay lập tức (bao gồm 1 Admin user, 3 roles, các báo giá mẫu, v.v.):
+*(Lưu ý: Nếu dùng MySQL Local, công cụ ở bước 3 sẽ tự động tạo bảng và nạp dữ liệu mẫu giúp bạn).*
+
+**Bước 3: Khởi Tạo Database và Nạp Dữ Liệu (Seeding)**
+
+**Trường hợp 1: Sử dụng Aiven.io MySQL (Cloud)**
+Do cơ sở dữ liệu online đã được khởi tạo sẵn cấu trúc và dữ liệu cho dự án, bạn **chỉ cần** tạo thư viện Prisma Client:
 ```bash
 npm run prisma:generate
+```
+> **Mẹo bên lề (Reset Dữ Liệu):** Nếu trong quá trình test bạn muốn xóa sạch dữ liệu hiện tại trên Cloud DB và khôi phục lại dữ liệu mẫu ban đầu (seed), hãy chạy các lệnh sau:
+> ```bash
+> npx prisma db push --force-reset
+> npx prisma db seed
+> ```
+
+**Trường hợp 2: Sử dụng MySQL Local**
+Nếu dùng DB local, dự án đã tích hợp file `documents/BNWEMS.sql` chứa sẵn toàn bộ cấu trúc bảng và dữ liệu mẫu. Hãy chạy các lệnh sau để tự động áp dụng:
+```bash
+npm run prisma:generate
+npx prisma db push
 npx prisma db seed
 ```
-> **Lưu ý:** Tài khoản đăng nhập mặc định (đã seed) có thể xem trong file `prisma/seed.ts` (ví dụ số điện thoại `0987654321`, mật khẩu `password123`).
+> **Giải thích:**
+> - `prisma:generate`: Tạo bộ thư viện client để code Node.js giao tiếp với Database.
+> - `db push`: Đồng bộ sơ đồ từ `schema.prisma` sang Database Local.
+> - `db seed`: Tự động chèn dữ liệu mẫu vào (bao gồm tài khoản Admin, đơn hàng, v.v.).
+
+**Bước 4: Cấu Hình Firebase (Dịch vụ Lưu Trữ Ảnh)**
+Dự án sử dụng Firebase Storage để lưu trữ và quản lý hình ảnh. Bạn cần cập nhật các biến môi trường Firebase trong file `.env`:
+```env
+FIREBASE_PROJECT_ID="your-project-id"
+FIREBASE_CLIENT_EMAIL="your-client-email@..."
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
+FIREBASE_STORAGE_BUCKET="your-project-id.firebasestorage.app"
+```
+> **Cách lấy thông tin Firebase (nếu bạn tự setup Project riêng):**
+> 1. Truy cập [Firebase Console](https://console.firebase.google.com/), tạo một Project mới.
+> 2. Vào **Project settings** (Cài đặt dự án) > tab **Service accounts** > Chọn nút **Generate new private key**.
+> 3. Tải file JSON về máy. Mở file JSON đó ra để lấy các giá trị `project_id`, `client_email` và `private_key` điền tương ứng vào file `.env`.
+> 4. Vào mục **Storage** trên Firebase Console để lấy tên bucket (ví dụ: `your-project.firebasestorage.app` hoặc `your-project.appspot.com`).
+> 
+> *(Lưu ý: Nếu team đã cung cấp sẵn file `.env` chứa thông tin Firebase dùng chung thì bạn có thể bỏ qua bước setup thủ công này).*
 
 ---
 
-## 💻 Chạy Ứng Dụng
+## 💻 Hướng Dẫn Chạy Ứng Dụng
 
-### Môi trường phát triển (Development)
-Khởi động server với tính năng auto-reload (sử dụng `ts-node`):
+**Môi trường Phát Triển (Development)**
+Chạy lệnh sau để khởi động server (có tính năng tự động tải lại khi sửa code):
 ```bash
 npm run dev
 ```
-> **Dấu hiệu thành công:** Terminal sẽ hiển thị: `[Server] Server is running on port 3000`
+> Nếu hiển thị `✅ Firebase Admin SDK initialized` và `[Server] Server is running on port 3000`, tức là ứng dụng đã chạy thành công!
 
-### Môi trường sản xuất (Production)
-Build mã nguồn TypeScript sang JavaScript thuần và chạy:
+**Xem Database Trực Quan (Prisma Studio)**
+Bạn có thể xem và chỉnh sửa trực tiếp dữ liệu trong Database thông qua giao diện Web:
 ```bash
-# Xóa build cũ (nếu có) và biên dịch mã nguồn
-npm run build
-
-# Chạy server ở chế độ Production
-npm run start
+npm run prisma:studio
 ```
-> **Lưu ý về BigInt:** Hệ thống sử dụng khóa chính dạng `BigInt` để tăng hiệu suất. Khi trả kết quả qua JSON, các trường ID này sẽ được parse thành `String` (VD: `"userId": "1"`). Frontend cần chú ý xử lý dạng chuỗi này thay vì số nguyên.
+> Mở trình duyệt và truy cập `http://localhost:5555`.
 
 ---
 
-## 🧪 Kế Hoạch Kiểm Thử (Automation Testing)
+## 🧪 Chạy Kiểm Thử (Automation Testing)
 
-Hệ thống được thiết kế đi kèm với các bộ kiểm thử tự động toàn diện, dựa trên tài liệu **13 API Contracts** đã được thống nhất. Chi tiết về kế hoạch kiểm thử xem tại [TESTING_PLAN.md](./TESTING_PLAN.md).
+Hệ thống có bộ test suite rất mạnh để đảm bảo tính chính xác của các tính năng. Hiện tại hệ thống có tỷ lệ **bao phủ 100% đối với 14 API Contracts**.
 
-### 1. Công Cụ & Chiến Lược
-- **Testing Framework**: Jest
-- **Assertion & HTTP Request**: Supertest
-- **Mocking**: `jest-mock-extended` (Deep mock Prisma Client để giả lập Database mà không cần kết nối MySQL thực tế).
-
-### 2. Chạy Kiểm Thử (Running Tests)
-Để chạy toàn bộ các test suites, sử dụng lệnh:
+Để chạy kiểm thử tự động, sử dụng:
 ```bash
-npm test
+npm run test
 ```
-> **Kết quả mong đợi:** 100% các bài kiểm tra được phủ sóng và chạy thành công (177/177 test cases PASS).
-
-### 3. Xem độ phủ (Coverage)
-Để xem chi tiết tỷ lệ code đã được kiểm thử:
+Để xem báo cáo mức độ bao phủ code chi tiết:
 ```bash
 npm run test:coverage
 ```
 
-### 4. Cấu Trúc Các Test Suites
-Hệ thống kiểm thử tự động gồm 21 file test tương ứng với Router, đã đạt mức độ bao phủ 100% (177/177 test cases PASS) và khớp 1:1 với 13 API contracts:
-- `auth.test.ts`, `user.test.ts`: Xác thực, quản lý tài khoản.
-- `catalog.test.ts`, `warehouse.test.ts`, `inventory.test.ts`: Quản lý kho, hạng mục, tồn kho.
-- `supplier.test.ts`, `suppliertx.test.ts`: Quản lý nhà cung cấp.
-- `order.test.ts`, `quotation.test.ts`: Đơn hàng, báo giá.
-- `task.test.ts`, `survey.test.ts`, `attendance.test.ts`: Khảo sát, task công việc.
-- `payment.test.ts`, `settlement.test.ts`: Thanh toán, quyết toán.
-- `policy.test.ts`, `wage.test.ts`: Hợp đồng, lương.
-- V.v.
+## 🔐 Thông Tin Đăng Nhập Mẫu
 
----
+Sau khi chạy lệnh `seed` thành công, bạn có thể sử dụng các tài khoản sau để đăng nhập trên Swagger hoặc Postman:
 
-## 🧰 Các Tiện Ích Hỗ Trợ (Utilities)
-
-- **Xem trực tiếp CSDL qua giao diện Web:**
-  ```bash
-  npm run prisma:studio
-  ```
-  *(Truy cập `http://localhost:5555` để thao tác trực tiếp với các bảng dữ liệu)*
+| Vai Trò | Số Điện Thoại | Mật Khẩu |
+| :--- | :--- | :--- |
+| **Admin** | `0987654321` | `password123` |
+| **Quản Lý (Manager)** | Tự xem trong bảng `internal_users` | `password123` |
+| **Nhân Viên (Staff)** | Tự xem trong bảng `internal_users` | `password123` |

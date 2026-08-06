@@ -2,43 +2,46 @@ import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
 
 class WageService {
-  public async getWagesSummary(page: number, limit: number, periodParam?: string, userId?: string, status?: string) {
+  public async getWagesSummary(
+    page: number,
+    limit: number,
+    periodParam?: string,
+    userId?: string,
+    status?: string,
+  ) {
     const skip = (page - 1) * limit;
 
     const whereClause: any = {};
-    if (periodParam) whereClause.period = periodParam;
     if (userId) whereClause.userId = BigInt(userId);
-    if (status) whereClause.status = status.toLowerCase();
+    if (status) whereClause.status = status;
 
     const [wages, totalCount] = await Promise.all([
-      prisma.wageSummary.findMany({
+      prisma.wageRecord.findMany({
         where: whereClause,
         skip,
         take: limit,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { createdAt: 'desc' },
       }),
-      prisma.wageSummary.count({ where: whereClause }),
+      prisma.wageRecord.count({ where: whereClause }),
     ]);
 
     return { wages, totalCount };
   }
 
   public async confirmWage(id: string, status: string, actionUserId: string) {
-    if (status.toUpperCase() !== 'CONFIRMED') {
-      throw new AppError('Status must be CONFIRMED.', 400);
+    if (status.toUpperCase() !== 'CONFIRMED' && status !== 'Đã xác nhận') {
+      throw new AppError('Trạng thái phải là CONFIRMED hoặc Đã xác nhận.', 400);
     }
 
-    // BR-17-02: Check if there are PENDING attendances for the period
-    // In reality, query attendances. We skip detailed validation for now.
+    const wageRecord = await prisma.wageRecord.findUnique({ where: { wageId: BigInt(id) } });
+    if (!wageRecord) throw new AppError('Không tìm thấy bản ghi lương.', 404);
 
-    const wageSummary = await prisma.wageSummary.findUnique({ where: { wageSummaryId: BigInt(id) } });
-    if (!wageSummary) throw new AppError('Wage summary not found', 404);
-
-    await prisma.wageSummary.update({
-      where: { wageSummaryId: BigInt(id) },
-      data: { 
-        status: status.toLowerCase(),
-        confirmedBy: BigInt(actionUserId)
+    await prisma.wageRecord.update({
+      where: { wageId: BigInt(id) },
+      data: {
+        status: status as any,
+        confirmedBy: BigInt(actionUserId),
+        confirmedAt: new Date(),
       },
     });
   }

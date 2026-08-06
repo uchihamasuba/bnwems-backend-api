@@ -1,43 +1,151 @@
 import { Router } from 'express';
-import * as orderController from '../controllers/order.controller';
-import * as handoverController from '../controllers/handover.controller';
-import * as damagelossController from '../controllers/damageloss.controller';
-import { nestedQuotationRouter } from './quotation.route';
-import { nestedChangeRequestRouter } from './changerequest.route';
-import { nestedTaskRouter } from './task.route';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
+import { orderController } from '../controllers/order.controller';
+import { inventoryController } from '../controllers/inventory.controller';
+import { validate } from '../middlewares/validate.middleware';
+import {
+  verifyToken as protect,
+  authorizeRoles as restrictTo,
+} from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
+import {
+  getOrdersSchema,
+  getOrderByIdSchema,
+  createOrderSchema,
+  updateOrderStatusSchema,
+  updateOrderItemsSchema,
+  getOrderWarningsSchema,
+  createOrderWarningSchema,
+  resolveOrderWarningSchema,
+  getOrderDepositsSchema,
+  createOrderDepositSchema,
+  updateDepositStatusSchema,
+  getOrderSettlementSchema,
+  createOrderSettlementSchema,
+  confirmSettlementSchema,
+} from '../validators/order.validator';
 
 const router = Router();
 
-router.use(authenticate);
+// ============================================================================
+// ORDERS
+// ============================================================================
 
-// Orders
-import { validate } from '../middlewares/validate.middleware';
-import { getOrdersSchema, getOrderByIdSchema, createOrderSchema, confirmOrderSchema, changeEventDateSchema, closeOrderSchema } from '../validators/order.validator';
+router.get(
+  '/',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(getOrdersSchema),
+  orderController.getOrders,
+);
 
-router.get('/', authorizeRoles('ADMIN', 'MANAGER'), validate(getOrdersSchema), orderController.getOrders);
-router.get('/field-progress', authorizeRoles('ADMIN', 'MANAGER'), orderController.getFieldProgress);
-router.get('/:id', authorizeRoles('ADMIN', 'MANAGER'), validate(getOrderByIdSchema), orderController.getOrderById);
-router.post('/', authorizeRoles('ADMIN', 'MANAGER'), validate(createOrderSchema), orderController.createOrder);
-router.put('/:id/confirm', authorizeRoles('ADMIN', 'MANAGER'), validate(confirmOrderSchema), orderController.confirmOrder);
-router.put('/:id/change-date', authorizeRoles('ADMIN', 'MANAGER'), validate(changeEventDateSchema), orderController.changeEventDate);
-router.put('/:id/close', authorizeRoles('ADMIN', 'MANAGER'), validate(closeOrderSchema), orderController.closeOrder);
+router.post(
+  '/',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(createOrderSchema),
+  orderController.createOrder,
+);
 
-import { recordHandoverSchema } from '../validators/handover.validator';
+router.get(
+  '/:id',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER, Role.TECHNICAL),
+  validate(getOrderByIdSchema),
+  orderController.getOrderById,
+);
 
-import { recordDamageLossSchema } from '../validators/damageloss.validator';
+router.put(
+  '/:id/status',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(updateOrderStatusSchema),
+  orderController.updateOrderStatus,
+);
 
-router.post('/:orderId/handover', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(recordHandoverSchema), handoverController.recordHandover);
-router.post('/:orderId/damage-loss', authorizeRoles('LEADER_STAFF', 'MANAGER'), validate(recordDamageLossSchema), damagelossController.recordDamageLoss);
+router.put(
+  '/:id/items',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(updateOrderItemsSchema),
+  orderController.updateOrderItems,
+);
 
-import { nestedPaymentRouter } from './payment.route';
-import { nestedSettlementRouter } from './settlement.route';
+// ============================================================================
+// ORDER WARNINGS
+// ============================================================================
 
-// Nested routes
-router.use('/:orderId/quotations', nestedQuotationRouter);
-router.use('/:orderId/change-requests', nestedChangeRequestRouter);
-router.use('/:orderId/tasks', nestedTaskRouter);
-router.use('/:orderId/payments', nestedPaymentRouter);
-router.use('/:orderId/settlement', nestedSettlementRouter);
+router.get(
+  '/:id/warnings',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER, Role.TECHNICAL, Role.LEADER),
+  validate(getOrderWarningsSchema),
+  orderController.getOrderWarnings,
+);
+
+router.post(
+  '/:id/warnings',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER, Role.TECHNICAL, Role.LEADER),
+  validate(createOrderWarningSchema),
+  orderController.createOrderWarning,
+);
+
+// ============================================================================
+// DEPOSITS
+// ============================================================================
+
+router.get(
+  '/:id/deposits',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(getOrderDepositsSchema),
+  orderController.getOrderDeposits,
+);
+
+router.post(
+  '/:id/deposits',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(createOrderDepositSchema),
+  orderController.createOrderDeposit,
+);
+
+// ============================================================================
+// SETTLEMENTS
+// ============================================================================
+
+router.get(
+  '/:id/settlement',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER, Role.LEADER),
+  validate(getOrderSettlementSchema),
+  orderController.getOrderSettlement,
+);
+
+router.post(
+  '/:id/settlement',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER, Role.LEADER),
+  validate(createOrderSettlementSchema),
+  orderController.createOrderSettlement,
+);
+
+// ============================================================================
+// INVENTORY PREPARATION & CHECKOUT
+// ============================================================================
+
+router.put(
+  '/:id/prepare',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  inventoryController.prepareOrder,
+);
+
+router.post(
+  '/:id/checkout',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  inventoryController.checkoutOrder,
+);
 
 export default router;

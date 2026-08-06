@@ -1,160 +1,233 @@
-# Operations & Field Work: Survey & Assignment
+# Operations & Field Work: Survey & Schedule Planning
 
 ## Overview
-This module handles **UC 2.12 (Survey Management)** and **UC 2.14 - 2.15 (Staff Assignment & Operation Planning)**.
-It manages `WorkTask` entities and assigns `InternalUser` personnel to them through the `Assignment` entity.
+This module handles **UC 2.12 (Survey Management)** and **UC 2.14 - 2.15 (Staff Assignment & Schedule Planning)**.
+It manages `WorkTask` definitions, specific `SchedulePlan` assignments for orders, and the creation of `SurveyReport`s.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC53-01`: Required information is missing or invalid.
-- `MSG-UC53-02`: System cannot complete the request.
-- `MSG-UC53-05`: Staff assignment information is missing.
-- `MSG-UC55-06`: Task cannot be deleted because it has already started or been executed.
-- `MSG-UC12-01`: Survey report already submitted.
+- `MSG-UC53-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC53-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC53-05`: Thiếu thông tin phân công nhân viên.
+- `MSG-UC55-06`: Không thể xóa phân công vì nó đã bắt đầu hoặc đã được thực hiện.
+- `MSG-UC12-01`: Báo cáo khảo sát đã được gửi.
 
-## 1. Survey Management (UC 2.12)
+---
 
-### `POST /api/v1/orders/:id/tasks`
-- **Use Case:** UC 2.12 - Create Survey Task
-- **Description:** Manager creates a survey task linked to an order.
-- **Request Body:**
-```json
-{
-  "taskType": "survey",
-  "scheduledStart": "2026-08-01T09:00:00Z",
-  "scheduledEnd": "2026-08-01T12:00:00Z",
-  "location": "123 Event Hall"
-}
-```
-- **Response (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Survey task created.",
-  "data": { "workTaskId": 1 }
-}
-```
+## 1. Work Task Dictionary
 
-### `GET /api/v1/tasks/:id/survey-report`
-- **Use Case:** UC 2.12 - View Survey Report
-- **Description:** Manager reviews submitted survey reports attached to a task.
+### 1. `GET /api/v1/work-tasks`
+- **Use Case:** View predefined tasks.
+- **Description:** Retrieves the catalog of work tasks (e.g., Khảo sát, Lắp đặt, Thu dọn).
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "data": {
-    "workTaskId": 1,
-    "notes": "Venue has strict height limits.",
-    "evidences": [
-      { "fileUrl": "https://storage.example.com/survey1.jpg" }
-    ],
-    "submittedAt": "2026-06-22T12:00:00Z"
-  }
-}
-```
-
-## 2. Staff Assignment (UC 2.14, 2.15)
-
-### `GET /api/v1/tasks`
-- **Use Case:** UC 2.14 - View Schedule Plan List
-- **Description:** Manager views scheduled tasks.
-- **Query Parameters:**
-  - `orderId` (string, optional)
-  - `taskType` (enum, optional)
-  - `status` (enum, optional)
-  - `page` (number, default 1)
-  - `limit` (number, default 20)
-- **Response (200 OK):**
-```json
-{
-  "success": true,
+  "code": "MSG-SV-01",
   "data": [
     {
-      "workTaskId": 1,
-      "orderId": 1,
-      "taskType": "installation",
-      "scheduledStart": "2026-10-14T08:00:00Z",
-      "scheduledEnd": "2026-10-15T18:00:00Z",
-      "status": "pending"
+      "taskId": 1,
+      "taskCode": "TSK-001",
+      "taskName": "Khảo sát mặt bằng",
+      "isActive": true
+    }
+  ]
+}
+```
+
+---
+
+## 2. Schedule Planning & Staff Assignment (UC 2.14, 2.15)
+
+### 2. `GET /api/v1/schedule-plans`
+- **Use Case:** UC 2.14 - View Schedule List
+- **Description:** Retrieves schedule plans across all orders. Manager access required.
+- **Query Parameters:**
+  - `orderId` (string, optional)
+  - `assignedTo` (string, optional)
+  - `status` (enum, optional) - Chờ xử lý, Đã xác nhận, Đang thực hiện, Hoàn thành, Đã hủy
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SV-02",
+  "data": [
+    {
+      "planId": 1,
+      "planCode": "PLN-001",
+      "orderId": 100,
+      "taskId": 1,
+      "taskName": "Khảo sát mặt bằng",
+      "assignedTo": 5,
+      "assigneeName": "Nguyễn Văn A",
+      "startTime": "2026-10-01T09:00:00Z",
+      "endTime": "2026-10-01T12:00:00Z",
+      "location": "123 Event Hall",
+      "status": "Chờ xử lý"
     }
   ],
   "meta": { "page": 1, "limit": 20, "totalCount": 50 }
 }
 ```
 
-### `POST /api/v1/tasks`
-- **Use Case:** UC 2.15.1 - Create Work Task for Staff
-- **Description:** Creates an operational task (e.g. preparation, transport, installation).
+### 3. `POST /api/v1/schedule-plans`
+- **Use Case:** UC 2.15.2 - Create Schedule Plan / Assign Staff
+- **Description:** Creates a schedule plan for an order and assigns a staff member.
 - **Business Rules:**
-  - BR-52-05: Must be linked to a related order.
+  - BR-53-06: Automatically notifies the assigned user.
 - **Request Body:**
 ```json
 {
-  "orderId": 1,
-  "taskType": "installation",
-  "scheduledStart": "2026-10-14T08:00:00Z",
-  "scheduledEnd": "2026-10-15T18:00:00Z",
-  "location": "123 Event Hall"
+  "orderId": 100,
+  "taskId": 1,
+  "assignedTo": 5,
+  "startTime": "2026-10-01T09:00:00Z",
+  "endTime": "2026-10-01T12:00:00Z",
+  "location": "123 Event Hall",
+  "notes": "Nhớ mang theo thước đo"
 }
 ```
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "message": "Task created successfully.",
-  "data": { "workTaskId": 1 }
+  "code": "MSG-SV-03",
+  "message": "Đã tạo phân công và gửi thông báo cho nhân viên."
 }
 ```
 
-### `POST /api/v1/tasks/:id/assignments`
-- **Use Case:** UC 2.15.2 - Assign Work Task for Staff
-- **Description:** Assigns staff members to a specific task.
+### 4. `PUT /api/v1/schedule-plans/:id`
+- **Use Case:** UC 2.15.3 - Edit Schedule Plan
+- **Description:** Modifies a schedule plan.
 - **Business Rules:**
-  - BR-53-06: Must identify responsible staff and roles.
-  - BR-53-08: Assignment changes should trigger notification to affected staff (UC 2.3).
+  - BR-54-07: Executed or Completed plans should not be modified.
 - **Request Body:**
 ```json
 {
-  "assignments": [
+  "startTime": "2026-10-01T10:00:00Z",
+  "endTime": "2026-10-01T11:00:00Z"
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SV-03-UPDATED",
+  "message": "Cập nhật phân công thành công."
+}
+```
+
+### 5. `PATCH /api/v1/schedule-plans/:id/status`
+- **Use Case:** UC 2.15.4 - Update Schedule Status
+- **Description:** Updates the status of the plan (e.g., to Đã hủy or Đã xác nhận).
+- **Request Body:**
+```json
+{
+  "status": "Đã hủy"
+}
+```
+
+---
+
+## 3. Survey Management (UC 2.12)
+
+### 6. `GET /api/v1/orders/:orderId/survey-reports`
+- **Use Case:** UC 2.12 - View Survey Reports for an Order
+- **Description:** Retrieves all survey reports associated with an order.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-SV-04",
+  "data": [
     {
-      "userId": 1,
-      "assignedRole": "Leader Staff"
-    },
-    {
-      "userId": 2,
-      "assignedRole": "Technical Staff"
+      "surveyId": 1,
+      "reportCode": "SRV-001",
+      "orderId": 100,
+      "planId": 1,
+      "surveyDate": "2026-10-01T00:00:00Z",
+      "location": "123 Event Hall",
+      "area": 200.5,
+      "status": "Đã xác nhận"
     }
   ]
 }
 ```
+
+### 7. `GET /api/v1/survey-reports/:id`
+- **Use Case:** View Survey Report Details
+- **Description:** Retrieves full details of a survey report, including evidence links.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Staff assigned and notified."
+  "code": "MSG-SV-04-DETAIL",
+  "data": {
+    "surveyId": 1,
+    "reportCode": "SRV-001",
+    "orderId": 100,
+    "planId": 1,
+    "evidenceId": 15,
+    "surveyDate": "2026-10-01T00:00:00Z",
+    "location": "123 Event Hall",
+    "area": 200.5,
+    "length": 20.0,
+    "width": 10.0,
+    "entrance": "Cổng sau rộng 3m",
+    "siteConstraints": "Không dùng đinh đóng tường",
+    "proposedItems": "Nên dùng khung truss tự đứng",
+    "notes": "Khách hàng dặn kỹ về vệ sinh",
+    "status": "Đã xác nhận",
+    "evidence": {
+      "fileId": 15,
+      "fileUrl": "https://example.com/survey-doc.pdf"
+    }
+  }
 }
 ```
 
-### `PUT /api/v1/tasks/:id`
-- **Use Case:** UC 2.15.3 - Edit Work Task
-- **Description:** Modifies a task.
-- **Business Rules:**
-  - BR-54-07: Executed tasks should not be modified, only updated with progress.
+### 8. `POST /api/v1/survey-reports`
+- **Use Case:** UC 2.12 - Submit Survey Report
+- **Description:** Staff submits a survey report after completing a site survey.
 - **Request Body:**
 ```json
 {
-  "scheduledStart": "2026-10-14T09:00:00Z"
+  "orderId": 100,
+  "planId": 1,
+  "evidenceId": 15,
+  "surveyDate": "2026-10-01T00:00:00Z",
+  "location": "123 Event Hall",
+  "area": 200.5,
+  "length": 20.0,
+  "width": 10.0,
+  "entrance": "Cổng sau rộng 3m",
+  "siteConstraints": "Không dùng đinh đóng tường",
+  "proposedItems": "Nên dùng khung truss tự đứng",
+  "notes": "Khách hàng dặn kỹ về vệ sinh"
+}
+```
+- **Response (201 Created):**
+```json
+{
+  "success": true,
+  "code": "MSG-SV-05",
+  "message": "Đã nộp báo cáo khảo sát thành công."
 }
 ```
 
-### `DELETE /api/v1/tasks/:id`
-- **Use Case:** UC 2.15.4 - Delete Work Task for Staff
-- **Description:** Deletes an unscheduled or draft task.
-- **Business Rules:**
-  - BR-55-07: Cannot delete if `status` is not `PENDING`. Returns `MSG-UC55-06`.
+### 9. `PUT /api/v1/survey-reports/:id/confirm`
+- **Use Case:** UC 2.12 - Survey Report Approval
+- **Description:** Manager confirms the submitted survey report.
+- **Request Body:**
+```json
+{
+  "status": "Đã xác nhận"
+}
+```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Task deleted."
+  "code": "MSG-SV-06",
+  "message": "Báo cáo khảo sát đã được xác nhận."
 }
 ```

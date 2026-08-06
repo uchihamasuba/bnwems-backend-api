@@ -1,12 +1,13 @@
 import { z } from 'zod';
+import { QuotationStatus } from '@prisma/client';
 
-export const getQuotationsByOrderSchema = z.object({
+export const getCustomerQuotationsSchema = z.object({
   params: z.object({
-    orderId: z.string().regex(/^\d+$/, 'Invalid ID format').optional(), // Sometimes it's mounted on /quotations
+    customerId: z.string().regex(/^\d+$/, 'Invalid customerId'),
   }),
   query: z.object({
-    page: z.string().regex(/^\d+$/, 'Page must be a number').optional(),
-    limit: z.string().regex(/^\d+$/, 'Limit must be a number').optional(),
+    page: z.string().regex(/^\d+$/).optional(),
+    limit: z.string().regex(/^\d+$/).optional(),
   }),
 });
 
@@ -18,14 +19,21 @@ export const getQuotationByIdSchema = z.object({
 
 export const createQuotationSchema = z.object({
   params: z.object({
-    orderId: z.string().regex(/^\d+$/, 'Invalid ID format'),
+    customerId: z.string().regex(/^\d+$/, 'Invalid customerId'),
   }),
   body: z.object({
-    subtotal: z.number().min(0, 'Subtotal must be non-negative'),
-    tax: z.number().min(0).optional(),
-    discount: z.number().min(0).optional(),
-    totalAmount: z.number().min(0, 'Total amount must be non-negative'),
-    details: z.any().optional(),
+    version: z.string().min(1),
+    notes: z.string().optional(),
+    items: z
+      .array(
+        z.object({
+          itemId: z.number().int().positive(),
+          quantity: z.number().int().positive(),
+          price: z.number().min(0),
+          discount: z.number().min(0).optional(),
+        }),
+      )
+      .min(1, 'At least one item is required'),
   }),
 });
 
@@ -34,21 +42,30 @@ export const updateQuotationSchema = z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),
   body: z.object({
-    subtotal: z.number().min(0).optional(),
-    tax: z.number().min(0).optional(),
-    discount: z.number().min(0).optional(),
-    totalAmount: z.number().min(0).optional(),
-    details: z.any().optional(),
+    notes: z.string().optional(),
+    items: z
+      .array(
+        z.object({
+          itemId: z.number().int().positive(),
+          quantity: z.number().int().positive(),
+          price: z.number().min(0),
+          discount: z.number().min(0).optional(),
+        }),
+      )
+      .min(1, 'At least one item is required'),
+  }),
+});
+
+export const updateQuotationStatusSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
+  }),
+  body: z.object({
+    status: z.nativeEnum(QuotationStatus),
   }),
 });
 
 export const deleteQuotationSchema = z.object({
-  params: z.object({
-    id: z.string().regex(/^\d+$/, 'Invalid ID format'),
-  }),
-});
-
-export const confirmQuotationSchema = z.object({
   params: z.object({
     id: z.string().regex(/^\d+$/, 'Invalid ID format'),
   }),

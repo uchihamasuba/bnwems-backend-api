@@ -13,7 +13,7 @@ function extractFromDocs(dir) {
     for (const file of files) {
         if (file.endsWith('.md')) {
             const content = fs.readFileSync(path.join(dir, file), 'utf8');
-            const regex = /### `(GET|POST|PUT|DELETE|PATCH)\s+(\/api\/v1[a-zA-Z0-9\/\-:]+)`/g;
+            const regex = /###\s+(?:\d+\.\s+)?(?:`)?(GET|POST|PUT|DELETE|PATCH)\s+(\/api\/v1[a-zA-Z0-9\/\-:]+)(?:`)?/g;
             let match;
             while ((match = regex.exec(content)) !== null) {
                 // normalize paths

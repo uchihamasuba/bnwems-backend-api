@@ -4,11 +4,11 @@
 This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account Management)** for `Internal User`. It uses JSON Web Tokens (JWT) for session management and relies on the `InternalUser` entity.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC01-01`: Required information is missing or invalid.
-- `MSG-UC01-02`: Invalid username or password.
-- `MSG-UC01-03`: Account is locked or inactive.
-- `MSG-UC01-04`: Token expired or invalid.
-- `MSG-UC02-01`: Password change failed (old password incorrect).
+- `MSG-UC01-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC01-02`: Tên người dùng hoặc mật khẩu không hợp lệ.
+- `MSG-UC01-03`: Tài khoản bị khóa hoặc không hoạt động.
+- `MSG-UC01-04`: Token đã hết hạn hoặc không hợp lệ.
+- `MSG-UC02-01`: Đổi mật khẩu thất bại (mật khẩu cũ không chính xác).
 
 ## Endpoints
 
@@ -17,7 +17,7 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 - **Description:** Authenticates an internal user and issues a JWT token.
 - **Business Rules:**
   - BR-01-01: Must validate username and password against `InternalUser` table.
-  - BR-01-02: User `status` must be `ACTIVE`. If `LOCKED` or `INACTIVE`, return error `MSG-UC01-03`.
+  - BR-01-02: User `status` must be `active`. If inactive, return error `MSG-UC01-03`.
   - BR-01-03: On success, log activity in `AuditLog`.
 - **Request Body:**
 ```json
@@ -30,7 +30,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "message": "Login successful",
+  "code": "MSG-AU-01",
+  "message": "Đăng nhập thành công",
   "data": {
     "token": "eyJhbGciOiJIUzI1...",
     "expiresIn": 86400,
@@ -38,11 +39,10 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
       "userId": 1,
       "username": "adminUser",
       "fullName": "System Admin",
-      "role": {
-        "roleId": 1,
-        "roleName": "Admin"
-      },
-      "status": "active"
+      "avatarUrl": "https://example.com/avatar.jpg",
+      "bio": "Quản trị viên hệ thống",
+      "role": "Quản trị viên",
+      "status": "Hoạt động"
     }
   }
 }
@@ -52,11 +52,13 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 - **Use Case:** UC 2.1 - Logout
 - **Description:** Invalidates the current user session.
 - **Headers:** `Authorization: Bearer <token>`
+- **Request Body:** None (Empty body)
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Logged out successfully."
+  "code": "MSG-AU-02",
+  "message": "Đăng xuất thành công."
 }
 ```
 
@@ -73,7 +75,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "message": "If the account exists, a recovery email has been sent."
+  "code": "MSG-AU-03",
+  "message": "Nếu tài khoản tồn tại, email khôi phục sẽ được gửi."
 }
 ```
 
@@ -96,7 +99,8 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
-  "message": "Password changed successfully."
+  "code": "MSG-AU-04",
+  "message": "Đổi mật khẩu thành công."
 }
 ```
 
@@ -108,17 +112,132 @@ This module handles **UC 2.1 (Authentication)** and **UC 2.2 (Personal Account M
 ```json
 {
   "success": true,
+  "code": "MSG-AU-05",
   "data": {
     "userId": 1,
     "username": "adminUser",
     "fullName": "System Admin",
-    "role": {
-      "roleId": 1,
-      "roleName": "Admin"
-    },
-    "status": "active",
+    "email": "admin@example.com",
+    "phone": "+123456789",
+    "avatarUrl": "https://example.com/avatar.jpg",
+    "bio": "Quản trị viên hệ thống",
+    "role": "Quản trị viên",
+    "status": "Hoạt động",
     "createdAt": "2026-06-22T10:00:00Z",
     "updatedAt": "2026-06-22T10:00:00Z"
   }
+}
+```
+
+### 6. `PUT /api/v1/auth/profile`
+- **Use Case:** UC 2.2 - Update Profile
+- **Description:** Allows the authenticated user to update their personal profile information, including their avatar.
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "fullName": "System Admin Updated",
+  "phone": "+1234567890",
+  "bio": "Quản trị viên hệ thống (đã cập nhật)",
+  "avatarUrl": "https://example.com/new-avatar.jpg"
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-06",
+  "message": "Cập nhật hồ sơ thành công.",
+  "data": {
+    "userId": 1,
+    "username": "adminUser",
+    "fullName": "System Admin Updated",
+    "email": "admin@example.com",
+    "phone": "+1234567890",
+    "avatarUrl": "https://example.com/new-avatar.jpg",
+    "bio": "Quản trị viên hệ thống (đã cập nhật)",
+    "role": "Quản trị viên",
+    "status": "Hoạt động",
+    "createdAt": "2026-06-22T10:00:00Z",
+    "updatedAt": "2026-06-22T10:00:00Z"
+  }
+}
+```
+
+### 7. `POST /api/v1/auth/device-token`
+- **Use Case:** UC 7 - Register Device Token
+- **Description:** Registers or updates a device token (e.g., FCM token) for the authenticated user to receive push notifications.
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "fcmToken": "fcm_token_string_here",
+  "platform": "IOS" 
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-07",
+  "message": "Đăng ký token thiết bị thành công."
+}
+```
+
+### 8. `GET /api/v1/notifications`
+- **Use Case:** UC 7 - View Notifications
+- **Description:** Retrieves a paginated list of notifications for the authenticated user.
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Params:** `?page=1&limit=20`
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-08",
+  "data": [
+    {
+      "notificationId": 1,
+      "title": "Được phân công đơn hàng mới",
+      "body": "Bạn đã được phân công thực hiện đơn hàng #ORD-010.",
+      "type": "ORDER_ASSIGNMENT",
+      "referenceId": 10,
+      "isRead": false,
+      "createdAt": "2026-06-22T10:05:00Z"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "total_pages": 1
+  }
+}
+```
+
+### 9. `PUT /api/v1/notifications/:id/read`
+- **Use Case:** UC 7 - Mark Notification as Read
+- **Description:** Marks a specific notification as read.
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:** None (Empty body)
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-09",
+  "message": "Đã đánh dấu thông báo là đã đọc."
+}
+```
+
+### 10. `PUT /api/v1/notifications/read-all`
+- **Use Case:** UC 7 - Mark All Notifications as Read
+- **Description:** Marks all unread notifications for the user as read.
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:** None (Empty body)
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-AU-10",
+  "message": "Đã đánh dấu tất cả thông báo là đã đọc."
 }
 ```

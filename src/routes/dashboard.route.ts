@@ -1,12 +1,14 @@
 import { Router } from 'express';
-import * as reportController from '../controllers/report.controller';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
+import { dashboardController } from '../controllers/dashboard.controller';
+import {
+  verifyToken as protect,
+  authorizeRoles as restrictTo,
+} from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
 
 const router = Router();
 
-router.use(authenticate);
-
-router.get('/admin', authorizeRoles('ADMIN'), reportController.getAdminDashboard);
-router.get('/manager', authorizeRoles('MANAGER'), reportController.getManagerDashboard);
+router.get('/admin', protect, restrictTo(Role.ADMIN), dashboardController.getAdminDashboard);
+router.get('/manager', protect, restrictTo(Role.MANAGER), dashboardController.getManagerDashboard);
 
 export default router;

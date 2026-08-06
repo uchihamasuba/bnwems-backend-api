@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { authService } from '../services/auth.service';
+import { BigIntUtils } from '../utils/bigint.util';
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -9,7 +10,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: 'Đăng nhập thành công.',
       data: result,
     });
   } catch (error) {
@@ -25,7 +26,7 @@ export const logout = async (req: AuthRequest, res: Response, next: NextFunction
 
     res.status(200).json({
       success: true,
-      message: 'Logged out successfully.',
+      message: 'Đăng xuất thành công.',
     });
   } catch (error) {
     next(error);
@@ -39,7 +40,7 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     res.status(200).json({
       success: true,
-      message: 'If the account exists, a recovery email has been sent.',
+      message: 'Nếu tài khoản tồn tại, email khôi phục đã được gửi.',
     });
   } catch (error) {
     next(error);
@@ -55,7 +56,7 @@ export const changePassword = async (req: AuthRequest, res: Response, next: Next
 
     res.status(200).json({
       success: true,
-      message: 'Password changed successfully.',
+      message: 'Đổi mật khẩu thành công.',
     });
   } catch (error) {
     next(error);
@@ -69,7 +70,40 @@ export const profile = async (req: AuthRequest, res: Response, next: NextFunctio
 
     res.status(200).json({
       success: true,
-      data: user,
+      data: BigIntUtils.toJSON(user),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const updateData = req.body;
+
+    const updatedUser = await authService.updateProfile(userId, updateData);
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật hồ sơ thành công.',
+      data: BigIntUtils.toJSON(updatedUser),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const registerDeviceToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { deviceToken, deviceType } = req.body;
+
+    await authService.registerDeviceToken(userId, deviceToken, deviceType);
+
+    res.status(200).json({
+      success: true,
+      message: 'Đăng ký token thiết bị thành công.',
     });
   } catch (error) {
     next(error);

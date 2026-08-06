@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { generateTestToken } from './setup/authMock';
 
 describe('Auth API (Module 1)', () => {
-  const token = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const token = generateTestToken({ userId: '1', role: 'ADMIN' });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -57,17 +57,17 @@ describe('Auth API (Module 1)', () => {
         userId: 1n,
         username: 'admin',
         passwordHash: await bcrypt.hash('correctpass', 10),
-        status: 'active',
+        status: 'ACTIVE',
         role: { roleId: 1n, roleName: 'ADMIN' },
       } as any);
-      
+
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
         .post('/api/v1/auth/login')
         .send({ username: 'admin', password: 'correctpass' });
 
-      expect(res.status).toBe(200);
+      if(res.status !== 200) console.log(res.body); expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.token).toBeDefined();
       expect(prismaMock.auditLog.create).toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('Auth API (Module 1)', () => {
       const res = await request(app)
         .post('/api/v1/auth/logout')
         .set('Authorization', `Bearer ${token}`);
-        
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(prismaMock.auditLog.create).toHaveBeenCalled();
@@ -89,7 +89,9 @@ describe('Auth API (Module 1)', () => {
 
   describe('POST /api/v1/auth/forgot-password', () => {
     it('should return 200 if email sent or process initiated', async () => {
-      const res = await request(app).post('/api/v1/auth/forgot-password').send({ username: 'admin' });
+      const res = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ username: 'admin' });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
     });
@@ -114,7 +116,11 @@ describe('Auth API (Module 1)', () => {
       const res = await request(app)
         .put('/api/v1/auth/change-password')
         .set('Authorization', `Bearer ${token}`)
-        .send({ oldPassword: 'wrongold', newPassword: 'newpass123', confirmNewPassword: 'newpass123' });
+        .send({
+          oldPassword: 'wrongold',
+          newPassword: 'newpass123',
+          confirmNewPassword: 'newpass123',
+        });
 
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('MSG-UC02-01');
@@ -131,7 +137,11 @@ describe('Auth API (Module 1)', () => {
       const res = await request(app)
         .put('/api/v1/auth/change-password')
         .set('Authorization', `Bearer ${token}`)
-        .send({ oldPassword: 'realold', newPassword: 'newpass123', confirmNewPassword: 'newpass123' });
+        .send({
+          oldPassword: 'realold',
+          newPassword: 'newpass123',
+          confirmNewPassword: 'newpass123',
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -141,19 +151,81 @@ describe('Auth API (Module 1)', () => {
 
   describe('GET /api/v1/auth/profile', () => {
     it('should return 200 and user profile', async () => {
-      prismaMock.internalUser.findUnique.mockResolvedValue({ username: 'admin', fullName: 'Admin User' } as any);
+      prismaMock.internalUser.findUnique.mockResolvedValue({
+        userId: 1n,
+        username: 'admin',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        status: 'ACTIVE'
+      } as any);
       const res = await request(app)
         .get('/api/v1/auth/profile')
         .set('Authorization', `Bearer ${token}`);
-      
+
       expect(res.status).toBe(200);
       expect(res.body.data.username).toBe('admin');
       expect(res.body.data.fullName).toBe('Admin User');
     });
-    
+
     it('should return 401 if token is not provided', async () => {
       const res = await request(app).get('/api/v1/auth/profile');
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('PUT /api/v1/auth/profile', () => {
+    it('should return 200 and update user profile', async () => {
+      prismaMock.internalUser.update.mockResolvedValue({
+        userId: 1n,
+        username: 'admin',
+        fullName: 'Updated Admin User',
+        avatarUrl: 'http://example.com/avatar.png',
+        role: 'ADMIN',
+        status: 'ACTIVE'
+      } as any);
+
+      const res = await request(app)
+        .put('/api/v1/auth/profile')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ fullName: 'Updated Admin User', avatarUrl: 'http://example.com/avatar.png' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.fullName).toBe('Updated Admin User');
+      expect(res.body.data.avatarUrl).toBe('http://example.com/avatar.png');
+      expect(prismaMock.internalUser.update).toHaveBeenCalled();
+    });
+
+    it('should return 401 if token is not provided', async () => {
+      const res = await request(app)
+        .put('/api/v1/auth/profile')
+        .send({ fullName: 'Updated Admin User' });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /api/v1/auth/device-token', () => {
+    it('should return 200 and register device token', async () => {
+      prismaMock.deviceToken.findUnique.mockResolvedValue(null);
+      prismaMock.deviceToken.create.mockResolvedValue({} as any);
+
+      const res = await request(app)
+        .post('/api/v1/auth/device-token')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ deviceToken: 'fcm_token_123', deviceType: 'ANDROID' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(prismaMock.deviceToken.create).toHaveBeenCalled();
+    });
+
+    it('should return 400 if validation fails', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/device-token')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ deviceToken: 'fcm_token_123', deviceType: 'invalid_type' });
+
+      expect(res.status).toBe(400);
     });
   });
 });

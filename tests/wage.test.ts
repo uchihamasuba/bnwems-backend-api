@@ -4,22 +4,22 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Wage API (Module 4)', () => {
-  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const adminToken = generateTestToken({ userId: '1', role: 'ADMIN' });
   const validId1 = '1';
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('GET /api/v1/wages/summary', () => {
+  describe('GET /api/v1/wages', () => {
     it('should return list of wage summaries', async () => {
-      prismaMock.wageSummary.findMany.mockResolvedValue([
-        { wageId: 1n, userId: validId1, period: '2023-10' } as any
+      prismaMock.wageRecord.findMany.mockResolvedValue([
+        { wageId: 1n, userId: validId1, period: '2023-10' } as any,
       ]);
-      prismaMock.wageSummary.count.mockResolvedValue(1);
+      prismaMock.wageRecord.count.mockResolvedValue(1);
 
       const res = await request(app)
-        .get('/api/v1/wages/summary')
+        .get('/api/v1/wages')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
@@ -28,13 +28,13 @@ describe('Wage API (Module 4)', () => {
     });
   });
 
-  describe('POST /api/v1/wages/summary/:id/confirm', () => {
+  describe('POST /api/v1/wages/:id/confirm', () => {
     it('should confirm wage successfully', async () => {
-      prismaMock.wageSummary.findUnique.mockResolvedValue({ wageId: 1n } as any);
-      prismaMock.wageSummary.update.mockResolvedValue({} as any);
+      prismaMock.wageRecord.findUnique.mockResolvedValue({ wageId: 1n } as any);
+      prismaMock.wageRecord.update.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .post(`/api/v1/wages/summary/${validId1}/confirm`)
+        .post(`/api/v1/wages/${validId1}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'CONFIRMED' });
 
@@ -44,7 +44,7 @@ describe('Wage API (Module 4)', () => {
 
     it('should return 400 if validation fails', async () => {
       const res = await request(app)
-        .post(`/api/v1/wages/summary/${validId1}/confirm`)
+        .post(`/api/v1/wages/${validId1}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: '' }); // invalid status
 
@@ -53,10 +53,10 @@ describe('Wage API (Module 4)', () => {
     });
 
     it('should return 404 if wage summary not found', async () => {
-      prismaMock.wageSummary.findUnique.mockResolvedValue(null);
+      prismaMock.wageRecord.findUnique.mockResolvedValue(null);
 
       const res = await request(app)
-        .post(`/api/v1/wages/summary/${validId1}/confirm`)
+        .post(`/api/v1/wages/${validId1}/confirm`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'CONFIRMED' });
 

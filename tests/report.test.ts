@@ -4,8 +4,8 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Report API (Module 13)', () => {
-  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
-  const managerToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'MANAGER' } });
+  const adminToken = generateTestToken({ userId: '1', role: 'ADMIN' });
+  const managerToken = generateTestToken({ userId: '1', role: 'MANAGER' });
   const validId1 = '1';
 
   beforeEach(() => {
@@ -14,7 +14,7 @@ describe('Report API (Module 13)', () => {
 
   describe('GET /api/v1/reports/revenue', () => {
     it('should return revenue report', async () => {
-      prismaMock.payment.findMany.mockResolvedValue([{ amount: 1000 } as any]);
+      prismaMock.order.aggregate.mockResolvedValue({ _sum: { totalAmount: 1000 } } as any);
 
       const res = await request(app)
         .get('/api/v1/reports/revenue')
@@ -37,8 +37,10 @@ describe('Report API (Module 13)', () => {
 
   describe('GET /api/v1/reports/inventory', () => {
     it('should return inventory report', async () => {
-      prismaMock.inventory.findMany.mockResolvedValue([]);
-      
+      prismaMock.collectedEquipmentReportItem.aggregate.mockResolvedValue({
+        _sum: { damagedQuantity: 1, lostQuantity: 1 },
+      } as any);
+
       const res = await request(app)
         .get('/api/v1/reports/inventory')
         .set('Authorization', `Bearer ${adminToken}`);
@@ -49,25 +51,26 @@ describe('Report API (Module 13)', () => {
 
   describe('GET /api/v1/reports/verification', () => {
     it('should return verification report', async () => {
-      prismaMock.workTask.findMany.mockResolvedValue([]);
-      prismaMock.handoverRecord.findUnique.mockResolvedValue(null);
-      prismaMock.damageLossReport.findFirst.mockResolvedValue(null);
+      prismaMock.schedulePlan.findMany.mockResolvedValue([]);
 
       const res = await request(app)
         .get('/api/v1/reports/verification')
         .query({ orderId: validId1 })
-        .set('Authorization', `Bearer ${adminToken}`);
+        .set('Authorization', `Bearer ${managerToken}`);
 
-      expect([200, 404]).toContain(res.status); // 200 if valid
+      expect(res.status).toBe(200);
     });
   });
 
   describe('Dashboard API', () => {
     it('GET /api/v1/dashboard/admin should return 200', async () => {
       prismaMock.order.count.mockResolvedValue(10);
+      prismaMock.order.aggregate.mockResolvedValue({ _sum: { totalAmount: 1000 } } as any);
+      prismaMock.supplierTransaction.aggregate.mockResolvedValue({
+        _sum: { estimatedCost: 500 },
+      } as any);
       prismaMock.order.findMany.mockResolvedValue([]);
-      prismaMock.supplierDebt.findMany.mockResolvedValue([]);
-      
+
       const res = await request(app)
         .get('/api/v1/dashboard/admin')
         .set('Authorization', `Bearer ${adminToken}`);
@@ -78,9 +81,10 @@ describe('Report API (Module 13)', () => {
 
     it('GET /api/v1/dashboard/manager should return 200', async () => {
       prismaMock.order.count.mockResolvedValue(5);
-      prismaMock.changeRequest.count.mockResolvedValue(2);
-      prismaMock.scheduleActivity.findMany.mockResolvedValue([]);
-      prismaMock.workTask.count.mockResolvedValue(1);
+      prismaMock.orderWarning.count.mockResolvedValue(2);
+      prismaMock.schedulePlan.count.mockResolvedValue(1);
+      prismaMock.orderWarning.findMany.mockResolvedValue([]);
+
       const res = await request(app)
         .get('/api/v1/dashboard/manager')
         .set('Authorization', `Bearer ${managerToken}`);

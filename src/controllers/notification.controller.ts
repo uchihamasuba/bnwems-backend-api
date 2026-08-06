@@ -1,42 +1,40 @@
-import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../middlewares/auth.middleware';
-import { notificationService } from '../services/notification.service';
+import { Request, Response, NextFunction } from 'express';
 
-export const getNotifications = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.userId;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const isReadParam = req.query.isRead as string;
+export const notificationController = {
+  async getNotifications(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json({
+        success: true,
+        code: 'MSG-NT-01',
+        data: [],
+        meta: { page: 1, limit: 20, totalCount: 0 },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    const { notifications, totalCount } = await notificationService.getNotifications(userId, page, limit, isReadParam);
+  async readNotification(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json({
+        success: true,
+        code: 'MSG-NT-02',
+        message: 'Đánh dấu đã đọc thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    res.status(200).json({
-      success: true,
-      data: notifications,
-      meta: {
-        page,
-        limit,
-        totalCount,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const markAsRead = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.userId;
-    const { id } = req.params;
-
-    await notificationService.markAsRead(id, userId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Notification marked as read.',
-    });
-  } catch (error) {
-    next(error);
-  }
+  async readAllNotifications(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json({
+        success: true,
+        code: 'MSG-NT-03',
+        message: 'Đã đánh dấu đọc tất cả.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

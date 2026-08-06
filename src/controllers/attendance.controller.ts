@@ -1,36 +1,34 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthRequest } from '../middlewares/auth.middleware';
 import { attendanceService } from '../services/attendance.service';
 
-export const checkIn = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { assignmentId, checkInTime } = req.body;
-    const userId = req.user!.userId;
+export const attendanceController = {
+  async checkIn(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user!.userId;
+      await attendanceService.checkIn(req.body, userId);
 
-    await attendanceService.checkIn(assignmentId, checkInTime, userId);
+      res.status(200).json({
+        success: true,
+        code: 'MSG-PO-04',
+        message: 'Chấm công vào ca thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    res.status(200).json({
-      success: true,
-      message: 'Check-in successful.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  async checkOut(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user!.userId;
+      await attendanceService.checkOut(req.params.id, req.body, userId);
 
-export const confirmAttendance = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { status, checkOutTime } = req.body;
-    const actionUserId = req.user!.userId;
-
-    await attendanceService.confirmAttendance(id, status, actionUserId, checkOutTime);
-
-    res.status(200).json({
-      success: true,
-      message: 'Attendance confirmed.',
-    });
-  } catch (error) {
-    next(error);
-  }
+      res.status(200).json({
+        success: true,
+        code: 'MSG-PO-05',
+        message: 'Chấm công ra ca thành công.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

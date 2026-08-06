@@ -4,8 +4,8 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('User API (Module 2)', () => {
-  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
-  const staffToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'STAFF' } });
+  const adminToken = generateTestToken({ userId: '1', role: 'ADMIN' });
+  const staffToken = generateTestToken({ userId: '1', role: 'TECHNICAL' });
   const validId = '1';
 
   beforeEach(() => {
@@ -27,14 +27,14 @@ describe('User API (Module 2)', () => {
 
     it('should return list of users for ADMIN', async () => {
       prismaMock.internalUser.findMany.mockResolvedValue([
-        { id: '1', username: 'user1', role: 'STAFF' } as any
+        { id: '1', username: 'user1', role: 'TECHNICAL' } as any,
       ]);
       prismaMock.internalUser.count.mockResolvedValue(1);
 
       const res = await request(app)
         .get('/api/v1/users?page=1&limit=10')
         .set('Authorization', `Bearer ${adminToken}`);
-      
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data).toHaveLength(1);
@@ -66,7 +66,7 @@ describe('User API (Module 2)', () => {
           username: 'existinguser',
           password: 'Password123!',
           fullName: 'Existing User',
-          roleId: '3',
+          role: 'TECHNICAL',
         });
 
       expect(res.status).toBe(400);
@@ -75,7 +75,13 @@ describe('User API (Module 2)', () => {
 
     it('should create user successfully', async () => {
       prismaMock.internalUser.findUnique.mockResolvedValue(null);
-      prismaMock.internalUser.create.mockResolvedValue({ id: 'new-user', username: 'newuser', fullName: 'New User', role: { roleId: '3', roleName: 'STAFF' }, status: 'active' } as any);
+      prismaMock.internalUser.create.mockResolvedValue({
+        id: 'new-user',
+        username: 'newuser',
+        fullName: 'New User',
+        role: { roleId: '3', roleName: 'TECHNICAL' },
+        status: 'active',
+      } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
@@ -85,7 +91,11 @@ describe('User API (Module 2)', () => {
           username: 'newuser',
           password: 'Password123!',
           fullName: 'New User',
-          roleId: '3',
+          role: 'TECHNICAL',
+          email: 'newuser@example.com',
+          phone: '0123456789',
+          bio: 'Some bio',
+          avatarUrl: 'http://example.com/avatar.png',
         });
 
       expect(res.status).toBe(201);
@@ -111,18 +121,23 @@ describe('User API (Module 2)', () => {
       const res = await request(app)
         .put(`/api/v1/users/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ fullName: 'Updated Name', role: 'MANAGER' });
-      
+        .send({
+          fullName: 'Updated Name',
+          role: 'MANAGER',
+          avatarUrl: 'http://example.com/new-avatar.png',
+          bio: 'New bio',
+        });
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(prismaMock.internalUser.update).toHaveBeenCalled();
     });
   });
 
-  describe('PUT /api/v1/users/:id/status', () => {
+  describe('PATCH /api/v1/users/:id/status', () => {
     it('should return 400 for invalid status', async () => {
       const res = await request(app)
-        .put(`/api/v1/users/${validId}/status`)
+        .patch(`/api/v1/users/${validId}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'DELETED' }); // invalid enum
       expect(res.status).toBe(400);
@@ -134,10 +149,10 @@ describe('User API (Module 2)', () => {
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
       const res = await request(app)
-        .put(`/api/v1/users/${validId}/status`)
+        .patch(`/api/v1/users/${validId}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'INACTIVE' });
-        
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
     });
@@ -161,9 +176,59 @@ describe('User API (Module 2)', () => {
         .post(`/api/v1/users/${validId}/reset-password`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ newPassword: 'NewPassword123' });
-        
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/v1/users/:id/avatar', () => {
+    it('should return 400 if no file is provided', async () => {
+      const res = await request(app)
+        .post(`/api/v1/users/${validId}/avatar`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('MSG-UF-01');
+    });
+
+    it('should return 403 if user tries to update another user avatar', async () => {
+      const res = await request(app)
+        .post(`/api/v1/users/999/avatar`) // Different user ID
+        .set('Authorization', `Bearer ${staffToken}`) // Not admin
+        .attach('file', Buffer.from('fake image data'), 'avatar.png');
+
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('MSG-UC04-03');
+    });
+
+    it('should upload avatar successfully for authorized user', async () => {
+      // Mock the dynamic import of UploadService
+      jest.mock(
+        '../src/services/upload.service',
+        () => ({
+          UploadService: {
+            uploadImageToFirebase: jest.fn().mockResolvedValue({
+              url: 'https://example.com/avatar.png',
+              fileName: 'avatar.png',
+              folder: 'avatars',
+            }),
+          },
+        }),
+        { virtual: true },
+      );
+
+      prismaMock.internalUser.update.mockResolvedValue({ userId: 1n } as any);
+      prismaMock.auditLog.create.mockResolvedValue({} as any);
+
+      const res = await request(app)
+        .post(`/api/v1/users/${validId}/avatar`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', Buffer.from('fake image data'), 'avatar.png');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.avatarUrl).toBe('https://example.com/avatar.png');
     });
   });
 });

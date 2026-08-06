@@ -4,7 +4,7 @@ import { prismaMock } from './singleton';
 import { generateTestToken } from './setup/authMock';
 
 describe('Customer API (Module 7)', () => {
-  const adminToken = generateTestToken({ userId: '1', role: { roleId: '1', roleName: 'ADMIN' } });
+  const adminToken = generateTestToken({ userId: '1', role: 'ADMIN' });
   const validId = '1';
 
   beforeEach(() => {
@@ -19,7 +19,7 @@ describe('Customer API (Module 7)', () => {
 
     it('should return list of customers', async () => {
       prismaMock.customer.findMany.mockResolvedValue([
-        { customerId: 1n, fullName: 'Test Customer', phone: '0987654321' } as any
+        { customerId: 1n, fullName: 'Test Customer', phone: '0987654321' } as any,
       ]);
       prismaMock.customer.count.mockResolvedValue(1);
 
@@ -51,7 +51,8 @@ describe('Customer API (Module 7)', () => {
 
     it('should return 200 and the customer', async () => {
       prismaMock.customer.findUnique.mockResolvedValue({
-        customerId: 1n, fullName: 'Test Customer'
+        customerId: 1n,
+        fullName: 'Test Customer',
       } as any);
 
       const res = await request(app)
@@ -69,20 +70,20 @@ describe('Customer API (Module 7)', () => {
         .post('/api/v1/customers')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          fullName: 'Test Customer',
+          customerName: 'Test Customer',
         });
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
     });
 
     it('should return 400 if phone already exists (MSG-UC09-05)', async () => {
-      prismaMock.customer.findUnique.mockResolvedValue({ id: 'existing' } as any);
+      prismaMock.customer.findFirst.mockResolvedValue({ id: 'existing' } as any);
 
       const res = await request(app)
         .post('/api/v1/customers')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          fullName: 'Test Customer',
+          customerName: 'Test Customer',
           phone: '0987654321',
         });
 
@@ -91,7 +92,7 @@ describe('Customer API (Module 7)', () => {
     });
 
     it('should create new customer successfully', async () => {
-      prismaMock.customer.findUnique.mockResolvedValue(null);
+      prismaMock.customer.findFirst.mockResolvedValue(null);
       prismaMock.customer.create.mockResolvedValue({ customerId: 1n } as any);
       prismaMock.auditLog.create.mockResolvedValue({} as any);
 
@@ -99,8 +100,8 @@ describe('Customer API (Module 7)', () => {
         .post('/api/v1/customers')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          fullName: 'Test Customer',
-          phone: '0987654321',
+          customerName: 'Test Customer',
+          phone: '0123456789',
         });
 
       expect(res.status).toBe(201);
@@ -129,7 +130,7 @@ describe('Customer API (Module 7)', () => {
         .put(`/api/v1/customers/${validId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          fullName: 'Updated Customer',
+          customerName: 'Updated Customer',
         });
 
       expect(res.status).toBe(200);

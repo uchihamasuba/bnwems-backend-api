@@ -3,170 +3,146 @@
 ## Overview
 This module aggregates endpoints primarily consumed by the Mobile App for field operations.
 It covers:
-- **UC 2.18:** Field Operation Monitoring & Approval
-- **UC 2.20:** Assigned Field Task Management
-- **UC 2.21:** Equipment Pick-list Viewing
-- **UC 2.22:** Survey Reporting
-- **UC 2.25:** Field Progress Tracking
-- **UC 2.26:** Handover Evidence Management
-- **UC 2.28:** Damage/Loss Recording
+- **UC 2.20:** Assigned Field Task Management (SchedulePlan)
+- **UC 2.21:** Equipment Pick-list Viewing (OrderItem)
+- **UC 2.25:** Field Progress Tracking (SchedulePlan Status)
+- **UC 2.26:** Handover Evidence Management (Evidence)
+- **UC 2.28:** Damage/Loss Recording (CollectedEquipmentReport)
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC20-01`: Task not found or access denied.
-- `MSG-UC25-01`: Invalid progress state transition.
-- `MSG-UC26-01`: Missing customer signature/evidence for handover.
-- `MSG-UC28-01`: Missing evidence for damage/loss report.
+- `MSG-UC20-01`: Không tìm thấy phân công hoặc bị từ chối truy cập.
+- `MSG-UC25-01`: Chuyển đổi trạng thái tiến độ không hợp lệ.
+- `MSG-UC26-01`: Thiếu chữ ký khách hàng/bằng chứng cho việc bàn giao.
+- `MSG-UC28-01`: Thiếu bằng chứng cho báo cáo thu hồi.
 
-## Endpoints
+---
 
-### `GET /api/v1/tasks/assigned`
+## 1. Assigned Tasks & Progress (UC 2.20, UC 2.25)
+
+### 1. `GET /api/v1/mobile/schedule-plans`
 - **Use Case:** UC 2.20 - View Assigned Tasks
-- **Description:** Mobile staff views their assigned tasks.
+- **Description:** Mobile staff views their assigned schedule plans.
 - **Query Parameters:**
   - `date` (string, format YYYY-MM-DD, optional)
-  - `status` (enum, optional) - PENDING, IN_PROGRESS
+  - `status` (enum, optional) - Chờ xử lý, Đã xác nhận, Đang thực hiện
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-MO-01",
   "data": [
     {
-      "workTaskId": 1,
-      "orderId": 1,
-      "taskType": "installation",
-      "scheduledStart": "2026-10-14T08:00:00Z",
+      "planId": 1,
+      "orderId": 100,
+      "taskName": "Lắp đặt sự kiện",
+      "startTime": "2026-10-14T08:00:00Z",
+      "endTime": "2026-10-14T12:00:00Z",
       "location": "123 Event Hall",
-      "status": "pending"
-    }
-  ],
-  "meta": { "totalCount": 5 }
-}
-```
-
-### `GET /api/v1/tasks/:id/pick-list`
-- **Use Case:** UC 2.21 - View Pick List
-- **Description:** Retrieves the pick-list of equipment for a specific task (preparation, delivery, etc.).
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "catalogItemId": 1,
-      "itemName": "Standard Speaker",
-      "quantity": 10
+      "status": "Chờ xử lý"
     }
   ]
 }
 ```
 
-### `POST /api/v1/tasks/:id/survey-report`
-- **Use Case:** UC 2.22 - Record Survey Report
-- **Description:** Leader staff uploads survey details and images from the field.
-- **Business Rules:**
-  - BR-22-01: Must include at least one photo evidence.
-- **Request Body:**
-```json
-{
-  "notes": "Venue height limits noted.",
-  "evidences": [{ "fileUrl": "url-to-image" }]
-}
-```
-- **Response (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Survey report submitted."
-}
-```
-
-### `PUT /api/v1/tasks/:id/progress`
+### 2. `PUT /api/v1/mobile/schedule-plans/:id/status`
 - **Use Case:** UC 2.25 - Update Field Progress
-- **Description:** Leader staff updates the progress status of a task.
+- **Description:** Staff updates the status of their assigned plan.
 - **Business Rules:**
-  - BR-25-01: Updating to `IN_PROGRESS` sets `actualStart`. Updating to `COMPLETED` sets `actualEnd`.
+  - BR-25-01: Update status to `Đang thực hiện` when starting, `Hoàn thành` when finished.
 - **Request Body:**
 ```json
 {
-  "status": "in_progress",
-  "notes": "Arrived at venue, starting setup."
+  "status": "Đang thực hiện",
+  "notes": "Đã đến địa điểm, bắt đầu lắp đặt."
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Task progress updated."
+  "code": "MSG-MO-02",
+  "message": "Cập nhật tiến độ công việc thành công."
 }
 ```
 
-### `GET /api/v1/orders/field-progress`
-- **Use Case:** UC 2.18 - Monitor Field Operation Progress
-- **Description:** Manager view to monitor real-time updates from field staff.
+---
+
+## 2. Order Information & Pick List (UC 2.21)
+
+### 3. `GET /api/v1/mobile/orders/:id`
+- **Use Case:** Order Status Checking & Pick-list Viewing
+- **Description:** Mobile staff views order details and the equipment list to verify items.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "orderId": 1,
-      "currentTask": "installation",
-      "status": "in_progress",
-      "lastUpdate": "2026-06-22T08:30:00Z"
-    }
-  ],
-  "meta": { "totalCount": 12 }
-}
-```
-
-### `POST /api/v1/orders/:id/handover`
-- **Use Case:** UC 2.26 - Record Handover Evidence
-- **Description:** Leader staff uploads handover photos and confirmation after setup.
-- **Business Rules:**
-  - BR-26-01: `customerAgreed` must be true and evidence must be provided.
-- **Request Body:**
-```json
-{
-  "customerAgreed": true,
-  "notes": "Customer signed off.",
-  "evidences": [{ "fileUrl": "url-to-image" }]
-}
-```
-- **Response (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Handover record created."
-}
-```
-
-### `POST /api/v1/orders/:id/damage-loss`
-- **Use Case:** UC 2.28 - Record Damage/Loss Report
-- **Description:** Leader staff records any damaged or lost items during collection/return.
-- **Business Rules:**
-  - BR-28-01: Must specify responsible party (CUSTOMER or STAFF).
-  - BR-28-02: Requires evidence.
-- **Request Body:**
-```json
-{
-  "reportDetails": {
+  "code": "MSG-MO-03",
+  "data": {
+    "orderId": 100,
+    "orderCode": "ORD-001",
+    "eventName": "Đám cưới Minh & Lan",
+    "location": "123 Event Hall",
     "items": [
       {
-        "catalogItemId": 1,
-        "quantity": 1,
-        "type": "damaged",
-        "responsible": "staff",
-        "responsibleUserId": 1
+        "itemId": 1,
+        "itemName": "Loa JBL",
+        "quantity": 2,
+        "preparedQty": 2,
+        "source": "Kho nội bộ"
       }
     ]
-  },
-  "evidences": [{ "fileUrl": "url-to-image" }]
+  }
+}
+```
+
+---
+
+## 3. Handover & Return Reports (UC 2.26, UC 2.28)
+
+### 4. `POST /api/v1/mobile/schedule-plans/:id/handover`
+- **Use Case:** UC 2.26 - Record Handover Evidence
+- **Description:** Staff uploads handover photos and confirmation after setup. This updates the `evidenceId` in `SchedulePlan` and marks it `Hoàn thành`.
+- **Request Body:**
+```json
+{
+  "notes": "Khách hàng đã ký nghiệm thu.",
+  "evidenceId": 10
 }
 ```
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "message": "Damage/Loss report submitted successfully."
+  "code": "MSG-MO-04",
+  "message": "Tạo biên bản bàn giao thành công."
+}
+```
+
+### 5. `POST /api/v1/mobile/orders/:id/collected-reports`
+- **Use Case:** UC 2.28 - Record Damage/Loss Report (Thu hồi thiết bị)
+- **Description:** Leader staff records collected items, including damaged or lost quantities, when tearing down an event.
+- **Business Rules:**
+  - BR-28-01: Creates a `CollectedEquipmentReport` which later affects Inventory and Settlement.
+- **Request Body:**
+```json
+{
+  "reportType": "Kho công ty",
+  "notes": "Đã thu hồi xong, có hư hỏng nhẹ.",
+  "items": [
+    {
+      "itemId": 1,
+      "goodQuantity": 1,
+      "damagedQuantity": 1,
+      "lostQuantity": 0
+    }
+  ]
+}
+```
+- **Response (201 Created):**
+```json
+{
+  "success": true,
+  "code": "MSG-MO-05",
+  "message": "Gửi báo cáo thu hồi/hư hỏng thành công."
 }
 ```

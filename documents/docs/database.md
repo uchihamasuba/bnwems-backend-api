@@ -1,825 +1,864 @@
 # Database Schema
 
 ## 1. Overview
-The database schema has been thoroughly updated to align with the physical SQL seed data (`BNWEMS.sql`), replacing the high-level 23-entity architecture with a detailed 60-table schema. 
-This schema is defined in Prisma ORM notation, adhering to the `camelCase` naming convention for all properties and relations. It covers everything from Authentication, Catalog, and Orders to detailed Field Operations, Inventory, Supplier management, and Finance.
+The database schema is based on the updated architecture defined in `BNWEMS.sql`, which supports the Manager and Admin Apps for the Binh Nguyen Wedding Event Management System. It strictly maps entities into logical groups: users, catalog (categories/types/items), inventory, orders, tasks/schedules, financial settlements, field operations, and system notifications.
 
 ## 2. Prisma Schema Definition
 
 ```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
+// =====================================================================
+// ENUMS
+// =====================================================================
+
+enum Role {
+  ADMIN     @map("Quản trị viên")
+  MANAGER   @map("Quản lý")
+  LEADER    @map("Trưởng nhóm")
+  TECHNICAL @map("Nhân viên kỹ thuật")
 }
 
-// =============================================================================
-// 1. USER & ROLE
-// =============================================================================
-
-model Role {
-  roleId      BigInt         @id @default(autoincrement()) @map("role_id")
-  roleName    String         @unique @db.VarChar(50) @map("role_name")
-  description String?        @db.VarChar(255)
-  
-  users       InternalUser[]
-
-  @@map("roles")
+enum UserStatus {
+  ACTIVE    @map("Hoạt động")
+  INACTIVE  @map("Ngừng hoạt động")
+  SUSPENDED @map("Tạm khóa")
 }
+
+enum Platform {
+  ANDROID @map("android")
+  IOS     @map("ios")
+  WEB     @map("web")
+}
+
+enum NotificationType {
+  SYSTEM    @map("Hệ thống")
+  INVENTORY @map("Tồn kho")
+  POLICY    @map("Chính sách")
+  USER      @map("Người dùng")
+  REPORT    @map("Báo cáo")
+  ORDER     @map("Đơn hàng")
+  TASK      @map("Công việc")
+  SCHEDULE  @map("Lịch trình")
+  PAYMENT   @map("Thanh toán")
+  SURVEY    @map("Khảo sát")
+  WAGE      @map("Lương")
+  SUPPLIER  @map("Nhà cung cấp")
+  OTHER     @map("Khác")
+}
+
+enum PushStatus {
+  PENDING @map("Chờ gửi")
+  SENT    @map("Đã gửi")
+  FAILED  @map("Thất bại")
+}
+
+enum CustomerStatus {
+  ACTIVE   @map("Hoạt động")
+  INACTIVE @map("Ngừng hoạt động")
+}
+
+enum PolicyType {
+  DEPOSIT      @map("Đặt cọc")
+  CANCELLATION @map("Hủy đơn")
+  COMPENSATION @map("Bồi thường")
+  FEE          @map("Phụ phí")
+  WAGE         @map("Lương")
+}
+
+enum PolicyUnit {
+  DAY     @map("Ngày")
+  PERCENT @map("%")
+  VND     @map("VNĐ")
+}
+
+enum ItemStatus {
+  ACTIVE      @map("Đang hoạt động")
+  INACTIVE    @map("Ngừng hoạt động")
+  MAINTENANCE @map("Bảo trì")
+}
+
+enum QuotationStatus {
+  DRAFT    @map("Nháp")
+  APPROVED @map("Đã duyệt")
+  REJECTED @map("Từ chối")
+}
+
+enum PaymentStatus {
+  UNPAID    @map("Chưa thanh toán")
+  DEPOSITED @map("Đã cọc")
+  PAID      @map("Đã thanh toán")
+}
+
+enum OrderStatus {
+  NEW         @map("Mới")
+  CONFIRMED   @map("Đã xác nhận")
+  IN_PROGRESS @map("Đang thực hiện")
+  COMPLETED   @map("Hoàn thành")
+  CANCELLED   @map("Đã hủy")
+}
+
+enum OrderItemSource {
+  INTERNAL @map("Kho nội bộ")
+  SUPPLIER @map("Nhà cung cấp")
+}
+
+enum ScheduleStatus {
+  PENDING     @map("Chờ xử lý")
+  CONFIRMED   @map("Đã xác nhận")
+  IN_PROGRESS @map("Đang thực hiện")
+  COMPLETED   @map("Hoàn thành")
+  CANCELLED   @map("Đã hủy")
+}
+
+enum SurveyStatus {
+  DRAFT        @map("Nháp")
+  NEEDS_REVIEW @map("Cần xem xét")
+  SUBMITTED    @map("Đã nộp")
+  CONFIRMED    @map("Đã xác nhận")
+}
+
+enum SupplierStatus {
+  ACTIVE   @map("Hoạt động")
+  INACTIVE @map("Ngừng hoạt động")
+}
+
+enum TransactionType {
+  RENTAL   @map("Thuê")
+  PURCHASE @map("Mua")
+}
+
+enum TransactionStatus {
+  PENDING     @map("Chờ duyệt")
+  APPROVED    @map("Đã duyệt")
+  IN_PROGRESS @map("Đang thực hiện")
+  COMPLETED   @map("Hoàn thành")
+  CANCELLED   @map("Đã hủy")
+}
+
+enum SettlementStatus {
+  DRAFT     @map("Nháp")
+  AGREED    @map("Đã thống nhất")
+  REQUESTED @map("Đã yêu cầu")
+  PAID      @map("Đã thanh toán")
+  CONFIRMED @map("Đã xác nhận")
+}
+
+enum DepositStatus {
+  PENDING   @map("Chờ đặt cọc")
+  SUCCESS   @map("Thành công")
+  OVERDUE   @map("Quá hạn")
+  CANCELLED @map("Đã hủy")
+}
+
+enum ReportType {
+  INTERNAL @map("Kho công ty")
+  SUPPLIER @map("Nhà cung cấp")
+}
+
+enum ReportStatus {
+  SUBMITTED @map("Đã nộp")
+  CONFIRMED @map("Đã xác nhận")
+}
+
+enum MovementType {
+  OUTBOUND   @map("Xuất kho")
+  INBOUND    @map("Nhập kho")
+  ADJUSTMENT @map("Điều chỉnh")
+}
+
+enum WageRole {
+  SETUP     @map("Setup Nhân sự")
+  DECOR     @map("Thi công Decor")
+  SOUND     @map("Kỹ thuật Âm thanh")
+  LEADER    @map("Leader Điều phối")
+  MC_SINGER @map("MC / Ca sĩ")
+}
+
+enum WageStatus {
+  DRAFT     @map("Nháp")
+  PENDING   @map("Chờ duyệt")
+  CONFIRMED @map("Đã xác nhận")
+  PAID      @map("Đã thanh toán")
+}
+
+// =====================================================================
+// MODELS
+// =====================================================================
 
 model InternalUser {
-  userId       BigInt         @id @default(autoincrement()) @map("user_id")
-  roleId       BigInt @map("role_id")
-  role         Role           @relation(fields: [roleId], references: [roleId])
-  username     String         @unique @db.VarChar(100)
-  passwordHash String         @db.VarChar(255) @map("password_hash")
-  fullName     String         @db.VarChar(150) @map("full_name")
-  email        String?        @unique @db.VarChar(150)
-  phone        String?        @db.VarChar(20)
-  status       String         @default("active") // active, inactive
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  userId       BigInt     @id @default(autoincrement()) @map("user_id")
+  username     String     @unique @db.VarChar(100)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  fullName     String     @map("full_name") @db.VarChar(150)
+  email        String?    @unique @db.VarChar(150)
+  phone        String?    @db.VarChar(20)
+  address      String?    @db.VarChar(255)
+  role         Role
+  status       UserStatus @default(ACTIVE)
+  avatarUrl    String?    @map("avatar_url") @db.VarChar(500)
+  bio          String?    @db.VarChar(255)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  deviceTokens            DeviceToken[]
+  auditLogs               AuditLog[]
+  createdNotifications    Notification[]
+  receivedNotifications   NotificationRecipient[]
+  createdCustomers        Customer[]
+  updatedPolicies         BusinessPolicy[]
+  createdItems            Item[]
+  updatedInventories      Inventory[]
+  createdQuotations       Quotation[]
+  createdOrders           Order[]
+  preparedOrderItems      OrderItem[]
+  resolvedWarnings        OrderWarning[]
+  assignedPlans           SchedulePlan[]          @relation("PlanAssignee")
+  createdPlans            SchedulePlan[]          @relation("PlanCreator")
+  attendances             Attendance[]
+  reportedSurveys         SurveyReport[]          @relation("SurveyReporter")
+  confirmedSurveys        SurveyReport[]          @relation("SurveyConfirmer")
+  createdSuppliers        Supplier[]
+  createdTransactions     SupplierTransaction[]   @relation("TransactionCreator")
+  receivedTransactions    SupplierTransaction[]   @relation("TransactionReceiver")
+  returnedTransactions    SupplierTransaction[]   @relation("TransactionReturner")
+  requestedSettlements    Settlement[]            @relation("SettlementRequester")
+  confirmedSettlements    Settlement[]            @relation("SettlementConfirmer")
+  requestedDeposits       Deposit[]               @relation("DepositRequester")
+  approvedDeposits        Deposit[]               @relation("DepositApprover")
+  reportedCollectedEqs    CollectedEquipmentReport[] @relation("ReportReporter")
+  confirmedCollectedEqs   CollectedEquipmentReport[] @relation("ReportConfirmer")
+  inventoryMovements      InventoryMovement[]
+  wageRecords             WageRecord[]            @relation("WageUser")
+  confirmedWageRecords    WageRecord[]            @relation("WageConfirmer")
+  uploadedEvidences       Evidence[]
 
   @@map("internal_users")
 }
 
-// =============================================================================
-// 2. CUSTOMER & POLICY
-// =============================================================================
-
-model Customer {
-  customerId   BigInt         @id @default(autoincrement()) @map("customer_id")
-  fullName     String         @db.VarChar(150) @map("full_name")
-  phone        String?        @unique @db.VarChar(20)
-  email        String?        @db.VarChar(150)
-  address      String?        @db.VarChar(255)
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
-
-  @@map("customers")
-}
-
-model Supplier {
-  supplierId    BigInt         @id @default(autoincrement()) @map("supplier_id")
-  name          String         @db.VarChar(150)
-  contactPerson String?        @db.VarChar(150) @map("contact_person")
-  phone         String?        @db.VarChar(20)
-  address       String?        @db.VarChar(255)
-  status        String         @default("active") // active, inactive
-
-  @@map("suppliers")
-}
-
-model Warehouse {
-  warehouseId   BigInt         @id @default(autoincrement()) @map("warehouse_id")
-  name          String         @db.VarChar(150)
-  address       String?        @db.VarChar(255)
-  status        String         @default("active") // active, inactive
-
-  @@map("warehouses")
-}
-
-model CatalogItem {
-  catalogItemId      BigInt         @id @default(autoincrement()) @map("catalog_item_id")
-  code               String         @unique @db.VarChar(50)
-  name               String         @db.VarChar(150)
-  category           String?        @db.VarChar(100)
-  unit               String?        @db.VarChar(30)
-  currentRentalPrice Decimal        @default(0) @db.Decimal(12,2) @map("current_rental_price")
-  currentCost        Decimal        @default(0) @db.Decimal(12,2) @map("current_cost")
-  replacementValue   Decimal        @default(0) @db.Decimal(12,2) @map("replacement_value")
-  status             String         @default("active") // active, inactive
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
-
-  @@map("catalog_items")
-}
-
-model BusinessPolicy {
-  policyId       BigInt         @id @default(autoincrement()) @map("policy_id")
-  policyType     String @map("policy_type") // deposit, cancellation, compensation, additional_fee, wage
-  name           String         @db.VarChar(150)
-  config         Json
-  effectiveFrom  DateTime       @db.Date @map("effective_from")
-  effectiveTo    DateTime?      @db.Date @map("effective_to")
-  status         String         @default("active") // active, inactive
-  createdBy      BigInt @map("created_by")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-
-  @@map("business_policies")
-}
-
-// =============================================================================
-// 3. CATALOG PRICE / COST HISTORY
-// =============================================================================
-
-model ItemPriceHistory {
-  id             BigInt         @id @default(autoincrement())
-  catalogItemId  BigInt @map("catalog_item_id")
-  price          Decimal        @db.Decimal(12,2)
-  effectiveFrom  DateTime @map("effective_from")
-  effectiveTo    DateTime? @map("effective_to")
-  createdBy      BigInt @map("created_by")
-
-  @@map("item_price_history")
-}
-
-model ItemCostHistory {
-  id             BigInt         @id @default(autoincrement())
-  catalogItemId  BigInt @map("catalog_item_id")
-  cost           Decimal        @db.Decimal(12,2)
-  effectiveFrom  DateTime @map("effective_from")
-  effectiveTo    DateTime? @map("effective_to")
-  createdBy      BigInt @map("created_by")
-
-  @@map("item_cost_history")
-}
-
-// =============================================================================
-// 4. ORDER & QUOTATION
-// =============================================================================
-
-model Order {
-  orderId             BigInt         @id @default(autoincrement()) @map("order_id")
-  customerId          BigInt @map("customer_id")
-  eventDate           DateTime       @db.Date @map("event_date")
-  eventLocation       String?        @db.VarChar(255) @map("event_location")
-  totalValue          Decimal        @default(0) @db.Decimal(12,2) @map("total_value")
-  status              String         @default("draft") // draft, confirmed, in_progress, completed, cancelled
-  revenueStatus       String         @default("pending") @map("revenue_status") // pending, recognized
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("orders")
-}
-
-model Quotation {
-  quotationId         BigInt         @id @default(autoincrement()) @map("quotation_id")
-  customerId          BigInt @map("customer_id")
-  orderId             BigInt         @unique @map("order_id")
-  totalAmount         Decimal        @default(0) @db.Decimal(12,2) @map("total_amount")
-  status              String         @default("draft") // draft, confirmed, deleted
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("quotations")
-}
-
-model QuotationItem {
-  id                  BigInt         @id @default(autoincrement())
-  quotationId         BigInt @map("quotation_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  quantity            Int
-  unitPrice           Decimal        @db.Decimal(12,2) @map("unit_price")
-  lineTotal           Decimal        @db.Decimal(12,2) @map("line_total")
-
-  @@map("quotation_items")
-}
-
-model OrderItem {
-  id                  BigInt         @id @default(autoincrement())
-  orderId             BigInt @map("order_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  quantity            Int
-  unitPrice           Decimal        @db.Decimal(12,2) @map("unit_price")
-  source              String         @default("internal") // internal, supplier
-
-  @@map("order_items")
-}
-
-model OrderStatusHistory {
-  id                  BigInt         @id @default(autoincrement())
-  orderId             BigInt @map("order_id")
-  fromStatus          String?        @db.VarChar(30) @map("from_status")
-  toStatus            String         @db.VarChar(30) @map("to_status")
-  changedBy           BigInt @map("changed_by")
-  note                String?        @db.VarChar(255)
-  changedAt           DateTime       @default(now()) @map("changed_at")
-
-  @@map("order_status_history")
-}
-
-model OrderOutstandingCase {
-  caseId              BigInt         @id @default(autoincrement()) @map("case_id")
-  orderId             BigInt @map("order_id")
-  caseType            String @map("case_type") // supplier_debt, wage_pending
-  referenceId         BigInt @map("reference_id")
-  direction           String         @default("out") // out
-  amount              Decimal        @default(0) @db.Decimal(12,2)
-  status              String         @default("open") // open, resolved
-  resolvedBy          BigInt? @map("resolved_by")
-  resolvedAt          DateTime? @map("resolved_at")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("order_outstanding_cases")
-}
-
-model RevenueRecord {
-  revenueRecordId     BigInt         @id @default(autoincrement()) @map("revenue_record_id")
-  orderId             BigInt         @unique @map("order_id")
-  recognizedPeriod    String         @db.VarChar(7) @map("recognized_period")
-  grossRevenue        Decimal        @db.Decimal(12,2) @map("gross_revenue")
-  revenueDeduction    Decimal        @default(0) @db.Decimal(12,2) @map("revenue_deduction")
-  netRevenue          Decimal        @db.Decimal(12,2) @map("net_revenue")
-  supplierCost        Decimal        @default(0) @db.Decimal(12,2) @map("supplier_cost")
-  wageCost            Decimal        @default(0) @db.Decimal(12,2) @map("wage_cost")
-  grossProfit         Decimal        @db.Decimal(12,2) @map("gross_profit")
-  recognizedAt        DateTime @map("recognized_at")
-  recognizedBy        BigInt? @map("recognized_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-
-  @@map("revenue_records")
-}
-
-// =============================================================================
-// 5. PAYMENT & SETTLEMENT
-// =============================================================================
-
-model CompanyBankAccount {
-  bankAccountId       BigInt         @id @default(autoincrement()) @map("bank_account_id")
-  bankCode            String         @db.VarChar(20) @map("bank_code")
-  accountNumber       String         @db.VarChar(30) @map("account_number")
-  accountName         String         @db.VarChar(150) @map("account_name")
-  isDefault           Boolean        @default(false) @map("is_default")
-  status              String         @default("active") // active, inactive
-
-  @@map("company_bank_accounts")
-}
-
-model PaymentRequest {
-  paymentRequestId    BigInt         @id @default(autoincrement()) @map("payment_request_id")
-  orderId             BigInt @map("order_id")
-  paymentType         String @map("payment_type") // deposit, final
-  amount              Decimal        @db.Decimal(12,2)
-  methodHint          String? @map("method_hint") // cash, bank_transfer
-  bankAccountId       BigInt? @map("bank_account_id")
-  transferCode        String?        @unique @db.VarChar(50) @map("transfer_code")
-  qrUrl               String?        @db.VarChar(500) @map("qr_url")
-  dueDate             DateTime?      @db.Date @map("due_date")
-  instruction         String?        @db.Text
-  status              String         @default("pending") // pending, partially_paid, paid, cancelled
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("payment_requests")
-}
-
-model Payment {
-  paymentId           BigInt         @id @default(autoincrement()) @map("payment_id")
-  paymentRequestId    BigInt @map("payment_request_id")
-  orderId             BigInt @map("order_id")
-  amount              Decimal        @db.Decimal(12,2)
-  method              String         // cash, bank_transfer
-  status              String         @default("pending") // pending, success, failed
-  paidAt              DateTime? @map("paid_at")
-  confirmedBy         BigInt @map("confirmed_by")
-  confirmedAt         DateTime? @map("confirmed_at")
-  createdAt           DateTime       @default(now()) @map("created_at")
-
-  @@map("payments")
-}
-
-model Settlement {
-  settlementId        BigInt         @id @default(autoincrement()) @map("settlement_id")
-  orderId             BigInt         @unique @map("order_id")
-  originalValue       Decimal        @db.Decimal(12,2) @map("original_value")
-  changeAdjustment    Decimal        @default(0) @db.Decimal(12,2) @map("change_adjustment")
-  additionalFee       Decimal        @default(0) @db.Decimal(12,2) @map("additional_fee")
-  compensation        Decimal        @default(0) @db.Decimal(12,2)
-  totalPaid           Decimal        @default(0) @db.Decimal(12,2) @map("total_paid")
-  remainingAmount     Decimal        @default(0) @db.Decimal(12,2) @map("remaining_amount")
-  paymentMethod       String? @map("payment_method") // cash, bank_transfer
-  recordedBy          BigInt? @map("recorded_by")
-  status              String         @default("draft") // draft, recorded, confirmed
-  confirmedBy         BigInt? @map("confirmed_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("settlements")
-}
-
-model SettlementLine {
-  id                  BigInt         @id @default(autoincrement())
-  settlementId        BigInt @map("settlement_id")
-  lineType            String @map("line_type") // original, change, additional_fee, compensation, deposit, payment
-  refType             String?        @db.VarChar(50) @map("ref_type")
-  refId               BigInt? @map("ref_id")
-  description         String?        @db.VarChar(255)
-  amount              Decimal        @db.Decimal(12,2)
-
-  @@map("settlement_lines")
-}
-
-// =============================================================================
-// 6. SCHEDULE
-// =============================================================================
-
-model SchedulePlan {
-  schedulePlanId      BigInt         @id @default(autoincrement()) @map("schedule_plan_id")
-  orderId             BigInt         @unique @map("order_id")
-  status              String         @default("draft") // draft, active, done, deleted
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("schedule_plans")
-}
-
-model ScheduleActivity {
-  activityId          BigInt         @id @default(autoincrement()) @map("activity_id")
-  schedulePlanId      BigInt @map("schedule_plan_id")
-  activityType        String @map("activity_type") // preparation, transport, execution, collection, return
-  plannedStart        DateTime @map("planned_start")
-  plannedEnd          DateTime? @map("planned_end")
-  location            String?        @db.VarChar(255)
-  note                String?        @db.Text
-  sortOrder           Int? @map("sort_order")
-
-  @@map("schedule_activities")
-}
-
-// =============================================================================
-// 7. TASK & ATTENDANCE
-// =============================================================================
-
-model WorkTask {
-  workTaskId          BigInt         @id @default(autoincrement()) @map("work_task_id")
-  orderId             BigInt @map("order_id")
-  taskCategory        String         @default("operation") @map("task_category") // survey, operation
-  scheduleActivityId  BigInt? @map("schedule_activity_id")
-  title               String         @db.VarChar(200)
-  description         String?        @db.Text
-  status              String         @default("draft") // draft, assigned, in_progress, done
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("work_tasks")
-}
-
-model Assignment {
-  assignmentId        BigInt         @id @default(autoincrement()) @map("assignment_id")
-  workTaskId          BigInt @map("work_task_id")
-  userId              BigInt @map("user_id")
-  roleInTask          String @map("role_in_task") // leader, technical
-  assignedAt          DateTime       @default(now()) @map("assigned_at")
-
-  @@map("assignments")
-}
-
-model TaskProgressUpdate {
-  id                  BigInt         @id @default(autoincrement())
-  workTaskId          BigInt @map("work_task_id")
-  updatedBy           BigInt @map("updated_by")
-  progressStatus      String         @db.VarChar(50) @map("progress_status")
-  note                String?        @db.Text
-  createdAt           DateTime       @default(now()) @map("created_at")
-
-  @@map("task_progress_updates")
-}
-
-model Attendance {
-  attendanceId        BigInt         @id @default(autoincrement()) @map("attendance_id")
-  assignmentId        BigInt @map("assignment_id")
-  checkIn             DateTime? @map("check_in")
-  checkOut            DateTime? @map("check_out")
-  completionStatus    String         @default("pending") @map("completion_status") // pending, completed
-  confirmedBy         BigInt? @map("confirmed_by")
-  confirmedAt         DateTime? @map("confirmed_at")
-
-  @@map("attendance")
-}
-
-model StaffAvailability {
-  id                  BigInt         @id @default(autoincrement())
-  userId              BigInt @map("user_id")
-  workDate            DateTime       @db.Date @map("work_date")
-  status              String         @default("available") // available, unavailable
-  note                String?        @db.VarChar(255)
-
-  @@map("staff_availability")
-}
-
-// =============================================================================
-// 8. WAGE
-// =============================================================================
-
-model WageRule {
-  wageRuleId          BigInt         @id @default(autoincrement()) @map("wage_rule_id")
-  roleInTask          String @map("role_in_task") // leader, technical
-  ratePerSession      Decimal        @db.Decimal(12,2) @map("rate_per_session")
-  effectiveFrom       DateTime       @db.Date @map("effective_from")
-  effectiveTo         DateTime?      @db.Date @map("effective_to")
-  status              String         @default("active") // active, inactive
-
-  @@map("wage_rules")
-}
-
-model WageSummary {
-  wageSummaryId       BigInt         @id @default(autoincrement()) @map("wage_summary_id")
-  userId              BigInt @map("user_id")
-  orderId             BigInt? @map("order_id")
-  period              String?        @db.VarChar(20)
-  totalSessions       Int            @default(0) @map("total_sessions")
-  grossAmount         Decimal        @default(0) @db.Decimal(12,2) @map("gross_amount")
-  totalDeduction      Decimal        @default(0) @db.Decimal(12,2) @map("total_deduction")
-  totalWage           Decimal        @default(0) @db.Decimal(12,2) @map("total_wage")
-  status              String         @default("draft") // draft, confirmed, settled
-  confirmedBy         BigInt? @map("confirmed_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("wage_summaries")
-}
-
-model WageSummaryLine {
-  id                  BigInt         @id @default(autoincrement())
-  wageSummaryId       BigInt @map("wage_summary_id")
-  assignmentId        BigInt? @map("assignment_id")
-  attendanceId        BigInt? @map("attendance_id")
-  wageRuleId          BigInt? @map("wage_rule_id")
-  sessionDate         DateTime?      @db.Date @map("session_date")
-  wageRate            Decimal        @db.Decimal(12,2) @map("wage_rate")
-  lineAmount          Decimal        @db.Decimal(12,2) @map("line_amount")
-
-  @@map("wage_summary_lines")
-}
-
-model WageDeduction {
-  id                  BigInt         @id @default(autoincrement())
-  wageSummaryId       BigInt @map("wage_summary_id")
-  reason              String         @db.VarChar(255)
-  amount              Decimal        @db.Decimal(12,2)
-  createdBy           BigInt @map("created_by")
-
-  @@map("wage_deductions")
-}
-
-model WagePayment {
-  id                  BigInt         @id @default(autoincrement())
-  wageSummaryId       BigInt @map("wage_summary_id")
-  amount              Decimal        @db.Decimal(12,2)
-  paidAt              DateTime @map("paid_at")
-  paidBy              BigInt @map("paid_by")
-  note                String?        @db.VarChar(255)
-
-  @@map("wage_payments")
-}
-
-// =============================================================================
-// 9. INVENTORY
-// =============================================================================
-
-model Inventory {
-  inventoryId         BigInt         @id @default(autoincrement()) @map("inventory_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  warehouseId         BigInt @map("warehouse_id")
-  totalQuantity       Int            @default(0) @map("total_quantity")
-  availableQuantity   Int            @default(0) @map("available_quantity")
-
-  @@map("inventory")
-}
-
-model InventoryReservation {
-  reservationId       BigInt         @id @default(autoincrement()) @map("reservation_id")
-  orderId             BigInt @map("order_id")
-  eventDate           DateTime       @db.Date @map("event_date")
-  status              String         @default("reserved") // reserved, released, fulfilled
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("inventory_reservations")
-}
-
-model InventoryReservationItem {
-  id                  BigInt         @id @default(autoincrement())
-  reservationId       BigInt @map("reservation_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  reservedQuantity    Int @map("reserved_quantity")
-
-  @@map("inventory_reservation_items")
-}
-
-model InventoryReport {
-  inventoryReportId   BigInt         @id @default(autoincrement()) @map("inventory_report_id")
-  orderId             BigInt @map("order_id")
-  reportType          String @map("report_type") // checkout, collection, return
-  recordedBy          BigInt @map("recorded_by")
-  confirmedBy         BigInt? @map("confirmed_by")
-  status              String         @default("submitted") // submitted, confirmed
-  note                String?        @db.Text
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("inventory_reports")
-}
-
-model InventoryReportItem {
-  id                  BigInt         @id @default(autoincrement())
-  inventoryReportId   BigInt @map("inventory_report_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  expectedQuantity    Int? @map("expected_quantity")
-  quantity            Int
-  conditionStatus     String         @default("good") @map("condition_status") // good, damaged, lost
-
-  @@map("inventory_report_items")
-}
-
-model WarehouseHistory {
-  historyId           BigInt         @id @default(autoincrement()) @map("history_id")
-  warehouseId         BigInt @map("warehouse_id")
-  orderId             BigInt? @map("order_id")
-  inventoryReportId   BigInt? @map("inventory_report_id")
-  movementType        String @map("movement_type") // in, out, return, adjust
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-
-  @@map("warehouse_histories")
-}
-
-model WarehouseHistoryItem {
-  id                  BigInt         @id @default(autoincrement())
-  historyId           BigInt @map("history_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  quantity            Int
-
-  @@map("warehouse_history_items")
-}
-
-model PickList {
-  pickListId          BigInt         @id @default(autoincrement()) @map("pick_list_id")
-  orderId             BigInt @map("order_id")
-  purpose             String         // preparation, checkout, delivery, collection, return
-  status              String         @default("draft") // draft, active, done
-  createdBy           BigInt @map("created_by")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-
-  @@map("pick_lists")
-}
-
-model PickListItem {
-  id                  BigInt         @id @default(autoincrement())
-  pickListId          BigInt @map("pick_list_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  plannedQuantity     Int @map("planned_quantity")
-  actualQuantity      Int? @map("actual_quantity")
-
-  @@map("pick_list_items")
-}
-
-model EquipmentMaintenance {
-  maintenanceId       BigInt         @id @default(autoincrement()) @map("maintenance_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  warehouseId         BigInt? @map("warehouse_id")
-  quantity            Int
-  startDate           DateTime       @db.Date @map("start_date")
-  endDate             DateTime?      @db.Date @map("end_date")
-  status              String         @default("in_maintenance") // in_maintenance, done
-  note                String?        @db.Text
-
-  @@map("equipment_maintenance")
-}
-
-// =============================================================================
-// 10. SUPPLIER
-// =============================================================================
-
-model SupplierTransaction {
-  supplierTransactionId BigInt       @id @default(autoincrement()) @map("supplier_transaction_id")
-  supplierId            BigInt @map("supplier_id")
-  orderId               BigInt @map("order_id")
-  type                  String       // rental, purchase
-  totalCost             Decimal      @default(0) @db.Decimal(12,2) @map("total_cost")
-  expectedDelivery      DateTime?    @db.Date @map("expected_delivery")
-  status                String       @default("draft") // draft, confirmed, received, returned
-  createdBy             BigInt @map("created_by")
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
-
-  @@map("supplier_transactions")
-}
-
-model SupplierTransactionItem {
-  id                    BigInt       @id @default(autoincrement())
-  supplierTransactionId BigInt @map("supplier_transaction_id")
-  catalogItemId         BigInt? @map("catalog_item_id")
-  description           String?      @db.VarChar(255)
-  quantity              Int
-  unitCost              Decimal      @db.Decimal(12,2) @map("unit_cost")
-
-  @@map("supplier_transaction_items")
-}
-
-model SupplierReceiptReport {
-  receiptReportId       BigInt       @id @default(autoincrement()) @map("receipt_report_id")
-  supplierTransactionId BigInt @map("supplier_transaction_id")
-  recordedBy            BigInt @map("recorded_by")
-  confirmedBy           BigInt? @map("confirmed_by")
-  status                String       @default("submitted") // submitted, confirmed
-  note                  String?      @db.Text
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
-
-  @@map("supplier_receipt_reports")
-}
-
-model SupplierReceiptReportItem {
-  id                            BigInt       @id @default(autoincrement())
-  receiptReportId               BigInt @map("receipt_report_id")
-  supplierTransactionItemId     BigInt? @map("supplier_transaction_item_id")
-  catalogItemId                 BigInt? @map("catalog_item_id")
-  description                   String?      @db.VarChar(255)
-  receivedQuantity              Int @map("received_quantity")
-  conditionStatus               String       @default("good") @map("condition_status") // good, damaged
-
-  @@map("supplier_receipt_report_items")
-}
-
-model SupplierReturnReport {
-  returnReportId          BigInt       @id @default(autoincrement()) @map("return_report_id")
-  supplierTransactionId   BigInt @map("supplier_transaction_id")
-  recordedBy              BigInt @map("recorded_by")
-  confirmedBy             BigInt? @map("confirmed_by")
-  totalCompensation       Decimal      @default(0) @db.Decimal(12,2) @map("total_compensation")
-  status                  String       @default("submitted") // submitted, confirmed
-  createdAt               DateTime     @default(now()) @map("created_at")
-  updatedAt               DateTime     @updatedAt @map("updated_at")
-
-  @@map("supplier_return_reports")
-}
-
-model SupplierReturnReportItem {
-  id                    BigInt       @id @default(autoincrement())
-  returnReportId        BigInt @map("return_report_id")
-  catalogItemId         BigInt? @map("catalog_item_id")
-  description           String?      @db.VarChar(255)
-  returnedQuantity      Int @map("returned_quantity")
-  conditionStatus       String @map("condition_status") // good, damaged, lost
-  compensationAmount    Decimal      @default(0) @db.Decimal(12,2) @map("compensation_amount")
-
-  @@map("supplier_return_report_items")
-}
-
-model SupplierDebt {
-  debtId                  BigInt       @id @default(autoincrement()) @map("debt_id")
-  supplierId              BigInt @map("supplier_id")
-  supplierTransactionId   BigInt @map("supplier_transaction_id")
-  amount                  Decimal      @db.Decimal(12,2)
-  paidAmount              Decimal      @default(0) @db.Decimal(12,2) @map("paid_amount")
-  status                  String       @default("open") // open, partial, paid
-  createdAt               DateTime     @default(now()) @map("created_at")
-  updatedAt               DateTime     @updatedAt @map("updated_at")
-
-  @@map("supplier_debts")
-}
-
-model SupplierPayment {
-  paymentId           BigInt       @id @default(autoincrement()) @map("payment_id")
-  debtId              BigInt @map("debt_id")
-  amount              Decimal      @db.Decimal(12,2)
-  paidAt              DateTime @map("paid_at")
-  recordedBy          BigInt @map("recorded_by")
-  note                String?      @db.VarChar(255)
-
-  @@map("supplier_payments")
-}
-
-// =============================================================================
-// 11. FIELD OPERATION
-// =============================================================================
-
-model SurveyReport {
-  surveyReportId      BigInt       @id @default(autoincrement()) @map("survey_report_id")
-  orderId             BigInt @map("order_id")
-  workTaskId          BigInt? @map("work_task_id")
-  siteAddress         String?      @db.VarChar(255) @map("site_address")
-  siteCondition       String?      @db.Text @map("site_condition")
-  feasibilityNote     String?      @db.Text @map("feasibility_note")
-  recordedBy          BigInt @map("recorded_by")
-  confirmedBy         BigInt? @map("confirmed_by")
-  status              String       @default("submitted") // submitted, confirmed
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
-
-  @@map("survey_reports")
-}
-
-model ChangeRequest {
-  changeRequestId     BigInt       @id @default(autoincrement()) @map("change_request_id")
-  orderId             BigInt @map("order_id")
-  requestedBy         BigInt @map("requested_by")
-  type                String       // add, remove, replace
-  status              String       @default("pending") // pending, approved, rejected, executed_pending_review, reconciled
-  executedAt          DateTime? @map("executed_at")
-  approvedBy          BigInt? @map("approved_by")
-  reconciledBy        BigInt? @map("reconciled_by")
-  reconciledAt        DateTime? @map("reconciled_at")
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
-
-  @@map("change_requests")
-}
-
-model ChangeRequestItem {
-  id                  BigInt       @id @default(autoincrement())
-  changeRequestId     BigInt @map("change_request_id")
-  catalogItemId       BigInt @map("catalog_item_id")
-  quantity            Int
-  action              String       // add, remove, replace
-
-  @@map("change_request_items")
-}
-
-model HandoverRecord {
-  handoverId          BigInt       @id @default(autoincrement()) @map("handover_id")
-  orderId             BigInt @map("order_id")
-  recordedBy          BigInt @map("recorded_by")
-  confirmedBy         BigInt? @map("confirmed_by")
-  status              String       @default("submitted") // submitted, confirmed
-  note                String?      @db.Text
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
-
-  @@map("handover_records")
-}
-
-model DamageLossReport {
-  damageLossId        BigInt       @id @default(autoincrement()) @map("damage_loss_id")
-  orderId             BigInt @map("order_id")
-  recordedBy          BigInt @map("recorded_by")
-  confirmedBy         BigInt? @map("confirmed_by")
-  totalCompensation   Decimal      @default(0) @db.Decimal(12,2) @map("total_compensation")
-  status              String       @default("submitted") // submitted, confirmed
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
-
-  @@map("damage_loss_reports")
-}
-
-model DamageLossItem {
-  id                           BigInt       @id @default(autoincrement())
-  damageLossId                 BigInt @map("damage_loss_id")
-  catalogItemId                BigInt @map("catalog_item_id")
-  quantity                     Int
-  damageType                   String @map("damage_type") // damaged, lost
-  source                       String       @default("internal") // internal, supplier
-  supplierTransactionItemId    BigInt? @map("supplier_transaction_item_id")
-  compensationAmount           Decimal      @default(0) @db.Decimal(12,2) @map("compensation_amount")
-
-  @@map("damage_loss_items")
-}
-
-// =============================================================================
-// 12. SYSTEM
-// =============================================================================
-
-model Notification {
-  notificationId      BigInt       @id @default(autoincrement()) @map("notification_id")
-  userId              BigInt @map("user_id")
-  type                String       @db.VarChar(50)
-  title               String       @db.VarChar(200)
-  content             String?      @db.Text
-  refType             String?      @db.VarChar(50) @map("ref_type")
-  refId               BigInt? @map("ref_id")
-  isRead              Boolean      @default(false) @map("is_read")
-  createdAt           DateTime     @default(now()) @map("created_at")
-
-  @@map("notifications")
+model DeviceToken {
+  deviceTokenId BigInt   @id @default(autoincrement()) @map("device_token_id")
+  userId        BigInt   @map("user_id")
+  fcmToken      String   @unique @map("fcm_token") @db.VarChar(255)
+  platform      Platform
+  deviceName    String?  @map("device_name") @db.VarChar(150)
+  isActive      Boolean  @default(true) @map("is_active")
+  lastUsedAt    DateTime? @map("last_used_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user InternalUser @relation(fields: [userId], references: [userId])
+
+  @@map("device_tokens")
 }
 
 model AuditLog {
-  logId               BigInt       @id @default(autoincrement()) @map("log_id")
-  userId              BigInt? @map("user_id")
-  action              String       @db.VarChar(100)
-  entityType          String       @db.VarChar(50) @map("entity_type")
-  entityId            BigInt? @map("entity_id")
-  oldValue            Json? @map("old_value")
-  newValue            Json? @map("new_value")
-  createdAt           DateTime     @default(now()) @map("created_at")
+  logId      BigInt   @id @default(autoincrement()) @map("log_id")
+  userId     BigInt?  @map("user_id")
+  action     String   @db.VarChar(100)
+  entityType String?  @map("entity_type") @db.VarChar(50)
+  entityId   BigInt?  @map("entity_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user InternalUser? @relation(fields: [userId], references: [userId])
 
   @@map("audit_logs")
 }
 
 model Evidence {
-  evidenceId          BigInt       @id @default(autoincrement()) @map("evidence_id")
-  refType             String       @db.VarChar(50) @map("ref_type")
-  refId               BigInt @map("ref_id")
-  fileUrl             String       @db.VarChar(500) @map("file_url")
-  fileType            String?      @db.VarChar(50) @map("file_type")
-  uploadedBy          BigInt @map("uploaded_by")
-  uploadedAt          DateTime     @default(now()) @map("uploaded_at")
+  evidenceId  BigInt   @id @default(autoincrement()) @map("evidence_id")
+  fileUrl     String   @map("file_url") @db.VarChar(500)
+  description String?  @db.VarChar(255)
+  uploadedBy  BigInt   @map("uploaded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  @@map("evidence")
+  uploader InternalUser @relation(fields: [uploadedBy], references: [userId])
+
+  schedulePlans   SchedulePlan[]
+  attendances     Attendance[]
+  surveyReports   SurveyReport[]
+  settlements     Settlement[]
+  deposits        Deposit[]
+
+  @@map("evidences")
+}
+
+model Notification {
+  notificationId   BigInt           @id @default(autoincrement()) @map("notification_id")
+  title            String           @db.VarChar(255)
+  content          String?          @db.Text
+  notificationType NotificationType @default(SYSTEM) @map("notification_type")
+  refType          String?          @map("ref_type") @db.VarChar(50)
+  refId            BigInt?          @map("ref_id")
+  createdBy        BigInt?          @map("created_by")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  creator    InternalUser?           @relation(fields: [createdBy], references: [userId])
+  recipients NotificationRecipient[]
+
+  @@map("notifications")
+}
+
+model NotificationRecipient {
+  recipientId    BigInt     @id @default(autoincrement()) @map("recipient_id")
+  notificationId BigInt     @map("notification_id")
+  userId         BigInt     @map("user_id")
+  isRead         Boolean    @default(false) @map("is_read")
+  sentAt         DateTime?  @map("sent_at")
+  readAt         DateTime?  @map("read_at")
+  pushStatus     PushStatus @default(PENDING) @map("push_status")
+
+  notification Notification @relation(fields: [notificationId], references: [notificationId], onDelete: Cascade)
+  user         InternalUser @relation(fields: [userId], references: [userId])
+
+  @@unique([notificationId, userId], name: "uq_notif_user")
+  @@map("notification_recipients")
+}
+
+model Customer {
+  customerId   BigInt         @id @default(autoincrement()) @map("customer_id")
+  customerCode String         @unique @map("customer_code") @db.VarChar(20)
+  customerName String         @map("customer_name") @db.VarChar(150)
+  phone        String         @db.VarChar(20)
+  email        String?        @db.VarChar(150)
+  address      String?        @db.VarChar(255)
+  notes        String?        @db.VarChar(500)
+  status       CustomerStatus @default(ACTIVE)
+  createdBy    BigInt         @map("created_by")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  creator    InternalUser @relation(fields: [createdBy], references: [userId])
+  quotations Quotation[]
+  orders     Order[]
+
+  @@map("customers")
+}
+
+model BusinessPolicy {
+  policyId    BigInt     @id @default(autoincrement()) @map("policy_id")
+  policyCode  String     @unique @map("policy_code") @db.VarChar(30)
+  policyName  String     @map("policy_name") @db.VarChar(200)
+  policyType  PolicyType @map("policy_type")
+  description String?    @db.Text
+  policyValue Decimal    @map("policy_value") @db.Decimal(15, 2)
+  unit        PolicyUnit
+  isActive    Boolean    @default(true) @map("is_active")
+  updatedBy   BigInt?    @map("updated_by")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  updater InternalUser? @relation(fields: [updatedBy], references: [userId])
+  orders  Order[]
+
+  @@map("business_policies")
+}
+
+model ItemCategory {
+  categoryId   BigInt     @id @default(autoincrement()) @map("category_id")
+  categoryName String     @unique @map("category_name") @db.VarChar(100)
+  description  String?    @db.VarChar(255)
+
+  itemTypes ItemType[]
+
+  @@map("item_categories")
+}
+
+model ItemType {
+  typeId      BigInt  @id @default(autoincrement()) @map("type_id")
+  categoryId  BigInt  @map("category_id")
+  typeName    String  @map("type_name") @db.VarChar(150)
+  description String? @db.VarChar(255)
+
+  category ItemCategory   @relation(fields: [categoryId], references: [categoryId])
+  items    Item[]
+  specs    ItemTypeSpec[]
+
+  @@unique([categoryId, typeName], name: "uq_type_name")
+  @@map("item_types")
+}
+
+model Item {
+  itemId         BigInt     @id @default(autoincrement()) @map("item_id")
+  itemCode       String     @unique @map("item_code") @db.VarChar(30)
+  itemName       String     @map("item_name") @db.VarChar(200)
+  typeId         BigInt     @map("type_id")
+  description    String?    @db.Text
+  unit           String     @default("Cái") @db.VarChar(50)
+  rentalPrice    Decimal    @default(0) @map("rental_price") @db.Decimal(15, 2)
+  priceValidFrom DateTime?  @map("price_valid_from") @db.Date
+  priceValidTo   DateTime?  @map("price_valid_to") @db.Date
+  imageUrl       String?    @map("image_url") @db.VarChar(500)
+  status         ItemStatus @default(ACTIVE)
+  createdBy      BigInt?    @map("created_by")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  type    ItemType      @relation(fields: [typeId], references: [typeId])
+  creator InternalUser? @relation(fields: [createdBy], references: [userId])
+
+  itemTypeSpecs                ItemTypeSpec[]
+  inventory                    Inventory?
+  quotationItems               QuotationItem[]
+  orderItems                   OrderItem[]
+  supplierTransactionItems     SupplierTransactionItem[]
+  collectedEquipmentReportItems CollectedEquipmentReportItem[]
+  inventoryMovements           InventoryMovement[]
+
+  @@map("items")
+}
+
+model ItemTypeSpec {
+  specId          BigInt  @id @default(autoincrement()) @map("spec_id")
+  typeId          BigInt  @map("type_id")
+  componentItemId BigInt? @map("component_item_id")
+  componentName   String  @map("component_name") @db.VarChar(200)
+  quantity        Int     @default(1)
+  note            String? @db.VarChar(255)
+
+  type          ItemType @relation(fields: [typeId], references: [typeId], onDelete: Cascade)
+  componentItem Item?    @relation(fields: [componentItemId], references: [itemId])
+
+  @@map("item_type_specs")
+}
+
+model Inventory {
+  inventoryId       BigInt   @id @default(autoincrement()) @map("inventory_id")
+  itemId            BigInt   @unique @map("item_id")
+  quantityTotal     Int      @default(0) @map("quantity_total")
+  quantityDamaged   Int      @default(0) @map("quantity_damaged")
+  quantityReserved  Int      @default(0) @map("quantity_reserved")
+  quantityAvailable Int?     @map("quantity_available") // GENERATED ALWAYS AS (quantity_total - quantity_damaged - quantity_reserved) STORED in DB
+  updatedBy         BigInt?  @map("updated_by")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  item    Item          @relation(fields: [itemId], references: [itemId])
+  updater InternalUser? @relation(fields: [updatedBy], references: [userId])
+
+  @@map("inventory")
+}
+
+model Quotation {
+  quotationId   BigInt          @id @default(autoincrement()) @map("quotation_id")
+  quotationCode String          @unique @map("quotation_code") @db.VarChar(20)
+  customerId    BigInt          @map("customer_id")
+  version       String          @default("v1.0") @db.VarChar(10)
+  subtotal      Decimal         @default(0) @db.Decimal(15, 2)
+  discountTotal Decimal         @default(0) @map("discount_total") @db.Decimal(15, 2)
+  totalAmount   Decimal         @default(0) @map("total_amount") @db.Decimal(15, 2)
+  status        QuotationStatus @default(DRAFT)
+  notes         String?         @db.VarChar(500)
+  createdBy     BigInt          @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  customer Customer       @relation(fields: [customerId], references: [customerId])
+  creator  InternalUser   @relation(fields: [createdBy], references: [userId])
+  items    QuotationItem[]
+  orders   Order[]
+
+  @@map("quotations")
+}
+
+model QuotationItem {
+  quotationItemId BigInt  @id @default(autoincrement()) @map("quotation_item_id")
+  quotationId     BigInt  @map("quotation_id")
+  itemId          BigInt? @map("item_id")
+  itemName        String  @map("item_name") @db.VarChar(200)
+  category        String? @db.VarChar(100)
+  unit            String  @default("Cái") @db.VarChar(50)
+  quantity        Int
+  price           Decimal @db.Decimal(15, 2)
+  discount        Decimal @default(0) @db.Decimal(15, 2)
+  lineTotal       Decimal? @map("line_total") @db.Decimal(15, 2) // GENERATED ALWAYS AS (quantity * price - discount) STORED in DB
+
+  quotation Quotation @relation(fields: [quotationId], references: [quotationId], onDelete: Cascade)
+  item      Item?     @relation(fields: [itemId], references: [itemId])
+
+  @@map("quotation_items")
+}
+
+model Order {
+  orderId       BigInt        @id @default(autoincrement()) @map("order_id")
+  orderCode     String        @unique @map("order_code") @db.VarChar(20)
+  customerId    BigInt        @map("customer_id")
+  quotationId   BigInt?       @map("quotation_id")
+  policyId      BigInt?       @map("policy_id")
+  eventType     String        @map("event_type") @db.VarChar(100)
+  eventName     String?       @map("event_name") @db.VarChar(200)
+  eventDate     DateTime      @map("event_date") @db.Date
+  location      String        @db.VarChar(255)
+  guestCount    Int?          @map("guest_count")
+  totalAmount   Decimal       @default(0) @map("total_amount") @db.Decimal(15, 2)
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
+  orderStatus   OrderStatus   @default(NEW) @map("order_status")
+  cancelReason  String?       @map("cancel_reason") @db.VarChar(500)
+  notes         String?       @db.VarChar(500)
+  createdBy     BigInt        @map("created_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  customer  Customer        @relation(fields: [customerId], references: [customerId])
+  quotation Quotation?      @relation(fields: [quotationId], references: [quotationId])
+  policy    BusinessPolicy? @relation(fields: [policyId], references: [policyId])
+  creator   InternalUser    @relation(fields: [createdBy], references: [userId])
+
+  orderItems               OrderItem[]
+  orderWarnings            OrderWarning[]
+  schedulePlans            SchedulePlan[]
+  surveyReports            SurveyReport[]
+  supplierTransactions     SupplierTransaction[]
+  settlements              Settlement[]
+  deposits                 Deposit[]
+  collectedEquipmentReports CollectedEquipmentReport[]
+  inventoryMovements       InventoryMovement[]
+  wageRecords              WageRecord[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  orderItemId BigInt          @id @default(autoincrement()) @map("order_item_id")
+  orderId     BigInt          @map("order_id")
+  itemId      BigInt          @map("item_id")
+  quantity    Int
+  unitPrice   Decimal         @map("unit_price") @db.Decimal(15, 2)
+  subtotal    Decimal?        @db.Decimal(15, 2) // GENERATED ALWAYS AS (quantity * unit_price) STORED in DB
+  source      OrderItemSource @default(INTERNAL)
+  preparedQty Int             @default(0) @map("prepared_qty")
+  preparedBy  BigInt?         @map("prepared_by")
+  notes       String?         @db.VarChar(255)
+
+  order    Order         @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  item     Item          @relation(fields: [itemId], references: [itemId])
+  preparer InternalUser? @relation(fields: [preparedBy], references: [userId])
+
+  @@unique([orderId, itemId], name: "uq_order_item")
+  @@map("order_items")
+}
+
+model OrderWarning {
+  warningId  BigInt    @id @default(autoincrement()) @map("warning_id")
+  orderId    BigInt    @map("order_id")
+  content    String    @db.VarChar(500)
+  isResolved Boolean   @default(false) @map("is_resolved")
+  resolvedBy BigInt?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  order    Order         @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  resolver InternalUser? @relation(fields: [resolvedBy], references: [userId])
+
+  @@map("order_warnings")
+}
+
+model WorkTask {
+  taskId      BigInt   @id @default(autoincrement()) @map("task_id")
+  taskCode    String   @unique @map("task_code") @db.VarChar(20)
+  taskName    String   @unique @map("task_name") @db.VarChar(150)
+  description String?  @db.VarChar(255)
+  isActive    Boolean  @default(true) @map("is_active")
+
+  schedulePlans SchedulePlan[]
+
+  @@map("work_tasks")
+}
+
+model SchedulePlan {
+  planId      BigInt         @id @default(autoincrement()) @map("plan_id")
+  planCode    String         @unique @map("plan_code") @db.VarChar(20)
+  orderId     BigInt         @map("order_id")
+  taskId      BigInt         @map("task_id")
+  assignedTo  BigInt         @map("assigned_to")
+  startTime   DateTime       @map("start_time")
+  endTime     DateTime?      @map("end_time")
+  location    String?        @db.VarChar(255)
+  status      ScheduleStatus @default(PENDING)
+  evidenceId  BigInt?        @map("evidence_id")
+  notes       String?        @db.VarChar(500)
+  createdBy   BigInt         @map("created_by")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  order    Order        @relation(fields: [orderId], references: [orderId])
+  task     WorkTask     @relation(fields: [taskId], references: [taskId])
+  assignee InternalUser @relation("PlanAssignee", fields: [assignedTo], references: [userId])
+  evidence Evidence?    @relation(fields: [evidenceId], references: [evidenceId])
+  creator  InternalUser @relation("PlanCreator", fields: [createdBy], references: [userId])
+
+  attendances   Attendance[]
+  surveyReports SurveyReport[]
+
+  @@map("schedule_plans")
+}
+
+model Attendance {
+  attendanceId       BigInt    @id @default(autoincrement()) @map("attendance_id")
+  planId             BigInt    @map("plan_id")
+  userId             BigInt    @map("user_id")
+  checkInAt          DateTime? @map("check_in_at")
+  checkInEvidenceId  BigInt?   @map("check_in_evidence_id")
+  checkOutAt         DateTime? @map("check_out_at")
+  note               String?   @db.VarChar(255)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  plan             SchedulePlan @relation(fields: [planId], references: [planId])
+  user             InternalUser @relation(fields: [userId], references: [userId])
+  checkInEvidence  Evidence?    @relation(fields: [checkInEvidenceId], references: [evidenceId])
+
+  @@unique([planId, userId], name: "uq_attendance")
+  @@map("attendances")
+}
+
+model SurveyReport {
+  surveyId           BigInt       @id @default(autoincrement()) @map("survey_id")
+  reportCode         String       @unique @map("report_code") @db.VarChar(20)
+  orderId            BigInt       @map("order_id")
+  planId             BigInt?      @map("plan_id")
+  evidenceId         BigInt?      @map("evidence_id")
+  surveyDate         DateTime     @map("survey_date") @db.Date
+  location           String       @db.VarChar(255)
+  area               Decimal?     @db.Decimal(10, 2)
+  length             Decimal?     @db.Decimal(10, 2)
+  width              Decimal?     @db.Decimal(10, 2)
+  entrance           String?      @db.VarChar(255)
+  siteConstraints    String?      @map("site_constraints") @db.Text
+  additionalRequests String?      @map("additional_requests") @db.Text
+  proposedItems      String?      @map("proposed_items") @db.Text
+  notes              String?      @db.VarChar(500)
+  status             SurveyStatus @default(DRAFT)
+  reportedBy         BigInt       @map("reported_by")
+  confirmedBy        BigInt?      @map("confirmed_by")
+  confirmedAt        DateTime?    @map("confirmed_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  order     Order         @relation(fields: [orderId], references: [orderId])
+  plan      SchedulePlan? @relation(fields: [planId], references: [planId])
+  evidence  Evidence?     @relation(fields: [evidenceId], references: [evidenceId])
+  reporter  InternalUser  @relation("SurveyReporter", fields: [reportedBy], references: [userId])
+  confirmer InternalUser? @relation("SurveyConfirmer", fields: [confirmedBy], references: [userId])
+
+  @@map("survey_reports")
+}
+
+model Supplier {
+  supplierId    BigInt         @id @default(autoincrement()) @map("supplier_id")
+  supplierCode  String         @unique @map("supplier_code") @db.VarChar(20)
+  supplierName  String         @map("supplier_name") @db.VarChar(200)
+  serviceType   String         @map("service_type") @db.VarChar(150)
+  contactPerson String?        @map("contact_person") @db.VarChar(150)
+  phone         String?        @db.VarChar(20)
+  email         String?        @db.VarChar(150)
+  address       String?        @db.VarChar(255)
+  rating        Int?           @db.TinyInt
+  notes         String?        @db.VarChar(500)
+  status        SupplierStatus @default(ACTIVE)
+  createdBy     BigInt         @map("created_by")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  creator      InternalUser          @relation(fields: [createdBy], references: [userId])
+  transactions SupplierTransaction[]
+
+  @@map("suppliers")
+}
+
+model SupplierTransaction {
+  transactionId   BigInt            @id @default(autoincrement()) @map("transaction_id")
+  transactionCode String            @unique @map("transaction_code") @db.VarChar(20)
+  supplierId      BigInt            @map("supplier_id")
+  orderId         BigInt            @map("order_id")
+  transactionType TransactionType   @default(RENTAL) @map("transaction_type")
+  serviceTitle    String            @map("service_title") @db.VarChar(255)
+  estimatedCost   Decimal           @default(0) @map("estimated_cost") @db.Decimal(15, 2)
+  depositAmount   Decimal           @default(0) @map("deposit_amount") @db.Decimal(15, 2)
+  paymentStatus   PaymentStatus     @default(UNPAID) @map("payment_status")
+  status          TransactionStatus @default(PENDING)
+  receivedBy      BigInt?           @map("received_by")
+  receivedAt      DateTime?         @map("received_at")
+  returnedBy      BigInt?           @map("returned_by")
+  returnedAt      DateTime?         @map("returned_at")
+  notes           String?           @db.VarChar(500)
+  createdBy       BigInt            @map("created_by")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  supplier  Supplier      @relation(fields: [supplierId], references: [supplierId])
+  order     Order         @relation(fields: [orderId], references: [orderId])
+  creator   InternalUser  @relation("TransactionCreator", fields: [createdBy], references: [userId])
+  receiver  InternalUser? @relation("TransactionReceiver", fields: [receivedBy], references: [userId])
+  returner  InternalUser? @relation("TransactionReturner", fields: [returnedBy], references: [userId])
+
+  items                    SupplierTransactionItem[]
+  collectedEquipmentReports CollectedEquipmentReport[]
+
+  @@map("supplier_transactions")
+}
+
+model SupplierTransactionItem {
+  stItemId         BigInt  @id @default(autoincrement()) @map("st_item_id")
+  transactionId    BigInt  @map("transaction_id")
+  itemId           BigInt? @map("item_id")
+  itemName         String  @map("item_name") @db.VarChar(200)
+  quantity         Int
+  unitCost         Decimal @map("unit_cost") @db.Decimal(15, 2)
+  subtotal         Decimal? @db.Decimal(15, 2) // GENERATED ALWAYS AS (quantity * unit_cost) STORED in DB
+  receivedQuantity Int     @default(0) @map("received_quantity")
+  notes            String? @db.VarChar(255)
+
+  transaction SupplierTransaction @relation(fields: [transactionId], references: [transactionId], onDelete: Cascade)
+  item        Item?               @relation(fields: [itemId], references: [itemId])
+
+  @@map("supplier_transaction_items")
+}
+
+model Settlement {
+  settlementId   BigInt           @id @default(autoincrement()) @map("settlement_id")
+  orderId        BigInt           @map("order_id")
+  additionalFee  Decimal          @default(0) @map("additional_fee") @db.Decimal(15, 2)
+  compensation   Decimal          @default(0) @db.Decimal(15, 2)
+  discount       Decimal          @default(0) @db.Decimal(15, 2)
+  finalAmount    Decimal          @map("final_amount") @db.Decimal(15, 2)
+  paymentMethod  String?          @map("payment_method") @db.VarChar(100)
+  qrCodeUrl      String?          @map("qr_code_url") @db.VarChar(500)
+  paidAt         DateTime?        @map("paid_at")
+  evidenceId     BigInt?          @map("evidence_id")
+  status         SettlementStatus @default(DRAFT)
+  requestedBy    BigInt?          @map("requested_by")
+  requestedAt    DateTime?        @map("requested_at")
+  confirmedBy    BigInt?          @map("confirmed_by")
+  confirmedAt    DateTime?        @map("confirmed_at")
+  notes          String?          @db.VarChar(500)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  order     Order         @relation(fields: [orderId], references: [orderId])
+  evidence  Evidence?     @relation(fields: [evidenceId], references: [evidenceId])
+  requester InternalUser? @relation("SettlementRequester", fields: [requestedBy], references: [userId])
+  confirmer InternalUser? @relation("SettlementConfirmer", fields: [confirmedBy], references: [userId])
+
+  @@map("settlements")
+}
+
+model Deposit {
+  depositId     BigInt        @id @default(autoincrement()) @map("deposit_id")
+  depositCode   String        @unique @map("deposit_code") @db.VarChar(20)
+  orderId       BigInt        @map("order_id")
+  amount        Decimal       @db.Decimal(15, 2)
+  dueDate       DateTime?     @map("due_date") @db.Date
+  paymentDate   DateTime?     @map("payment_date") @db.Date
+  paymentMethod String?       @map("payment_method") @db.VarChar(100)
+  qrCodeUrl     String?       @map("qr_code_url") @db.VarChar(500)
+  status        DepositStatus @default(PENDING)
+  evidenceId    BigInt?       @map("evidence_id")
+  requestedBy   BigInt        @map("requested_by")
+  approvedBy    BigInt?       @map("approved_by")
+  approvedAt    DateTime?     @map("approved_at")
+  notes         String?       @db.VarChar(500)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  order     Order         @relation(fields: [orderId], references: [orderId])
+  evidence  Evidence?     @relation(fields: [evidenceId], references: [evidenceId])
+  requester InternalUser  @relation("DepositRequester", fields: [requestedBy], references: [userId])
+  approver  InternalUser? @relation("DepositApprover", fields: [approvedBy], references: [userId])
+
+  @@map("deposits")
+}
+
+model CollectedEquipmentReport {
+  reportId      BigInt       @id @default(autoincrement()) @map("report_id")
+  orderId       BigInt       @map("order_id")
+  reportType    ReportType   @map("report_type")
+  transactionId BigInt?      @map("transaction_id")
+  status        ReportStatus @default(SUBMITTED)
+  reportedBy    BigInt       @map("reported_by")
+  confirmedBy   BigInt?      @map("confirmed_by")
+  confirmedAt   DateTime?    @map("confirmed_at")
+  notes         String?      @db.VarChar(500)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  order       Order                @relation(fields: [orderId], references: [orderId])
+  transaction SupplierTransaction? @relation(fields: [transactionId], references: [transactionId])
+  reporter    InternalUser         @relation("ReportReporter", fields: [reportedBy], references: [userId])
+  confirmer   InternalUser?        @relation("ReportConfirmer", fields: [confirmedBy], references: [userId])
+
+  items              CollectedEquipmentReportItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@map("collected_equipment_reports")
+}
+
+model CollectedEquipmentReportItem {
+  cerItemId       BigInt @id @default(autoincrement()) @map("cer_item_id")
+  reportId        BigInt @map("report_id")
+  itemId          BigInt @map("item_id")
+  goodQuantity    Int    @default(0) @map("good_quantity")
+  damagedQuantity Int    @default(0) @map("damaged_quantity")
+  lostQuantity    Int    @default(0) @map("lost_quantity")
+  notes           String? @db.VarChar(255)
+
+  report CollectedEquipmentReport @relation(fields: [reportId], references: [reportId], onDelete: Cascade)
+  item   Item                     @relation(fields: [itemId], references: [itemId])
+
+  @@unique([reportId, itemId], name: "uq_cer_item")
+  @@map("collected_equipment_report_items")
+}
+
+model InventoryMovement {
+  movementId   BigInt       @id @default(autoincrement()) @map("movement_id")
+  itemId       BigInt       @map("item_id")
+  orderId      BigInt?      @map("order_id")
+  reportId     BigInt?      @map("report_id")
+  movementType MovementType @map("movement_type")
+  quantity     Int
+  performedBy  BigInt       @map("performed_by")
+  notes        String?      @db.VarChar(255)
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  item      Item                      @relation(fields: [itemId], references: [itemId])
+  order     Order?                    @relation(fields: [orderId], references: [orderId])
+  report    CollectedEquipmentReport? @relation(fields: [reportId], references: [reportId])
+  performer InternalUser              @relation(fields: [performedBy], references: [userId])
+
+  @@map("inventory_movements")
+}
+
+model WageRecord {
+  wageId       BigInt     @id @default(autoincrement()) @map("wage_id")
+  wageCode     String     @unique @map("wage_code") @db.VarChar(20)
+  orderId      BigInt     @map("order_id")
+  userId       BigInt     @map("user_id")
+  wageRole     WageRole   @map("wage_role")
+  shifts       Int        @default(1)
+  wageRate     Decimal    @map("wage_rate") @db.Decimal(15, 2)
+  totalWage    Decimal?   @map("total_wage") @db.Decimal(15, 2) // GENERATED ALWAYS AS (shifts * wage_rate) STORED in DB
+  status       WageStatus @default(DRAFT)
+  confirmedBy  BigInt?    @map("confirmed_by")
+  confirmedAt  DateTime?  @map("confirmed_at")
+  notes        String?    @db.VarChar(255)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  order     Order         @relation(fields: [orderId], references: [orderId])
+  user      InternalUser  @relation("WageUser", fields: [userId], references: [userId])
+  confirmer InternalUser? @relation("WageConfirmer", fields: [confirmedBy], references: [userId])
+
+  @@unique([orderId, userId, wageRole], name: "uq_wage_order_user_role")
+  @@map("wage_records")
 }
 ```
-

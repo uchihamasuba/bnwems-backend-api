@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const apiDocsPath = path.join(__dirname, '../documents/Context/docs/api');
+const apiDocsPath = path.join(__dirname, '../documents/docs/api');
 const routesPath = path.join(__dirname, '../src/routes');
 
 // Parse markdown to get all endpoints

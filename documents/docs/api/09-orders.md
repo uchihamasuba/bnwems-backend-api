@@ -1,38 +1,43 @@
-# Sales & Customer Lifecycle: Order Lifecycle & Change Requests
+# Sales & Customer Lifecycle: Order Lifecycle & Warnings
 
 ## Overview
-This module handles **UC 2.11 (Order Lifecycle Management)** and **UC 2.27 (Field Change Request Management)**.
-It manages `Order` and `ChangeRequest` entities from creation to completion.
+This module handles **UC 2.11 (Order Lifecycle Management)**.
+It manages `Order` records, their `OrderItem`s, and `OrderWarning`s from creation to completion. Field changes and alerts are managed via the Order Warning system and direct Order Item adjustments, replacing the old Change Request workflow.
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC11-01`: Required information is missing or invalid.
-- `MSG-UC11-02`: System cannot complete the request.
-- `MSG-UC11-04`: Cannot confirm order without an accepted quotation.
-- `MSG-UC27-01`: Change request requires manager approval.
+- `MSG-UC11-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC11-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC11-04`: Không thể xác nhận đơn hàng khi chưa có báo giá được chấp nhận.
+
+---
 
 ## 1. Order Lifecycle Management (UC 2.11)
 
-### `GET /api/v1/orders`
+### 1. `GET /api/v1/orders`
 - **Use Case:** UC 2.11 - View Order List
-- **Description:** Retrieves a paginated list of orders for operational processing. Manager/Staff access required.
+- **Description:** Retrieves a paginated list of orders for operational processing.
 - **Query Parameters:**
   - `page` (number, default 1)
   - `limit` (number, default 20)
-  - `status` (enum, optional) - DRAFT, QUOTED, CONFIRMED, IN_PROGRESS, COMPLETED
-  - `search` (string, optional) - searches `orderNumber`
-  - `startDate`, `endDate` (string, optional)
+  - `orderStatus` (enum, optional) - Mới, Đã xác nhận, Đang thực hiện, Hoàn thành, Đã hủy
+  - `paymentStatus` (enum, optional) - Chưa thanh toán, Đã cọc, Đã thanh toán
+  - `search` (string, optional) - searches `orderCode`, `eventName`
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-CO-01",
   "data": [
     {
       "orderId": 1,
-      "orderNumber": "ORD-2026-0001",
+      "orderCode": "ORD-001",
       "customerId": 1,
-      "eventStartDate": "2026-10-15T00:00:00Z",
-      "venueAddress": "123 Event Hall",
-      "status": "confirmed",
+      "eventName": "Đám cưới Minh & Lan",
+      "eventDate": "2026-10-15T00:00:00Z",
+      "eventType": "Tiệc cưới",
+      "location": "123 Event Hall",
+      "paymentStatus": "Chưa thanh toán",
+      "orderStatus": "Mới",
       "createdAt": "2026-06-22T10:00:00Z"
     }
   ],
@@ -40,172 +45,175 @@ It manages `Order` and `ChangeRequest` entities from creation to completion.
 }
 ```
 
-### `GET /api/v1/orders/:id`
+### 2. `GET /api/v1/orders/:id`
 - **Use Case:** UC 2.11 - View Order Details
-- **Description:** Retrieves detailed order information including customer, quotation, and related operational data.
+- **Description:** Retrieves detailed order information including items, customer, and associated quotation.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-CO-02",
   "data": {
     "orderId": 1,
-    "orderNumber": "ORD-2026-0001",
+    "orderCode": "ORD-001",
     "customerId": 1,
-    "eventStartDate": "2026-10-15T00:00:00Z",
-    "venueAddress": "123 Event Hall",
-    "status": "confirmed",
-    "customer": {
-      "fullName": "Jane Doe",
-      "phone": "+198765432"
-    },
-    "createdAt": "2026-06-22T10:00:00Z",
-    "updatedAt": "2026-06-22T10:00:00Z"
+    "quotationId": 5,
+    "policyId": 2,
+    "eventName": "Đám cưới Minh & Lan",
+    "eventType": "Tiệc cưới",
+    "eventDate": "2026-10-15T00:00:00Z",
+    "location": "123 Event Hall",
+    "guestCount": 300,
+    "totalAmount": 50000000.00,
+    "paymentStatus": "Chưa thanh toán",
+    "orderStatus": "Mới",
+    "items": [
+      {
+        "orderItemId": 10,
+        "itemId": 1,
+        "itemName": "Loa JBL",
+        "quantity": 2,
+        "unitPrice": 750000.00,
+        "subtotal": 1500000.00,
+        "source": "Kho nội bộ",
+        "preparedQty": 0
+      }
+    ]
   }
 }
 ```
 
-### `POST /api/v1/orders`
+### 3. `POST /api/v1/orders`
 - **Use Case:** UC 2.11 - Create Order
-- **Description:** Creates a new customer order in DRAFT status.
+- **Description:** Creates a new customer order. Can be created directly or from a confirmed Quotation.
 - **Business Rules:**
-  - BR-11-01: Auto-generates unique `orderNumber`.
-  - BR-11-02: `eventDate` must be in the future.
+  - BR-11-01: Auto-generates unique `orderCode`.
 - **Request Body:**
 ```json
 {
   "customerId": 1,
-  "eventStartDate": "2026-10-15T00:00:00Z",
-  "venueAddress": "123 Event Hall"
-}
-```
-- **Response (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Order created successfully.",
-  "data": { "orderId": 1 }
-}
-```
-
-### `PUT /api/v1/orders/:id/confirm`
-- **Use Case:** UC 2.11 - Confirm Order
-- **Description:** Confirms an order after quotation agreement and deposit payment. Triggers inventory reservation.
-- **Business Rules:**
-  - BR-11-03: System checks if there is an `ACCEPTED` quotation. Returns MSG-UC11-04 if missing.
-  - BR-11-04: Transitions status to `CONFIRMED`.
-  - BR-11-05: System triggers automatic inventory reservation logic (UC 2.13).
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Order confirmed.",
-  "data": { "status": "confirmed" }
-}
-```
-
-### `PUT /api/v1/orders/:id/change-date`
-- **Use Case:** UC 2.11 - Change Event Date
-- **Description:** Changes the event date, rechecking inventory availability.
-- **Business Rules:**
-  - BR-11-06: Validates if `newEventDate` is available for all reserved items.
-  - BR-11-07: Applies `DATE_CHANGE` policy if applicable.
-- **Request Body:**
-```json
-{
-  "newEventStartDate": "2026-11-01T00:00:00Z"
-}
-```
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Order date updated."
-}
-```
-
-### `PUT /api/v1/orders/:id/close`
-- **Use Case:** UC 2.11 - Confirm Order Closure
-- **Description:** Reviews all final order data and closes the order.
-- **Business Rules:**
-  - BR-11-08: All payments, settlements, and warehouse returns must be completed before closure.
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Order closed successfully.",
-  "data": { "status": "completed" }
-}
-```
-
-## 2. Field Change Request Management (UC 2.27)
-
-### `GET /api/v1/change-requests`
-- **Use Case:** UC 2.27 - View Change Request List
-- **Description:** Retrieves a paginated list of field change requests, primarily used to build the Manager's pending-approval queue (UC 2.8 Operational Dashboard).
-- **Query Parameters:**
-  - `orderId` (string, optional)
-  - `status` (enum, optional) - pending, approved, rejected
-  - `page` (number, default 1)
-  - `limit` (number, default 20)
-- **Response (200 OK):**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "changeRequestId": 1,
-      "orderId": 1,
-      "type": "add",
-      "items": [
-        { "catalogItemId": 1, "quantity": 1, "action": "add" }
-      ],
-      "status": "pending",
-      "createdAt": "2026-06-24T09:00:00Z"
-    }
-  ],
-  "meta": { "page": 1, "limit": 20, "totalCount": 2 }
-}
-```
-
-### `POST /api/v1/orders/:id/change-requests`
-- **Use Case:** UC 2.27 - Record Change Request
-- **Description:** Submits an on-site change request (add/remove items).
-- **Request Body:**
-```json
-{
-  "type": "add",
+  "quotationId": 5,
+  "policyId": 2,
+  "eventName": "Đám cưới Minh & Lan",
+  "eventType": "Tiệc cưới",
+  "eventDate": "2026-10-15T00:00:00Z",
+  "location": "123 Event Hall",
+  "guestCount": 300,
   "items": [
-    { "catalogItemId": 1, "quantity": 1, "action": "add" }
+    {
+      "itemId": 1,
+      "quantity": 2,
+      "unitPrice": 750000.00,
+      "source": "Kho nội bộ"
+    }
   ]
 }
 ```
-- **Payload Rules:**
-  - `type`: Overall request type (`add`, `remove`, `replace`).
-  - `action`: Specific item action. For `type="replace"`, the `items` array must contain both the removed items (`action="remove"`) and the new items (`action="add"`).
-  - *Note: Pricing adjustments are calculated automatically upon approval and added to the final settlement.*
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "message": "Change request submitted for approval."
+  "code": "MSG-CO-03",
+  "message": "Tạo đơn hàng thành công.",
+  "data": { "orderId": 1, "orderCode": "ORD-001" }
 }
 ```
 
-### `PUT /api/v1/change-requests/:id/approve`
-- **Use Case:** UC 2.27 - Approve Change Request
-- **Description:** Approves or rejects a field change request.
-- **Business Rules:**
-  - BR-27-01: Approval updates `Order` financial totals.
+### 4. `PUT /api/v1/orders/:id/status`
+- **Use Case:** UC 2.11 - Update Order Status
+- **Description:** Updates the order status (e.g. from Mới to Đã xác nhận).
 - **Request Body:**
 ```json
 {
-  "status": "approved"
+  "orderStatus": "Đã xác nhận",
+  "notes": "Đã nhận cọc và duyệt hợp đồng"
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Change request status updated."
+  "code": "MSG-CO-04",
+  "message": "Cập nhật trạng thái đơn hàng thành công."
+}
+```
+
+### 5. `PUT /api/v1/orders/:id/items`
+- **Use Case:** Update Order Items (Field Changes)
+- **Description:** Updates the items for an order. If an order is already in progress, changes may reflect on-site requests.
+- **Request Body:**
+```json
+{
+  "items": [
+    {
+      "itemId": 1,
+      "quantity": 3,
+      "unitPrice": 750000.00,
+      "source": "Kho nội bộ"
+    }
+  ]
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-CO-05",
+  "message": "Cập nhật danh sách thiết bị thành công."
+}
+```
+
+---
+
+## 2. Order Warnings (Alerts & Field Issues)
+
+### 6. `GET /api/v1/orders/:id/warnings`
+- **Use Case:** View Order Warnings
+- **Description:** Retrieves the list of warnings or alerts submitted for a specific order.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-CO-06",
+  "data": [
+    {
+      "warningId": 1,
+      "orderId": 1,
+      "content": "Khách yêu cầu thêm 1 màn chiếu",
+      "isResolved": false,
+      "createdAt": "2026-06-22T10:00:00Z"
+    }
+  ]
+}
+```
+
+### 7. `POST /api/v1/orders/:id/warnings`
+- **Use Case:** Submit Order Warning
+- **Description:** Field staff can submit a warning if there are on-site issues (e.g., changes requested by customer, site not ready).
+- **Request Body:**
+```json
+{
+  "content": "Khách yêu cầu thêm 1 màn chiếu"
+}
+```
+- **Response (201 Created):**
+```json
+{
+  "success": true,
+  "code": "MSG-CO-07",
+  "message": "Tạo cảnh báo thành công."
+}
+```
+
+### 8. `PUT /api/v1/warnings/:id/resolve`
+- **Use Case:** Resolve Warning
+- **Description:** Manager reviews the warning, takes necessary actions (e.g., updating order items or settlement), and marks it as resolved.
+- **Request Body:** None
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-CO-08",
+  "message": "Đã xử lý cảnh báo thành công."
 }
 ```

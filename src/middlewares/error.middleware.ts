@@ -20,13 +20,20 @@ export const errorMiddleware = (
   req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  next: NextFunction
+  next: NextFunction,
 ) => {
   let statusCode = 500;
   let message = 'Internal Server Error';
   let code = 'SERVER_ERROR';
 
-  console.log('DEBUG ERR:', err, 'isOperational:', (err as any).isOperational, 'statusCode:', (err as any).statusCode);
+  console.log(
+    'DEBUG ERR:',
+    err,
+    'isOperational:',
+    (err as any).isOperational,
+    'statusCode:',
+    (err as any).statusCode,
+  );
 
   if (err instanceof AppError || (err && typeof err === 'object' && (err as any).isOperational)) {
     statusCode = (err as AppError).statusCode || 500;

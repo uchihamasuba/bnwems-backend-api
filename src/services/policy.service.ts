@@ -1,66 +1,56 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
+import { PolicyType } from '@prisma/client';
 
 class PolicyService {
-  public async getPolicies(policyType?: string, isActiveParam?: string) {
+  public async getPolicies(policyType?: PolicyType, isActive?: boolean) {
     const whereClause: any = {};
     if (policyType) whereClause.policyType = policyType;
-    if (isActiveParam !== undefined) {
-      whereClause.status = isActiveParam === 'true' ? 'active' : 'inactive';
-    }
+    if (isActive !== undefined) whereClause.isActive = isActive;
 
     const policies = await prisma.businessPolicy.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
     });
 
-    return policies.map(p => ({
-      ...p,
-      rules: p.config // Map config back to rules for API compatibility
-    }));
+    return { policies, totalCount: policies.length };
   }
 
-  public async createPolicy(data: any, actionUserId: string) {
-    const { policyType, name, rules } = data;
-
-    const newPolicy = await prisma.businessPolicy.create({
-      data: { 
-        policyType, 
-        name, 
-        config: rules,
-        effectiveFrom: new Date(), // default to now
-        createdBy: BigInt(actionUserId)
-      },
+  public async createPolicy(data: any) {
+    const existing = await prisma.businessPolicy.findUnique({
+      where: { policyCode: data.policyCode },
     });
+    if (existing) {
+      throw new AppError('Mã chính sách đã tồn tại', 400);
+    }
 
-    await prisma.auditLog.create({
+    return await prisma.businessPolicy.create({
       data: {
-        userId: BigInt(actionUserId),
-        action: 'CREATE_POLICY',
-        entityType: 'BusinessPolicy',
-        entityId: newPolicy.policyId,
+        policyCode: data.policyCode,
+        policyName: data.policyName,
+        policyType: data.policyType,
+        policyValue: data.policyValue,
+        unit: data.unit,
+        description: data.description,
       },
     });
-
-    return newPolicy;
   }
 
-  public async updatePolicy(id: string, rules: any, actionUserId: string) {
-    const policy = await prisma.businessPolicy.findUnique({ where: { policyId: BigInt(id) } });
-    if (!policy) throw new AppError('Policy not found', 404);
-
-    await prisma.businessPolicy.update({
+  public async updatePolicy(id: string, data: any) {
+    const existing = await prisma.businessPolicy.findUnique({
       where: { policyId: BigInt(id) },
-      data: { config: rules },
     });
+    if (!existing) throw new AppError('Không tìm thấy chính sách', 404);
 
-    await prisma.auditLog.create({
-      data: {
-        userId: BigInt(actionUserId),
-        action: 'UPDATE_POLICY',
-        entityType: 'BusinessPolicy',
-        entityId: BigInt(id),
-      },
+    const updateData: any = {};
+    if (data.policyValue !== undefined) updateData.policyValue = data.policyValue;
+    if (data.unit !== undefined) updateData.unit = data.unit;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.description !== undefined) updateData.description = data.description;
+
+    return await prisma.businessPolicy.update({
+      where: { policyId: BigInt(id) },
+      data: updateData,
     });
   }
 }

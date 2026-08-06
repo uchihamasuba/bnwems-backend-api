@@ -2,123 +2,155 @@
 
 ## Overview
 This module handles **UC 2.19 (Payment & Settlement Management)** and **UC 2.30 (Field Settlement Support)**.
-It deals with financial transactions (`Payment`) and the final reconciliation of an order (`Settlement`).
+It deals with advance payments (`Deposit`) and the final reconciliation of an order (`Settlement`).
 
 ## Standard Error Codes (SRS Mapping)
-- `MSG-UC19-01`: Required information is missing or invalid.
-- `MSG-UC19-02`: System cannot complete the request.
-- `MSG-UC19-04`: Payment amount exceeds total order amount.
-- `MSG-UC30-01`: Settlement discrepancy detected.
+- `MSG-UC19-01`: Thông tin bắt buộc bị thiếu hoặc không hợp lệ.
+- `MSG-UC19-02`: Hệ thống không thể hoàn thành yêu cầu.
+- `MSG-UC19-04`: Số tiền đặt cọc/quyết toán không hợp lệ.
+- `MSG-UC30-01`: Phát hiện chênh lệch quyết toán.
 
-## 1. Payment Management (UC 2.19)
+---
 
-### `GET /api/v1/orders/:id/payments`
-- **Use Case:** UC 2.19 - Track Payments
-- **Description:** Retrieves all payment records associated with an order.
+## 1. Deposit Management (UC 2.19)
+
+### 1. `GET /api/v1/orders/:id/deposits`
+- **Use Case:** View Deposits
+- **Description:** Retrieves all deposit records associated with an order.
 - **Response (200 OK):**
 ```json
 {
   "success": true,
+  "code": "MSG-PM-01",
   "data": [
     {
-      "paymentId": 1,
-      "amount": 500.00,
-      "paymentType": "deposit",
-      "paymentMethod": "bank_transfer",
-      "status": "completed",
-      "paymentDate": "2026-06-22T10:00:00Z",
-      "evidences": [{ "fileUrl": "https://storage.example.com/receipt.jpg" }]
+      "depositId": 1,
+      "orderId": 100,
+      "amount": 5000000.00,
+      "depositDate": "2026-06-22T10:00:00Z",
+      "paymentMethod": "Chuyển khoản",
+      "status": "Đã thanh toán",
+      "receivedBy": 2,
+      "notes": "Khách chuyển khoản VCB"
     }
   ]
 }
 ```
 
-### `POST /api/v1/orders/:id/payments/request`
-- **Use Case:** UC 2.19 - Create Deposit Payment Request
-- **Description:** Manager creates a payment request (e.g., Deposit) and generates payment instructions.
+### 2. `POST /api/v1/orders/:id/deposits`
+- **Use Case:** UC 2.19 - Create Deposit
+- **Description:** Records a deposit payment for an order.
 - **Business Rules:**
-  - BR-19-01: Auto-calculates required deposit based on `BusinessPolicy`.
+  - BR-19-01: Auto-calculates required deposit based on `BusinessPolicy` (if any).
+  - BR-19-02: After a successful deposit, the Order `paymentStatus` may update to `Đã cọc`.
 - **Request Body:**
 ```json
 {
-  "amount": 500.00,
-  "paymentType": "deposit",
-  "paymentMethod": "vnpay_qr"
+  "amount": 5000000.00,
+  "depositDate": "2026-06-22T10:00:00Z",
+  "paymentMethod": "Chuyển khoản",
+  "status": "Đã thanh toán",
+  "notes": "Khách chuyển khoản VCB"
 }
 ```
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "message": "Payment request created.",
-  "data": { "paymentRequestId": 1, "paymentUrl": "vnpay-qr-url" }
+  "code": "MSG-PM-02",
+  "message": "Ghi nhận tiền cọc thành công.",
+  "data": { "depositId": 1 }
 }
 ```
 
-### `PUT /api/v1/payments/:id/confirm`
-- **Use Case:** UC 2.19 - Confirm Deposit / Confirm Final Payment
-- **Description:** Manager confirms a payment manually after verifying evidence.
-- **Business Rules:**
-  - BR-19-02: Updates payment status to `COMPLETED`.
-  - BR-19-03: Triggers order status change (e.g. `DEPOSIT_PAID`) if applicable.
+### 3. `PUT /api/v1/deposits/:id`
+- **Use Case:** UC 2.19 - Update Deposit Status
+- **Description:** Manager confirms or updates a deposit record.
 - **Request Body:**
 ```json
 {
-  "status": "completed",
-  "evidenceUrl": "https://storage.example.com/receipt.jpg"
+  "status": "Đã thanh toán"
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Payment confirmed successfully."
+  "code": "MSG-PM-03",
+  "message": "Cập nhật trạng thái tiền cọc thành công."
 }
 ```
 
+---
+
 ## 2. Settlement Management (UC 2.19 & UC 2.30)
 
-### `POST /api/v1/orders/:id/settlement`
-- **Use Case:** UC 2.30 - Record Settlement (Field)
-- **Description:** Leader staff records on-site settlement info, including extra charges or compensation.
+### 4. `GET /api/v1/orders/:id/settlement`
+- **Use Case:** UC 2.30 - View Settlement (Field)
+- **Description:** Retrieves the existing settlement record for an order.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "code": "MSG-PM-04",
+  "data": {
+    "settlementId": 1,
+    "orderId": 100,
+    "settlementDate": "2026-10-16T15:00:00Z",
+    "totalAmount": 50000000.00,
+    "depositAmount": 10000000.00,
+    "deductionAmount": 2000000.00,
+    "finalAmount": 38000000.00,
+    "status": "Chưa quyết toán",
+    "notes": "Trừ 2tr tiền bồi thường hư hỏng đồ"
+  }
+}
+```
+
+### 5. `POST /api/v1/orders/:id/settlement`
+- **Use Case:** UC 2.30 - Record Settlement
+- **Description:** Records the final settlement data, including deductions (e.g., from damages tracked in `CollectedEquipmentReport`).
 - **Business Rules:**
-  - BR-30-01: `remainingAmount` = `originalValue` + `additionalFees` - `compensation` - `paidAmount`.
-  - BR-30-02: Requires evidence (e.g. signed agreement) if `additionalFees` or `compensation` > 0.
+  - BR-30-01: `finalAmount` = `totalAmount` - `depositAmount` - `deductionAmount`.
 - **Request Body:**
 ```json
 {
-  "originalValue": 1500.00,
-  "additionalFees": 100.00,
-  "compensation": 0,
-  "paidAmount": 500.00,
-  "remainingAmount": 1100.00,
-  "evidences": [{ "fileUrl": "https://storage.example.com/agreement.jpg" }]
+  "settlementDate": "2026-10-16T15:00:00Z",
+  "totalAmount": 50000000.00,
+  "depositAmount": 10000000.00,
+  "deductionAmount": 2000000.00,
+  "finalAmount": 38000000.00,
+  "status": "Chưa quyết toán",
+  "notes": "Trừ 2tr tiền bồi thường hư hỏng đồ"
 }
 ```
 - **Response (201 Created):**
 ```json
 {
   "success": true,
-  "message": "Field settlement recorded.",
+  "code": "MSG-PM-05",
+  "message": "Tạo biên bản quyết toán thành công.",
   "data": { "settlementId": 1 }
 }
 ```
 
-### `PUT /api/v1/settlements/:id/confirm`
+### 6. `PUT /api/v1/settlements/:id/confirm`
 - **Use Case:** UC 2.19 - Confirm Settlement
-- **Description:** Manager reviews and confirms the final settlement amount after the event.
+- **Description:** Manager reviews and confirms the final settlement after the customer has paid the `finalAmount`.
 - **Business Rules:**
-  - BR-19-05: Confirms the `Settlement` record, preparing the order for `COMPLETED` status.
+  - BR-19-05: Updates `Settlement` status to `Đã quyết toán`. Triggers parent `Order` paymentStatus to `Đã thanh toán`.
 - **Request Body:**
 ```json
 {
-  "status": "confirmed"
+  "status": "Đã quyết toán",
+  "notes": "Khách đã thanh toán phần còn lại"
 }
 ```
 - **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Settlement confirmed."
+  "code": "MSG-PM-06",
+  "message": "Xác nhận quyết toán thành công."
 }
 ```

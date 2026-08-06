@@ -10,7 +10,13 @@ export const getWagesSummary = async (req: Request, res: Response, next: NextFun
     const userId = req.query.userId as string;
     const status = req.query.status as string;
 
-    const { wages, totalCount } = await wageService.getWagesSummary(page, limit, period, userId, status);
+    const { wages, totalCount } = await wageService.getWagesSummary(
+      page,
+      limit,
+      period,
+      userId,
+      status,
+    );
 
     res.status(200).json({
       success: true,
@@ -32,7 +38,7 @@ export const confirmWage = async (req: AuthRequest, res: Response, next: NextFun
 
     res.status(200).json({
       success: true,
-      message: 'Wage summary confirmed.',
+      message: 'Xác nhận bảng lương thành công.',
     });
   } catch (error) {
     next(error);

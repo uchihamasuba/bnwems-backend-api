@@ -1,16 +1,50 @@
 import { Router } from 'express';
-import * as inventoryController from '../controllers/inventory.controller';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
+import { inventoryController } from '../controllers/inventory.controller';
+import { validate } from '../middlewares/validate.middleware';
+import {
+  verifyToken as protect,
+  authorizeRoles as restrictTo,
+} from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
+import {
+  getInventorySchema,
+  adjustInventorySchema,
+  getInventoryMovementsSchema,
+  createReturnReportSchema,
+  confirmReturnReportSchema,
+} from '../validators/inventory.validator';
 
 const router = Router();
 
-router.use(authenticate);
+router.get('/', validate(getInventorySchema), inventoryController.getInventory);
 
-import { validate } from '../middlewares/validate.middleware';
-import { getInventorySchema, checkAvailabilitySchema, reserveInventorySchema } from '../validators/inventory.validator';
+router.post(
+  '/adjust',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(adjustInventorySchema),
+  inventoryController.adjustInventory,
+);
 
-router.get('/', authorizeRoles('ADMIN', 'MANAGER', 'LEADER_STAFF'), validate(getInventorySchema), inventoryController.getInventory);
-router.get('/availability', authorizeRoles('ADMIN', 'MANAGER'), validate(checkAvailabilitySchema), inventoryController.checkAvailability);
-router.post('/reserve', authorizeRoles('ADMIN', 'MANAGER'), validate(reserveInventorySchema), inventoryController.reserveInventory);
+router.get(
+  '/movements',
+  validate(getInventoryMovementsSchema),
+  inventoryController.getInventoryMovements,
+);
+
+router.post(
+  '/return-reports',
+  protect,
+  validate(createReturnReportSchema),
+  inventoryController.createReturnReport,
+);
+
+router.put(
+  '/return-reports/:id/confirm',
+  protect,
+  restrictTo(Role.ADMIN, Role.MANAGER),
+  validate(confirmReturnReportSchema),
+  inventoryController.confirmReturnReport,
+);
 
 export default router;
