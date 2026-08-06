@@ -15,6 +15,7 @@ import dashboardRoutes from './dashboard.route';
 import evidenceRoutes from './evidence.route';
 import reportsRoutes from './reports.route';
 import managerRoutes from './manager.route';
+import uploadRoutes from './upload.route';
 
 import notificationRoutes from './notification.route';
 
@@ -57,5 +58,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/evidence', evidenceRoutes);
 router.use('/reports', reportsRoutes);
 router.use('/manager', managerRoutes);
+router.use('/upload', uploadRoutes);
 
 export default router;
