@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import helmet from 'helmet';
 import { env } from './config/env';
 import routes from './routes';
 
@@ -12,6 +13,7 @@ Object.defineProperty(BigInt.prototype, 'toJSON', {
   },
 });
 
+app.use(helmet());
 app.use(express.json());
 
 // Enable CORS
