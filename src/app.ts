@@ -29,6 +29,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../../public/uploads'))
 
 import { errorMiddleware } from './middlewares/error.middleware';
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/v1', routes);
 
 // Error handling
