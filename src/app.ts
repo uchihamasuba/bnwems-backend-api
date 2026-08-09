@@ -36,6 +36,14 @@ app.get('/health', (req, res) => {
 
 app.use('/api/v1', routes);
 
+// 404 Not Found handling
+app.use((req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    message: `Route not found: ${req.method} ${req.originalUrl}` 
+  });
+});
+
 // Error handling
 app.use(errorMiddleware);
 
