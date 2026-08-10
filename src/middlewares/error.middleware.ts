@@ -26,14 +26,7 @@ export const errorMiddleware = (
   let message = 'Internal Server Error';
   let code = 'SERVER_ERROR';
 
-  console.log(
-    'DEBUG ERR:',
-    err,
-    'isOperational:',
-    (err as any).isOperational,
-    'statusCode:',
-    (err as any).statusCode,
-  );
+
 
   if (err instanceof AppError || (err && typeof err === 'object' && (err as any).isOperational)) {
     statusCode = (err as AppError).statusCode || 500;
